@@ -44,7 +44,6 @@ def create_graph_flow():
     )
 
     # 워커 노드들은 일을 끝내고 항상 main_loop로 돌아온다
-    graph.add_edge("problem_intro", "session_manager")
     graph.add_edge("problem_intro_agent", "session_manager")
     graph.add_edge("problem_solving_eval_agent", "session_manager")
     graph.add_edge("hint_agent","session_manager")

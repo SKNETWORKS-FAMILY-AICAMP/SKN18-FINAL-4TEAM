@@ -22,9 +22,9 @@ requires = ["setuptools>=80.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["service"]
+packages = ["interview_engine"]
 [tool.setuptools.package-dir]
-service = "service"
+interview_engine = "interview_engine"
 
 
 [tool.setuptools.package-data]

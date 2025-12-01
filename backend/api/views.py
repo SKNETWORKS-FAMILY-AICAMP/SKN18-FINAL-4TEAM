@@ -1,16 +1,13 @@
-import json
-import sys
-from pathlib import Path
-from django.http import JsonResponse, HttpResponseBadRequest
-from django.views.decorators.csrf import csrf_exempt
-from interview_engine.graph import create_graph_flow
+from django.conf import settings
+from django.http import JsonResponse
+from rest_framework import status
+from rest_framework.response import Response
+from rest_framework.views import APIView
 
-# Ensure project root (where stt_client.py lives) is on sys.path
-ROOT_DIR = Path(__file__).resolve().parents[2]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.append(str(ROOT_DIR))
-
-from backend.tts_client import generate_interview_audio
+from .email_utils import send_verification_code, verify_code
+from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
+from .models import AuthIdentity, User
+from .serializers import SignupSerializer
 
 
 def health(request):
@@ -48,50 +45,91 @@ def roadmap(request):
     return JsonResponse(data)
 
 
-@csrf_exempt
-def start_livecoding(request):
-    if request.method != "POST":
-        return HttpResponseBadRequest("POST only")
+class SignupView(APIView):
+    def post(self, request):
+        serializer = SignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
 
-    try:
-        payload = json.loads(request.body or "{}")
-    except json.JSONDecodeError:
-        payload = {}
+        return Response(
+            {
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.phone_number,
+                "birthdate": user.birthdate,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
-    user_name = payload.get("user_name") or "지원자"
-    problem_description = payload.get("problem_description") or ""
 
-    initial_state = {
-        "user_name": user_name,
-        "problem_description": problem_description,
-        "event_type": "init",
-    }
+class EmailSendView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        if not email:
+            return Response({"detail": "이메일을 입력해 주세요."}, status=status.HTTP_400_BAD_REQUEST)
+        code, expires_at = send_verification_code(email)
+        return Response({"email": email, "expires_at": expires_at})
 
-    graph = create_graph_flow()
-    final_state = graph.invoke(initial_state)
 
-    question_text = final_state.get("current_question_text", "")
+class EmailVerifyView(APIView):
+    def post(self, request):
+        email = request.data.get("email")
+        code = request.data.get("code")
+        if not email or not code:
+            return Response({"detail": "이메일과 인증코드를 입력해 주세요."}, status=status.HTTP_400_BAD_REQUEST)
+        ok, msg = verify_code(email, code)
+        if not ok:
+            return Response({"detail": msg}, status=status.HTTP_400_BAD_REQUEST)
+        return Response({"email": email, "verified": True, "message": msg})
 
-    # Run TTS after graph execution
-    tts_chunks = []
-    tts_first_audio_base64 = None
-    tts_error = None
-    if question_text:
+
+class GoogleAuthView(APIView):
+    def post(self, request):
+        code = request.data.get("code")
+        if not code:
+            return Response({"detail": "code가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        redirect_uri = settings.GOOGLE_REDIRECT_URI
         try:
-            for chunk in generate_interview_audio(question_text):
-                tts_chunks.append(chunk)
-            first_with_audio = next((c for c in tts_chunks if c.get("audio_base64")), None)
-            if first_with_audio:
-                tts_first_audio_base64 = first_with_audio["audio_base64"]
-        except Exception as e:
-            tts_error = str(e)
+            token_data = exchange_code_for_tokens(code, redirect_uri)
+            userinfo = fetch_userinfo(token_data["access_token"])
+        except GoogleOAuthError as e:
+            return Response({"detail": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-    response = {
-        "question_text": question_text,
-        "tts_first_audio_base64": tts_first_audio_base64,
-        "tts_audio_chunks": tts_chunks,
-        "await_human": final_state.get("await_human", False),
-        "error": final_state.get("problem_intro_error") or tts_error,
-    }
+        sub = userinfo["sub"]
+        email = userinfo.get("email")
+        name = userinfo.get("name") or "Google User"
 
-    return JsonResponse(response)
+        auth_identity = AuthIdentity.objects.filter(provider="google", provider_user_id=sub).select_related("user").first()
+        if auth_identity:
+            user = auth_identity.user
+        else:
+            # 기존 이메일로 유저 있으면 연결, 없으면 생성
+            user = User.objects.filter(email=email).first()
+            if not user:
+                user = User.objects.create(
+                    email=email,
+                    name=name,
+                    password_hash=None,
+                    phone_number=None,
+                    birthdate=None,
+                    created_at=timezone.now(),
+                    updated_at=timezone.now(),
+                )
+            AuthIdentity.objects.create(
+                user=user,
+                provider="google",
+                provider_user_id=sub,
+                created_at=timezone.now(),
+            )
+
+        # TODO: JWT 발급 로직 연결 (지금은 user 데이터만 반환)
+        return Response(
+            {
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "provider": "google",
+            }
+        )

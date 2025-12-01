@@ -1,5 +1,14 @@
 <template>
   <div class="session-page">
+    <AntiCheatAlert
+      :visible="antiCheatAlert.visible"
+      :state="antiCheatAlert.state"
+      :title="antiCheatAlert.title"
+      :description="antiCheatAlert.description"
+      :level="antiCheatAlert.level"
+      :timestamp="antiCheatAlert.timestamp"
+      @dismiss="resetAntiCheatState"
+    />
     <header class="session-header">
       <h1>JobTory Live Coding</h1>
       <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
@@ -74,7 +83,9 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
+import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
@@ -85,6 +96,12 @@ const languageTemplates = {
 
 const selectedLanguage = ref("c");
 const code = ref(languageTemplates[selectedLanguage.value]);
+
+const {
+  alert: antiCheatAlert,
+  setState: setAntiCheatState,
+  resetState: resetAntiCheatState
+} = useAntiCheatStatus();
 
 watch(selectedLanguage, (lang) => {
   code.value = languageTemplates[lang];
@@ -123,11 +140,43 @@ const cmMode = computed(() => {
 const videoRef = ref(null);
 const cameraError = ref("");
 let mediaStream = null;
+let antiCheatTimer = null;
+
+const clearAntiCheatTimer = () => {
+  if (antiCheatTimer) {
+    clearTimeout(antiCheatTimer);
+    antiCheatTimer = null;
+  }
+};
+
+const showAntiCheat = (stateKey, detail) => {
+  clearAntiCheatTimer();
+  setAntiCheatState(stateKey, { detail, timestamp: Date.now() });
+  antiCheatTimer = setTimeout(() => {
+    resetAntiCheatState();
+    antiCheatTimer = null;
+  }, 7000);
+};
+
+const handleVisibilityChange = () => {
+  if (document.visibilityState === "hidden") {
+    showAntiCheat("tabSwitch", "시험 화면을 벗어났습니다.");
+  }
+};
+
+const handleWindowBlur = () => {
+  showAntiCheat("windowBlur", "다른 창으로 이동이 감지되었습니다.");
+};
+
+const handlePaste = () => {
+  showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 감지되었습니다.");
+};
 
 onMounted(async () => {
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
+      showAntiCheat("cameraBlocked", cameraError.value);
       return;
     }
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -140,8 +189,13 @@ onMounted(async () => {
     }
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
+    showAntiCheat("cameraBlocked", cameraError.value);
     console.error(err);
   }
+
+  window.addEventListener("blur", handleWindowBlur);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  document.addEventListener("paste", handlePaste);
 });
 
 onBeforeUnmount(() => {
@@ -149,6 +203,10 @@ onBeforeUnmount(() => {
     mediaStream.getTracks().forEach((t) => t.stop());
     mediaStream = null;
   }
+  window.removeEventListener("blur", handleWindowBlur);
+  document.removeEventListener("visibilitychange", handleVisibilityChange);
+  document.removeEventListener("paste", handlePaste);
+  clearAntiCheatTimer();
 });
 </script>
 

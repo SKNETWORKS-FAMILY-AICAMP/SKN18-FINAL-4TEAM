@@ -182,7 +182,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 .hero {
   position: relative;
-  padding: 80px 56px 120px;
+  padding: 100px 56px 150px;
 }
 
 .hero-inner {
@@ -258,7 +258,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .email-banner {
   box-sizing: border-box;
   background: #caa3b1;
-  padding: 60px 24px;
+  padding: 80px 50px;
   display: flex;
   justify-content: center;
 }
@@ -269,17 +269,17 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   margin: 0 auto;
   color: #0b1120;
   text-align: center;
-  display: flex;
+  display: grid;
   flex-direction: column;
   align-items: center;
-  gap: 12px;
+  gap: 25px;
 }
 
 .email-label {
   margin: 0;
   font-family: "Inter";
   font-style: normal;
-  font-weight: 200;
+  font-weight: 200; /* ExtraLight */
   font-size: 24px;
   line-height: 1.4;
   color: #000000;
@@ -299,7 +299,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   font-family: "Inter";
   font-style: normal;
   font-weight: 900;
-  font-size: 96px;
+  font-size: 100px;
   line-height: 1;
   color: #000000;
 }
@@ -307,12 +307,12 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .insights {
   background: #1f252d;
   color: #f9fafb;
-  padding: 120px 40px 140px;
+  padding: 100px 40px 170px;
 }
 
 .insights-header {
   max-width: 1280px;
-  margin: 0 auto 80px;
+  margin: 0 auto 50px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 36px;
@@ -353,7 +353,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 .insight-card {
   border-radius: 18px;
-  padding: 100px 10px 100px;
+  padding: 100px 10px 20px;
   display: flex;
   flex-direction: column;
   justify-content: space-between;
@@ -441,7 +441,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   }
 
   .email-logo {
-    font-size: 48px;
+    font-size: 40px;
   }
 
   .insights-header {

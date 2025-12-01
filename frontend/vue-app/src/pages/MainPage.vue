@@ -305,47 +305,47 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .insights {
-  background: #111827;
+  background: #1f252d;
   color: #f9fafb;
-  padding: 72px 24px 96px;
+  padding: 120px 40px 140px;
 }
 
 .insights-header {
-  max-width: 1080px;
-  margin: 0 auto 40px;
+  max-width: 1280px;
+  margin: 0 auto 80px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
-  gap: 24px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
+  gap: 36px;
+  align-items: start;
   text-align: left;
 }
 
 .insights-title {
-  margin: 10;
+  margin: 50;
   font-family: "SF Pro", sans-serif;
   font-style: normal;
-  font-weight: 700;
-  font-size: 66px;
-  line-height: 1.25;
-  color: #ffffff;
+  font-weight: 800;
+  font-size: 56px;
+  line-height: 1.54;
+  color: #f9fafb;
 }
 
 .insights-description {
-  margin: 0;
-  max-width: 640px;
+  margin: 125px 0 0;
+  max-width: 800px;
   font-family: 'SF Pro', sans-serif;
-  font-weight: 300;
-  font-size: 22px;
-  line-height: 1.6;
-  color: #e5e7eb;
+  font-weight: 400;
+  font-size: 20px;
+  line-height: 1.7;
+  color: #cbd5e1;
 }
 
 .insights-cards {
-  max-width: 1080px;
+  max-width: 1280px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 20px;
+  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+  gap: 32px;
   justify-items: center;
 }
 
@@ -353,59 +353,64 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 .insight-card {
   border-radius: 18px;
-  padding: 20px 18px;
+  padding: 100px 10px 100px;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: space-between;
   align-items: center;
   text-align: center;
-  min-height: 260px;
+  min-height: 650px;
   color: #111827;
   width: 100%;
-  max-width: 320px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  background: #f9fafb;
+  max-width: 420px;
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.24);
+  border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
 .insight-card h4 {
-  margin-bottom: 8px;
-  font-size: 16px;
+  margin-bottom: 30px;
+  font-size: 40px;
 }
 
 .insight-card p {
-  margin: 0;
-  font-size: 14px;
+  margin: 30px;
+  font-size: 20px;
 }
 
 .card-heading {
-  margin: 0 0 10px;
-  font-size: 20px;
-  font-weight: 700;
+  margin: 0 0 18px;
+  font-size: 32px;
+  font-weight: 800;
   letter-spacing: 0.01em;
   color: #0f172a;
 }
 
 .card-copy {
-  margin: 0;
-  font-size: 15px;
-  line-height: 1.6;
+  margin: 0px;
+  font-size: 20px;
+  line-height: 1.7;
   color: #1f2937;
 }
 
 .insight-card .hero-image-wrap {
-  margin-top: 16px;
+  margin-top: 32px;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  width: 100%;
+  min-height: 320px;
 }
 
 .insight-card .hero-image {
-  max-width: 100%;
+  max-width: 320px;
   box-shadow: none;
   border: none;
   border-radius: 12px;
+  object-fit: contain;
 }
 
 .card-one {
-  background: #f2c3d3;
+  background: #f9c5d5;
 }
 
 .card-two {

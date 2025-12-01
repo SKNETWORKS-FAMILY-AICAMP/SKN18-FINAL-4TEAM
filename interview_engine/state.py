@@ -1,20 +1,23 @@
 from typing import TypedDict, Literal, List, Dict, Any, Optional
 
-class InterviewState(TypedDict):
+class InterviewState(TypedDict, total=False):
+    """
+    Interview session state for langgraph.
+    All fields are optional (total=False) to allow flexible state updates.
+    """
     # HITL 용
-    await_human = bool
-    event_type = Literal["init", 'strategy_submit']
+    await_human: bool
+    event_type: str
     
     # 처음 input
-    username = str
+    user_name: str
     
     # 문제 
-    problem_description = str
+    problem_description: str
     
     # 1번 agent
-    problem_intro_error = str
-    current_question_text =str
+    problem_intro_error: str
+    current_question_text: str
     
     # 2번 agent
     
-    pass

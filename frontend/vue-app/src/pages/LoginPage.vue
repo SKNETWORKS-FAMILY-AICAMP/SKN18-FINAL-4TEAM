@@ -62,6 +62,16 @@
             {{ errorMessage }}
           </p>
 
+          <div class="helper-row">
+            <button type="button" class="link-button subtle" @click="isFindIdOpen = true">
+              아이디 찾기
+            </button>
+            <span class="divider-dot">·</span>
+            <button type="button" class="link-button subtle" @click="isFindPasswordOpen = true">
+              비밀번호 찾기
+            </button>
+          </div>
+
           <div class="divider">
             <span></span>
             <p>or</p>
@@ -90,13 +100,71 @@
             <span>Continue with Google</span>
           </button>
 
-          <p class="helper">
-            Don't have an account yet?
-            <RouterLink to="/signup" class="helper-link">Register for free</RouterLink>
-          </p>
-        </form>
-      </section>
+      <p class="helper">
+        Don't have an account yet?
+        <RouterLink to="/signup" class="helper-link">Register for free</RouterLink>
+      </p>
+    </form>
+  </section>
     </main>
+
+    <div v-if="isFindIdOpen" class="modal-backdrop">
+      <div class="modal-box">
+        <h2 class="modal-title">아이디 찾기</h2>
+        <p class="modal-subtitle">회원가입 시 사용한 이메일을 입력해 주세요.</p>
+        <form class="modal-form" @submit.prevent="handleFindId">
+          <input
+            v-model="findIdEmail"
+            type="email"
+            class="modal-input"
+            placeholder="username@gmail.com"
+          />
+          <div class="modal-actions">
+            <button type="button" class="modal-button ghost" @click="closeFindId">
+              취소
+            </button>
+            <button type="submit" class="modal-button primary">
+              아이디 찾기
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div v-if="isFindPasswordOpen" class="modal-backdrop">
+      <div class="modal-box">
+        <h2 class="modal-title">비밀번호 찾기</h2>
+        <p class="modal-subtitle">이름, 아이디, 이메일을 입력하면 임시 비밀번호를 보내드립니다.</p>
+        <form class="modal-form" @submit.prevent="handleFindPassword">
+          <input
+            v-model="findPwName"
+            type="text"
+            class="modal-input"
+            placeholder="이름"
+          />
+          <input
+            v-model="findPwUserId"
+            type="text"
+            class="modal-input"
+            placeholder="아이디"
+          />
+          <input
+            v-model="findPwEmail"
+            type="email"
+            class="modal-input"
+            placeholder="username@gmail.com"
+          />
+          <div class="modal-actions">
+            <button type="button" class="modal-button ghost" @click="closeFindPassword">
+              취소
+            </button>
+            <button type="submit" class="modal-button primary">
+              임시 비밀번호 받기
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -112,6 +180,14 @@ const identifier = ref("");
 const password = ref("");
 const errorMessage = ref("");
 const isHandlingGoogle = ref(false);
+
+const isFindIdOpen = ref(false);
+const findIdEmail = ref("");
+
+const isFindPasswordOpen = ref(false);
+const findPwName = ref("");
+const findPwUserId = ref("");
+const findPwEmail = ref("");
 
 const togglePassword = () => {
   showPassword.value = !showPassword.value;
@@ -142,6 +218,98 @@ const handleGoogleLogin = () => {
     return;
   }
   window.location.href = buildGoogleAuthUrl();
+};
+
+const closeFindId = () => {
+  isFindIdOpen.value = false;
+  findIdEmail.value = "";
+};
+
+const handleFindId = () => {
+  const email = findIdEmail.value.trim();
+  if (!email) {
+    window.alert("이메일을 입력해 주세요.");
+    return;
+  }
+
+  (async () => {
+    try {
+      const resp = await fetch(`${BACKEND_BASE}/api/auth/find-id/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ email })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        const detail = data.detail || "해당 이메일로 가입된 아이디가 없습니다.";
+        window.alert(detail);
+        return;
+      }
+
+      window.alert(`입력하신 이메일로 가입된 아이디는 "${data.user_id}" 입니다.`);
+      closeFindId();
+    } catch (err) {
+      console.error(err);
+      window.alert("아이디 찾기 처리 중 오류가 발생했습니다.");
+    }
+  })();
+};
+
+const closeFindPassword = () => {
+  isFindPasswordOpen.value = false;
+  findPwName.value = "";
+  findPwUserId.value = "";
+  findPwEmail.value = "";
+};
+
+const handleFindPassword = () => {
+  const name = findPwName.value.trim();
+  const userId = findPwUserId.value.trim();
+  const email = findPwEmail.value.trim();
+
+  if (!name) {
+    window.alert("이름을 입력해 주세요.");
+    return;
+  }
+  if (!userId) {
+    window.alert("아이디를 입력해 주세요.");
+    return;
+  }
+  if (!email) {
+    window.alert("이메일을 입력해 주세요.");
+    return;
+  }
+
+  (async () => {
+    try {
+      const resp = await fetch(`${BACKEND_BASE}/api/auth/find-password/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ name, user_id: userId, email })
+      });
+
+      const data = await resp.json().catch(() => ({}));
+
+      if (!resp.ok) {
+        const detail =
+          data.detail || "입력하신 정보와 일치하는 계정을 찾을 수 없습니다.";
+        window.alert(detail);
+        return;
+      }
+
+      window.alert("임시 비밀번호를 이메일로 발송했습니다. 메일을 확인해 주세요.");
+      closeFindPassword();
+    } catch (err) {
+      console.error(err);
+      window.alert("비밀번호 찾기 처리 중 오류가 발생했습니다.");
+    }
+  })();
 };
 
 const handleGoogleCallback = async () => {
@@ -462,6 +630,114 @@ const handleSubmit = async () => {
   flex: 1;
   height: 1px;
   background: #e5e7eb;
+}
+
+.helper-row {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 4px;
+  font-size: 12px;
+}
+
+.helper-link.subtle {
+  color: #6b7280;
+  text-decoration: none;
+}
+
+.helper-link.subtle:hover {
+  text-decoration: underline;
+}
+
+.link-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  color: #6b7280;
+}
+
+.link-button:hover {
+  text-decoration: underline;
+}
+
+.divider-dot {
+  color: #d1d5db;
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.25);
+  z-index: 40;
+}
+
+.modal-box {
+  width: min(520px, 92vw);
+  background: #f8f6ee;
+  border-radius: 24px;
+  padding: 24px 28px 20px;
+  box-shadow: 0 22px 50px rgba(15, 23, 42, 0.3);
+}
+
+.modal-title {
+  margin: 0 0 4px;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.modal-subtitle {
+  margin: 0 0 18px;
+  font-size: 13px;
+  color: #6b7280;
+}
+
+.modal-form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.modal-input {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  font-size: 14px;
+  outline: none;
+  background: #f9fafb;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.modal-button {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.modal-button.ghost {
+  background: #e5e7eb;
+  color: #374151;
+}
+
+.modal-button.primary {
+  background: #111827;
+  color: #f9fafb;
 }
 
 .google-button {

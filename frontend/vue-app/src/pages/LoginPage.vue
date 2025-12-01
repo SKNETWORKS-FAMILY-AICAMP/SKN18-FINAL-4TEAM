@@ -16,15 +16,16 @@
           </p>
         </div>
 
-        <form class="login-form">
+        <form class="login-form" @submit.prevent="handleSubmit">
           <label class="field">
             <span class="field-label">아이디</span>
             <div class="field-shell">
               <input
                 class="field-input field-input--email"
-                type="email"
-                placeholder="username@gmail.com"
-                autocomplete="email"
+                v-model="identifier"
+                type="text"
+                placeholder="아이디 또는 이메일"
+                autocomplete="username"
               />
             </div>
           </label>
@@ -34,6 +35,7 @@
             <div class="field-shell">
               <input
                 class="field-input field-input--password"
+                v-model="password"
                 :type="showPassword ? 'text' : 'password'"
                 placeholder="비밀번호를 입력하세요"
                 autocomplete="current-password"
@@ -55,6 +57,10 @@
           </label>
 
           <button type="submit" class="submit-button">다음</button>
+
+          <p v-if="errorMessage" class="error-text">
+            {{ errorMessage }}
+          </p>
 
           <div class="divider">
             <span></span>
@@ -95,17 +101,28 @@
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { RouterLink } from "vue-router";
+import { onMounted, ref } from "vue";
+import { RouterLink, useRouter, useRoute } from "vue-router";
+
+const router = useRouter();
+const route = useRoute();
 
 const showPassword = ref(false);
+const identifier = ref("");
+const password = ref("");
+const errorMessage = ref("");
+const isHandlingGoogle = ref(false);
+
 const togglePassword = () => {
   showPassword.value = !showPassword.value;
 };
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-const redirectUri = `${BACKEND_BASE}/api/auth/google/callback`;
+
+// Google 콘솔에 등록한 redirect URI와 정확히 일치하도록 고정
+// 로컬 개발 기준: http://localhost:5174/login
+const redirectUri = "http://localhost:5174/login";
 
 const buildGoogleAuthUrl = () => {
   const params = new URLSearchParams({
@@ -125,6 +142,84 @@ const handleGoogleLogin = () => {
     return;
   }
   window.location.href = buildGoogleAuthUrl();
+};
+
+const handleGoogleCallback = async () => {
+  const code = route.query.code;
+  if (!code || isHandlingGoogle.value) return;
+
+  isHandlingGoogle.value = true;
+  errorMessage.value = "";
+
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/auth/google/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ code })
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      errorMessage.value = data.detail || "Google 로그인에 실패했습니다.";
+      return;
+    }
+
+    if (data.access_token) {
+      localStorage.setItem("jobtory_access_token", data.access_token);
+    }
+
+    await router.replace({ path: "/", query: {} });
+  } catch (err) {
+    console.error(err);
+    errorMessage.value = "Google 로그인 처리 중 오류가 발생했습니다.";
+  } finally {
+    isHandlingGoogle.value = false;
+  }
+};
+
+onMounted(() => {
+  void handleGoogleCallback();
+});
+
+const handleSubmit = async () => {
+  errorMessage.value = "";
+  const id = identifier.value.trim();
+  const pw = password.value;
+
+  if (!id || !pw) {
+    errorMessage.value = "아이디(또는 이메일)와 비밀번호를 입력해 주세요.";
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/auth/login/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ user_id: id, password: pw })
+    });
+
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok) {
+      errorMessage.value = data.detail || "로그인에 실패했습니다.";
+      return;
+    }
+
+    if (data.access_token) {
+      localStorage.setItem("jobtory_access_token", data.access_token);
+    }
+
+    // 로그인 성공 후 메인 페이지로 이동
+    router.push("/");
+  } catch (err) {
+    console.error(err);
+    errorMessage.value = "서버와 통신할 수 없습니다. 잠시 후 다시 시도해 주세요.";
+  }
 };
 </script>
 
@@ -346,6 +441,12 @@ const handleGoogleLogin = () => {
 .submit-button:active {
   transform: translateY(1px) scale(0.99);
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.4);
+}
+
+.error-text {
+  margin-top: 10px;
+  font-size: 13px;
+  color: #dc2626;
 }
 
 .divider {

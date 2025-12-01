@@ -12,7 +12,7 @@
           <div class="field-block">
             <label class="field-label">아이디</label>
             <div class="field-line">
-              <input class="field-input" type="text" />
+              <input v-model="username" class="field-input" type="text" placeholder="아이디" />
               <button type="button" class="pill-button">중복확인</button>
             </div>
             <p class="hint-text">사용 가능한 아이디입니다.</p>
@@ -21,7 +21,7 @@
           <div class="field-block">
             <label class="field-label">이름</label>
             <div class="field-line">
-              <input class="field-input" type="text" />
+              <input v-model="name" class="field-input" type="text" placeholder="홍길동" />
             </div>
           </div>
 
@@ -35,11 +35,11 @@
           <div class="field-block">
             <label class="field-label">전화번호</label>
             <div class="field-line phone-line">
-              <input class="field-input phone-input" type="tel" maxlength="3" />
+              <input v-model="phone1" class="field-input phone-input" type="tel" maxlength="3" />
               <span class="hyphen">-</span>
-              <input class="field-input phone-input" type="tel" maxlength="4" />
+              <input v-model="phone2" class="field-input phone-input" type="tel" maxlength="4" />
               <span class="hyphen">-</span>
-              <input class="field-input phone-input" type="tel" maxlength="4" />
+              <input v-model="phone3" class="field-input phone-input" type="tel" maxlength="4" />
             </div>
           </div>
 
@@ -55,7 +55,7 @@
           <div class="field-block">
             <label class="field-label">이메일</label>
             <div class="field-line email-line">
-              <input class="field-input email-local" type="text" />
+              <input v-model="emailLocal" class="field-input email-local" type="text" placeholder="username" />
               <span class="at">@</span>
               <input
                 v-model="emailDomainInput"
@@ -70,8 +70,18 @@
                 <option value="daum.net">daum.net</option>
                 <option value="kakao.com">kakao.com</option>
               </select>
-              <button type="button" class="pill-button email-send-button">인증번호 발송</button>
+              <button
+                type="button"
+                class="pill-button email-send-button"
+                :disabled="emailSending"
+                @click="handleSendEmailCode"
+              >
+                {{ emailSending ? "발송 중..." : "인증번호 발송" }}
+              </button>
             </div>
+            <p v-if="emailInlineMessage" :class="['email-inline-msg', emailInlineType]">
+              {{ emailInlineMessage }}
+            </p>
           </div>
 
           <div class="field-block">
@@ -101,13 +111,23 @@
           <div class="field-block">
             <label class="field-label">인증번호</label>
             <div class="field-line">
-              <input class="field-input" type="text" />
-              <button type="button" class="pill-button">인증</button>
+              <input v-model="emailCode" class="field-input" type="text" placeholder="인증번호 입력" />
+              <button
+                type="button"
+                class="pill-button"
+                :disabled="emailVerifying"
+                @click="handleVerifyEmailCode"
+              >
+                {{ emailVerifying ? "확인 중..." : "인증" }}
+              </button>
             </div>
           </div>
         </div>
 
-        <button type="button" class="submit-button" @click="handleSubmit">회원가입</button>
+        <button type="button" class="submit-button" :disabled="pending" @click="handleSubmit">
+          {{ pending ? "가입 중..." : "회원가입" }}
+        </button>
+        <p v-if="message" :class="['form-message', messageType]">{{ message }}</p>
       </section>
     </main>
   </div>
@@ -115,6 +135,8 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 70 }, (_, i) => currentYear - i);
@@ -124,12 +146,27 @@ const days = Array.from({ length: 31 }, (_, i) => i + 1);
 const birthYear = ref("");
 const birthMonth = ref("");
 const birthDay = ref("");
+const name = ref("");
+const username = ref("");
+const phone1 = ref("");
+const phone2 = ref("");
+const phone3 = ref("");
 
 const password = ref("");
 const passwordConfirm = ref("");
 
+const emailLocal = ref("");
 const emailDomainInput = ref("");
 const emailDomainSelect = ref("");
+const pending = ref(false);
+const message = ref("");
+const messageType = ref("info");
+const emailVerified = ref(false);
+const emailCode = ref("");
+const emailSending = ref(false);
+const emailVerifying = ref(false);
+const emailInlineMessage = ref("");
+const emailInlineType = ref("info");
 
 watch(emailDomainSelect, (val) => {
   if (val) {
@@ -145,18 +182,177 @@ const showPasswordError = computed(
   () => !!password.value && !!passwordConfirm.value && password.value !== passwordConfirm.value
 );
 
-const handleSubmit = () => {
+const buildEmail = () => {
+  const domain = emailDomainSelect.value || emailDomainInput.value;
+  if (!emailLocal.value || !domain) return "";
+  return `${emailLocal.value}@${domain}`;
+};
+
+const buildPhone = () => {
+  if (!phone1.value || !phone2.value || !phone3.value) return "";
+  return `${phone1.value}-${phone2.value}-${phone3.value}`;
+};
+
+const buildBirthdate = () => {
+  if (!birthYear.value || !birthMonth.value || !birthDay.value) return null;
+  const month = String(birthMonth.value).padStart(2, "0");
+  const day = String(birthDay.value).padStart(2, "0");
+  return `${birthYear.value}-${month}-${day}`;
+};
+
+const handleSubmit = async () => {
+  message.value = "";
+
+  if (!name.value) {
+    message.value = "이름을 입력해 주세요.";
+    messageType.value = "error";
+    return;
+  }
+
+  // 이메일 로컬파트를 안 적었으면 아이디를 대신 사용
+  if (!emailLocal.value && username.value) {
+    emailLocal.value = username.value;
+  }
+
+  const email = buildEmail();
+  if (!email) {
+    message.value = "이메일을 올바르게 입력해 주세요.";
+    messageType.value = "error";
+    return;
+  }
+
+  if (!emailVerified.value) {
+    message.value = "이메일 인증을 완료해 주세요.";
+    messageType.value = "error";
+    return;
+  }
+
   if (!password.value || !passwordConfirm.value) {
-    window.alert("비밀번호와 비밀번호 확인을 모두 입력해 주세요.");
+    message.value = "비밀번호와 비밀번호 확인을 모두 입력해 주세요.";
+    messageType.value = "error";
     return;
   }
 
   if (password.value !== passwordConfirm.value) {
-    window.alert("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+    message.value = "비밀번호와 비밀번호 확인이 일치하지 않습니다.";
+    messageType.value = "error";
     return;
   }
 
-  // 실제 회원가입 로직은 추후 연동 예정
+  const phone_number = buildPhone();
+  const birthdate = buildBirthdate();
+
+  pending.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/signup/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        email,
+        name: name.value,
+        password: password.value,
+        phone_number: phone_number || null,
+        birthdate
+      })
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      const detail = data?.detail || Object.values(data || {})[0] || "가입에 실패했습니다.";
+      throw new Error(detail);
+    }
+    message.value = "가입이 완료되었습니다. 로그인해 주세요.";
+    messageType.value = "success";
+    password.value = "";
+    passwordConfirm.value = "";
+  } catch (err) {
+    message.value = err.message || "가입 중 오류가 발생했습니다.";
+    messageType.value = "error";
+  } finally {
+    pending.value = false;
+  }
+};
+
+const handleSendEmailCode = async () => {
+  const email = buildEmail();
+  if (!email) {
+    message.value = "이메일을 올바르게 입력해 주세요.";
+    messageType.value = "error";
+    emailInlineMessage.value = message.value;
+    emailInlineType.value = "error";
+    return;
+  }
+  emailSending.value = true;
+  message.value = "";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/email/send/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      // non-JSON 응답일 경우 대비
+    }
+    if (!res.ok) {
+      const detail = data?.detail || `인증번호 발송에 실패했습니다. (status ${res.status})`;
+      throw new Error(detail);
+    }
+    message.value = "인증번호를 전송했습니다. 메일을 확인해 주세요.";
+    messageType.value = "success";
+    emailInlineMessage.value = message.value;
+    emailInlineType.value = "success";
+  } catch (err) {
+    message.value = err.message || "인증번호 발송 중 오류가 발생했습니다.";
+    messageType.value = "error";
+    emailInlineMessage.value = message.value;
+    emailInlineType.value = "error";
+  } finally {
+    emailSending.value = false;
+  }
+};
+
+const handleVerifyEmailCode = async () => {
+  const email = buildEmail();
+  if (!email || !emailCode.value) {
+    message.value = "이메일과 인증번호를 입력해 주세요.";
+    messageType.value = "error";
+    emailInlineMessage.value = message.value;
+    emailInlineType.value = "error";
+    return;
+  }
+  emailVerifying.value = true;
+  message.value = "";
+  try {
+    const res = await fetch(`${API_BASE}/api/auth/email/verify/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code: emailCode.value })
+    });
+    let data = null;
+    try {
+      data = await res.json();
+    } catch (e) {
+      // non-JSON 응답일 경우 대비
+    }
+    if (!res.ok) {
+      const detail = data?.detail || `인증에 실패했습니다. (status ${res.status})`;
+      throw new Error(detail);
+    }
+    emailVerified.value = true;
+    message.value = "이메일 인증이 완료되었습니다.";
+    messageType.value = "success";
+    emailInlineMessage.value = message.value;
+    emailInlineType.value = "success";
+  } catch (err) {
+    message.value = err.message || "인증 중 오류가 발생했습니다.";
+    messageType.value = "error";
+    emailInlineMessage.value = message.value;
+    emailInlineType.value = "error";
+  } finally {
+    emailVerifying.value = false;
+  }
 };
 </script>
 
@@ -361,6 +557,45 @@ const handleSubmit = () => {
   font-weight: 700;
   cursor: pointer;
   box-shadow: 0 10px 24px rgba(15, 23, 42, 0.3);
+}
+
+.submit-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.form-message {
+  text-align: center;
+  margin-top: 16px;
+  font-size: 14px;
+  padding: 10px 12px;
+  border-radius: 12px;
+}
+
+.form-message.success {
+  background: #ecfdf3;
+  color: #166534;
+  border: 1px solid #bbf7d0;
+}
+
+.form-message.error {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+}
+
+.email-inline-msg {
+  margin: 4px 0 0;
+  font-size: 12px;
+}
+
+.email-inline-msg.success {
+  color: #15803d;
+}
+
+.email-inline-msg.error {
+  color: #b91c1c;
 }
 
 @media (max-width: 768px) {

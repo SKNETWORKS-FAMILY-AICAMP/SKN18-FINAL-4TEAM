@@ -62,7 +62,7 @@
             <span></span>
           </div>
 
-          <button type="button" class="google-button">
+          <button type="button" class="google-button" @click="handleGoogleLogin">
             <svg viewBox="0 0 533.5 544.3" class="google-icon">
               <path
                 fill="#4285f4"
@@ -101,6 +101,30 @@ import { RouterLink } from "vue-router";
 const showPassword = ref(false);
 const togglePassword = () => {
   showPassword.value = !showPassword.value;
+};
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const redirectUri = `${BACKEND_BASE}/api/auth/google/callback`;
+
+const buildGoogleAuthUrl = () => {
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: redirectUri,
+    response_type: "code",
+    scope: "openid email profile",
+    access_type: "offline",
+    prompt: "consent"
+  });
+  return `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+};
+
+const handleGoogleLogin = () => {
+  if (!GOOGLE_CLIENT_ID) {
+    alert("구글 클라이언트 ID가 설정되지 않았습니다. 관리자에게 문의하세요.");
+    return;
+  }
+  window.location.href = buildGoogleAuthUrl();
 };
 </script>
 

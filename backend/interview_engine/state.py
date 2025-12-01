@@ -18,6 +18,9 @@ class InterviewState(TypedDict, total=False):
     # 1번 agent
     problem_intro_error: str
     current_question_text: str
+    tts_first_audio_base64: str
+    tts_audio_chunks: List[Dict[str, Any]]
+    tts_error: str
     
     # 2번 agent
     

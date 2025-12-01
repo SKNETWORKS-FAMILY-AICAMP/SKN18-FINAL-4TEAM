@@ -1,7 +1,0 @@
-{
-  "dependencies": ["."],
-  "graphs": {
-    "agent": "./interview_engine/graph.py:graph"
-  },
-  "env": ".env"
-}

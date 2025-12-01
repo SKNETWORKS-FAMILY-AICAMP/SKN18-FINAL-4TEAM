@@ -1,12 +1,27 @@
 <template>
   <div class="landing">
-                <header class="landing-header">
-      <button class="nav-pill">
-        <span>MENU</span>
-        <span class="chevron">&#9662;</span>
-      </button>
+    <header class="landing-header">
+      <div class="nav-dropdown">
+        <button
+          class="nav-pill"
+          @click="isMenuOpen = !isMenuOpen"
+          aria-haspopup="true"
+          :aria-expanded="isMenuOpen"
+        >
+          <span>MENU</span>
+          <span class="chevron">&#9662;</span>
+        </button>
+        <div class="dropdown-menu" v-show="isMenuOpen">
+          <RouterLink to="/interview" class="dropdown-link" @click="isMenuOpen = false">
+            인터뷰
+          </RouterLink>
+          <RouterLink to="/coding-test" class="dropdown-link" @click="isMenuOpen = false">
+            라이브코딩
+          </RouterLink>
+        </div>
+      </div>
       <h1 class="nav-logo">JOBTORY</h1>
-      <div class="nav-dropdown" @mouseleave="isDropdownOpen = false">
+      <div class="nav-dropdown">
         <button class="nav-pill" @click="isDropdownOpen = !isDropdownOpen" aria-haspopup="true" :aria-expanded="isDropdownOpen">
           <span>Dropdown</span>
           <span class="chevron">&#9662;</span>
@@ -87,6 +102,7 @@
 import { ref } from "vue";
 import { RouterLink } from "vue-router";
 
+const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false);
 
 const heroImage = new URL("../assets/mainpage_image1.png", import.meta.url).href;

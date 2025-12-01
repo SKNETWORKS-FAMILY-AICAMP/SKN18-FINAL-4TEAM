@@ -240,11 +240,11 @@ const handleSubmit = () => {
 }
 
 .email-line {
-  gap: 6px;
+  gap: 2px;
 }
 
 .email-local {
-  flex: 0 0 90px;
+  flex: 0 0 70px;
   padding-bottom: 0;
 }
 
@@ -253,7 +253,7 @@ const handleSubmit = () => {
 }
 
 .email-domain {
-  flex: 0 0 100px;
+  flex: 0 0 90px;
   border-radius: 999px;
   border: 1px solid #d1d5db;
   padding: 4px 10px;
@@ -261,7 +261,7 @@ const handleSubmit = () => {
 }
 
 .email-domain-input {
-  flex: 0 0 130px;
+  flex: 1 1 auto;
   border: none;
   background: transparent;
   outline: none;

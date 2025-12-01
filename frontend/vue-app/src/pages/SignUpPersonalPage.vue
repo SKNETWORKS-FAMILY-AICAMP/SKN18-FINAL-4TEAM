@@ -13,9 +13,11 @@
             <label class="field-label">아이디</label>
             <div class="field-line">
               <input v-model="username" class="field-input" type="text" placeholder="아이디" />
-              <button type="button" class="pill-button">중복확인</button>
+              <button type="button" class="pill-button" @click="handleCheckUsername">중복확인</button>
             </div>
-            <p class="hint-text">사용 가능한 아이디입니다.</p>
+            <p v-if="usernameStatus === 'ok'" class="hint-text success">사용 가능한 아이디입니다.</p>
+            <p v-else-if="usernameStatus === 'taken'" class="hint-text error">이미 사용 중인 아이디입니다.</p>
+            <p v-else-if="usernameStatus === 'empty'" class="hint-text error">아이디를 입력해 주세요.</p>
           </div>
 
           <div class="field-block">
@@ -127,7 +129,6 @@
         <button type="button" class="submit-button" :disabled="pending" @click="handleSubmit">
           {{ pending ? "가입 중..." : "회원가입" }}
         </button>
-        <p v-if="message" :class="['form-message', messageType]">{{ message }}</p>
       </section>
     </main>
   </div>
@@ -135,8 +136,10 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
+import { useRouter } from "vue-router";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const router = useRouter();
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 70 }, (_, i) => currentYear - i);
@@ -167,12 +170,47 @@ const emailSending = ref(false);
 const emailVerifying = ref(false);
 const emailInlineMessage = ref("");
 const emailInlineType = ref("info");
+const usernameStatus = ref(""); // '', 'ok', 'taken', 'empty'
 
 watch(emailDomainSelect, (val) => {
   if (val) {
     emailDomainInput.value = val;
   }
 });
+
+// 아이디를 수정하면 중복검사 상태를 초기화
+watch(username, () => {
+  usernameStatus.value = "";
+});
+
+const handleCheckUsername = async () => {
+  const value = username.value.trim();
+  if (!value) {
+    usernameStatus.value = "empty";
+    return;
+  }
+
+  try {
+    const res = await fetch(
+      `${API_BASE}/api/auth/user-id/check/?user_id=${encodeURIComponent(value)}`,
+      {
+        method: "GET"
+      }
+    );
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const detail = data?.detail || "아이디 중복 확인에 실패했습니다.";
+      throw new Error(detail);
+    }
+
+    usernameStatus.value = data.available ? "ok" : "taken";
+  } catch (err) {
+    usernameStatus.value = "";
+    message.value = err.message || "아이디 중복 확인 중 오류가 발생했습니다.";
+    messageType.value = "error";
+  }
+};
 
 const showPasswordMatch = computed(
   () => !!password.value && !!passwordConfirm.value && password.value === passwordConfirm.value
@@ -203,9 +241,20 @@ const buildBirthdate = () => {
 const handleSubmit = async () => {
   message.value = "";
 
+  // 필수 필드 하나씩 체크하면서 비어 있으면 개별 안내
+  if (!username.value) {
+    window.alert("아이디를 입력해 주세요.");
+    return;
+  }
+
+  // 아이디 중복확인 선행
+  if (usernameStatus.value !== "ok") {
+    window.alert("아이디 중복확인을 먼저 해 주세요.");
+    return;
+  }
+
   if (!name.value) {
-    message.value = "이름을 입력해 주세요.";
-    messageType.value = "error";
+    window.alert("이름을 입력해 주세요.");
     return;
   }
 
@@ -214,28 +263,45 @@ const handleSubmit = async () => {
     emailLocal.value = username.value;
   }
 
+  if (!emailLocal.value) {
+    window.alert("이메일 아이디(username)를 입력해 주세요.");
+    return;
+  }
+
+  const hasEmailDomain = emailDomainSelect.value || emailDomainInput.value;
+  if (!hasEmailDomain) {
+    window.alert("이메일 도메인을 선택하거나 입력해 주세요.");
+    return;
+  }
+
   const email = buildEmail();
   if (!email) {
-    message.value = "이메일을 올바르게 입력해 주세요.";
-    messageType.value = "error";
+    window.alert("이메일을 올바르게 입력해 주세요.");
     return;
   }
 
   if (!emailVerified.value) {
-    message.value = "이메일 인증을 완료해 주세요.";
-    messageType.value = "error";
+    window.alert("이메일 인증을 완료해 주세요.");
     return;
   }
 
-  if (!password.value || !passwordConfirm.value) {
-    message.value = "비밀번호와 비밀번호 확인을 모두 입력해 주세요.";
-    messageType.value = "error";
+  if (!password.value) {
+    window.alert("비밀번호를 입력해 주세요.");
+    return;
+  }
+
+  if (!passwordConfirm.value) {
+    window.alert("비밀번호 확인을 입력해 주세요.");
     return;
   }
 
   if (password.value !== passwordConfirm.value) {
-    message.value = "비밀번호와 비밀번호 확인이 일치하지 않습니다.";
-    messageType.value = "error";
+    window.alert("비밀번호와 비밀번호 확인이 일치하지 않습니다.");
+    return;
+  }
+
+  if (!birthYear.value || !birthMonth.value || !birthDay.value) {
+    window.alert("생년월일을 모두 선택해 주세요.");
     return;
   }
 
@@ -248,6 +314,7 @@ const handleSubmit = async () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        user_id: username.value,
         email,
         name: name.value,
         password: password.value,
@@ -260,10 +327,13 @@ const handleSubmit = async () => {
       const detail = data?.detail || Object.values(data || {})[0] || "가입에 실패했습니다.";
       throw new Error(detail);
     }
-    message.value = "가입이 완료되었습니다. 로그인해 주세요.";
+    message.value = "가입이 완료되었습니다. 로그인 페이지로 이동합니다.";
     messageType.value = "success";
+    // 성공 안내 후 로그인 페이지로 이동
+    window.alert("회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.");
     password.value = "";
     passwordConfirm.value = "";
+    router.push("/login");
   } catch (err) {
     message.value = err.message || "가입 중 오류가 발생했습니다.";
     messageType.value = "error";
@@ -454,6 +524,14 @@ const handleVerifyEmailCode = async () => {
   color: #6b7280;
 }
 
+.hint-text.success {
+  color: #16a34a;
+}
+
+.hint-text.error {
+  color: #dc2626;
+}
+
 .password-hint {
   margin: 2px 0 0;
   font-size: 12px;
@@ -485,12 +563,12 @@ const handleVerifyEmailCode = async () => {
   cursor: pointer;
 }
 
-.email-line {
-  gap: 6px;
+.field-line.email-line {
+  gap: 2px;
 }
 
 .email-local {
-  flex: 0 0 90px;
+  flex: 0 0 70px;
   padding-bottom: 0;
 }
 
@@ -499,7 +577,7 @@ const handleVerifyEmailCode = async () => {
 }
 
 .email-domain {
-  flex: 0 0 100px;
+  flex: 0 0 90px;
   border-radius: 999px;
   border: 1px solid #d1d5db;
   padding: 4px 10px;
@@ -507,7 +585,7 @@ const handleVerifyEmailCode = async () => {
 }
 
 .email-domain-input {
-  flex: 0 0 130px;
+  flex: 1 1 auto;
   border: none;
   background: transparent;
   outline: none;
@@ -563,26 +641,6 @@ const handleVerifyEmailCode = async () => {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-.form-message {
-  text-align: center;
-  margin-top: 16px;
-  font-size: 14px;
-  padding: 10px 12px;
-  border-radius: 12px;
-}
-
-.form-message.success {
-  background: #ecfdf3;
-  color: #166534;
-  border: 1px solid #bbf7d0;
-}
-
-.form-message.error {
-  background: #fef2f2;
-  color: #b91c1c;
-  border: 1px solid #fecaca;
 }
 
 .email-inline-msg {

@@ -1,15 +1,21 @@
 <template>
   <div class="landing">
-    <header class="landing-header">
+                <header class="landing-header">
       <button class="nav-pill">
         <span>MENU</span>
-        <span class="chevron">▾</span>
+        <span class="chevron">&#9662;</span>
       </button>
       <h1 class="nav-logo">JOBTORY</h1>
-      <button class="nav-pill">
-        <span>Dropdown</span>
-        <span class="chevron">▾</span>
-      </button>
+      <div class="nav-dropdown" @mouseleave="isDropdownOpen = false">
+        <button class="nav-pill" @click="isDropdownOpen = !isDropdownOpen" aria-haspopup="true" :aria-expanded="isDropdownOpen">
+          <span>Dropdown</span>
+          <span class="chevron">&#9662;</span>
+        </button>
+        <div class="dropdown-menu" v-show="isDropdownOpen">
+          <RouterLink to="/login" class="dropdown-link" @click="isDropdownOpen = false">로그인</RouterLink>
+          <RouterLink to="/signup" class="dropdown-link" @click="isDropdownOpen = false">회원가입</RouterLink>
+        </div>
+      </div>
     </header>
 
     <section class="hero">
@@ -20,10 +26,7 @@
             <br />
             every live challenge.
           </h2>
-          <p class="hero-description">
-            실시간 라이브 코딩과 행동 기반 인터뷰로 개발자의 문제 해결력과 커뮤니케이션을
-            있는 그대로 평가하세요.
-          </p>
+          <p class="hero-description">실시간 라이브 코딩과 행동 기반 인터뷰로 개발자의 문제 해결력과 커뮤니케이션을 있는 그대로 평가하세요.</p>
           <div class="hero-actions">
             <RouterLink to="/coding-test" class="secondary">라이브 코딩 테스트 보기</RouterLink>
           </div>
@@ -35,8 +38,6 @@
       </div>
     </section>
 
-  
-
     <section class="insights">
       <div class="insights-header">
         <h3 class="insights-title">
@@ -44,33 +45,30 @@
           <br />
           Real insights.
         </h3>
-        <p class="insights-description">
-          실시간 코딩 인터뷰를 통해 문제 해결 과정과 커뮤니케이션을 함께 평가하고,
-          지원자의 잠재력을 깊이 있게 이해할 수 있습니다.
-        </p>
+        <p class="insights-description">실시간 코딩 인터뷰를 통해 문제 해결 과정과 커뮤니케이션을 함께 평가하고, 지원자의 잠재력을 깊이 있게 이해할 수 있습니다.</p>
       </div>
 
       <div class="insights-cards">
         <div class="insight-card card-one">
-          <h4>라이브 코드 실행</h4>
-          <p>코드를 작성하고 바로 실행하면서 사고 과정을 확인합니다.</p>
+          <h4 class="card-heading">라이브 코드 실행</h4>
+          <p class="card-copy">코드를 작성하고 바로 실행하며 사고 과정을 투명하게 보여줍니다.</p>
           <div class="hero-image-wrap">
-          <img :src="heroImage2" alt="Live coding interface" class="hero-image" />
-        </div>
+            <img :src="heroImage2" alt="Live coding interface" class="hero-image" />
+          </div>
         </div>
         <div class="insight-card card-two">
-          <h4>대화형 인터뷰</h4>
-          <p>화상 인터뷰와 채팅을 통해 협업 능력을 평가합니다.</p>
+          <h4 class="card-heading">협업형 인터뷰</h4>
+          <p class="card-copy">실시간 채팅으로 문제 해결 과정과 커뮤니케이션을 함께 확인합니다.</p>
           <div class="hero-image-wrap">
-          <img :src="heroImage3" alt="Live coding interface" class="hero-image" />
-        </div>
+            <img :src="heroImage3" alt="Live coding interface" class="hero-image" />
+          </div>
         </div>
         <div class="insight-card card-three">
-          <h4>정량 + 정성 피드백</h4>
-          <p>코딩 결과와 행동 기록을 함께 저장해 채용 의사결정을 돕습니다.</p>
+          <h4 class="card-heading">정량 + 정성 리포트</h4>
+          <p class="card-copy">결과와 행동 기록을 모두 남겨 채용 의사결정을 뒷받침합니다.</p>
           <div class="hero-image-wrap">
-          <img :src="heroImage4" alt="Live coding interface" class="hero-image" />
-        </div>
+            <img :src="heroImage4" alt="Live coding interface" class="hero-image" />
+          </div>
         </div>
       </div>
     </section>
@@ -86,7 +84,10 @@
 </template>
 
 <script setup>
+import { ref } from "vue";
 import { RouterLink } from "vue-router";
+
+const isDropdownOpen = ref(false);
 
 const heroImage = new URL("../assets/mainpage_image1.png", import.meta.url).href;
 const heroImage2 = new URL("../assets/mainpage_image2.png", import.meta.url).href;
@@ -147,6 +148,38 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   font-size: 12px;
 }
 
+.nav-dropdown {
+  position: relative;
+}
+
+.dropdown-menu {
+  position: absolute;
+  top: 100%;
+  right: 0;
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  padding: 8px 0;
+  background: #ffffff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.dropdown-link {
+  padding: 10px 14px;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 8px;
+}
+
+.dropdown-link:hover {
+  background: #f3f4f6;
+}
+
 .hero {
   position: relative;
   padding: 80px 56px 120px;
@@ -168,20 +201,19 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .hero-title {
-  margin: 0 0 24px;
   max-width: 640px;
   font-family: "SF Pro", sans-serif;
   font-style: normal;
   font-weight: 700;
   font-size: 64px;
-  line-height: 1.05;
+  line-height: 1.30;
   color: #000000;
 }
 
 .hero-description {
   max-width: 540px;
   margin: 0 0 32px;
-  font-size: 16px;
+  font-size: 17px;
   color: #4b5563;
 }
 
@@ -279,22 +311,22 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .insights-header {
-  max-width: 980px;
+  max-width: 1080px;
   margin: 0 auto 40px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-  text-align: center;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 24px;
   align-items: center;
+  text-align: left;
 }
 
 .insights-title {
-  margin: 0;
+  margin: 10;
   font-family: "SF Pro", sans-serif;
   font-style: normal;
   font-weight: 700;
-  font-size: 36px;
-  line-height: 1.1;
+  font-size: 66px;
+  line-height: 1.25;
   color: #ffffff;
 }
 
@@ -302,9 +334,9 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   margin: 0;
   max-width: 640px;
   font-family: 'SF Pro', sans-serif;
-  font-weight: 400;
-  font-size: 16px;
-  line-height: 1.5;
+  font-weight: 300;
+  font-size: 22px;
+  line-height: 1.6;
   color: #e5e7eb;
 }
 
@@ -344,6 +376,21 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .insight-card p {
   margin: 0;
   font-size: 14px;
+}
+
+.card-heading {
+  margin: 0 0 10px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  color: #0f172a;
+}
+
+.card-copy {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: #1f2937;
 }
 
 .insight-card .hero-image-wrap {
@@ -393,7 +440,9 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   }
 
   .insights-header {
-    gap: 12px;
+    gap: 16px;
+    grid-template-columns: 1fr;
+    text-align: center;
   }
 
   .insights-cards {

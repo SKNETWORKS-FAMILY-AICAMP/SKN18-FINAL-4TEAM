@@ -1,7 +1,13 @@
 import os
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+# 루트(.env) 파일 로드
+env_path = BASE_DIR.parent / ".env"
+load_dotenv(env_path)
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-secret-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
@@ -51,14 +57,21 @@ TEMPLATES = [
 WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
+# DB 설정을 환경변수에서 유연하게 가져오도록 POSTGRES_*와 DB_*를 모두 지원
+DB_NAME = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME", "jobtory")
+DB_USER = os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "gyulcross")
+DB_PASSWORD = os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD", "gyulcross0113")
+DB_HOST = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
+
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("POSTGRES_DB", "jobtory"),
-        "USER": os.getenv("POSTGRES_USER", "jobtory"),
-        "PASSWORD": os.getenv("POSTGRES_PASSWORD", ""),
-        "HOST": os.getenv("POSTGRES_HOST", "localhost"),
-        "PORT": os.getenv("POSTGRES_PORT", "5432"),
+        "NAME": DB_NAME,
+        "USER": DB_USER,
+        "PASSWORD": DB_PASSWORD,
+        "HOST": DB_HOST,
+        "PORT": DB_PORT,
     }
 }
 
@@ -92,3 +105,19 @@ REST_FRAMEWORK = {
 }
 
 ELASTICSEARCH_HOST = os.getenv("ELASTICSEARCH_HOST", "http://localhost:9200")
+
+# Email 설정 (기본은 콘솔 출력)
+EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+EMAIL_HOST = os.getenv("EMAIL_HOST", "")
+EMAIL_PORT = int(os.getenv("EMAIL_PORT", "587"))
+EMAIL_HOST_USER = os.getenv("EMAIL_HOST_USER", "")
+EMAIL_HOST_PASSWORD = os.getenv("EMAIL_HOST_PASSWORD", "")
+EMAIL_USE_TLS = os.getenv("EMAIL_USE_TLS", "true").lower() == "true"
+DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-reply@jobtory.local")
+
+# Google OAuth 설정
+GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
+GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
+# 개발 기본 포트를 실제 프론트 주소(5174)에 맞춰 둡니다.
+FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5174")
+GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_BASE_URL}/login")

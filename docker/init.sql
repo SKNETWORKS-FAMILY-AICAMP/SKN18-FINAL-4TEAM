@@ -29,3 +29,27 @@ CREATE TABLE IF NOT EXISTS test_case (
         REFERENCES coding_problem (problem_id)
         ON DELETE CASCADE
 );
+
+CREATE TABLE users (
+  user_id       VARCHAR(50) PRIMARY KEY,
+  email         VARCHAR(255) NOT NULL UNIQUE,
+  name          VARCHAR(50) NOT NULL,
+  phone_number  VARCHAR(30) UNIQUE,
+  password_hash VARCHAR(255),              -- 로컬만 값, 소셜-only는 NULL
+  birthdate     DATE,
+  created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE auth_identities (
+  id SERIAL PRIMARY KEY,
+  user_id VARCHAR(50) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  provider VARCHAR(20) NOT NULL,              -- 'local' | 'google'
+  provider_user_id VARCHAR(255) NOT NULL,     -- 구글 sub 또는 로컬 user_id/email 등
+  refresh_token TEXT,                         -- 필요하면 암호화/별도 저장
+  token_expires_at TIMESTAMP,
+  scope TEXT,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (provider, provider_user_id),
+  UNIQUE (user_id, provider)
+);

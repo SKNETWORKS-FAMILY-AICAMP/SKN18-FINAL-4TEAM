@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS test_case (
 );
 
 CREATE TABLE users (
-  user_id       SERIAL PRIMARY KEY,
+  user_id       VARCHAR(50) PRIMARY KEY,
   email         VARCHAR(255) NOT NULL UNIQUE,
   name          VARCHAR(50) NOT NULL,
   phone_number  VARCHAR(30) UNIQUE,
@@ -43,7 +43,7 @@ CREATE TABLE users (
 
 CREATE TABLE auth_identities (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
+  user_id VARCHAR(50) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,
   provider VARCHAR(20) NOT NULL,              -- 'local' | 'google'
   provider_user_id VARCHAR(255) NOT NULL,     -- 구글 sub 또는 로컬 user_id/email 등
   refresh_token TEXT,                         -- 필요하면 암호화/별도 저장

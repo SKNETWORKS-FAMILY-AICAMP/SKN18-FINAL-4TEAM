@@ -164,6 +164,16 @@ class FindIdView(APIView):
         if not user:
             return Response({"detail": "해당 이메일로 가입된 아이디가 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
+        # 구글 소셜 로그인 계정은 아이디 찾기 대상에서 제외
+        if AuthIdentity.objects.filter(user=user, provider="google").exists():
+            return Response(
+                {
+                    "detail": "구글 소셜 로그인으로 가입한 계정은 아이디 찾기 기능을 사용할 수 없습니다. "
+                    "구글 로그인을 이용해 주세요."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         return Response({"email": email, "user_id": user.user_id})
 
 
@@ -189,6 +199,16 @@ class FindPasswordView(APIView):
             return Response(
                 {"detail": "입력하신 정보와 일치하는 계정을 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # 구글 소셜 로그인 계정은 비밀번호 찾기/임시 비밀번호 발송 대상에서 제외
+        if AuthIdentity.objects.filter(user=user, provider="google").exists():
+            return Response(
+                {
+                    "detail": "구글 소셜 로그인으로 가입한 계정은 비밀번호 찾기 기능을 사용할 수 없습니다. "
+                    "구글 로그인을 이용해 주세요."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
             )
 
         # 임시 비밀번호 생성

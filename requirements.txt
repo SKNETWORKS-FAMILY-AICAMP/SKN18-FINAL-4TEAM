@@ -8,3 +8,6 @@ psycopg2-binary==2.9.11
 requests==2.32.5
 python-dotenv==1.0.1
 PyJWT==2.9.0
+mediapipe==0.10.20
+opencv-python==4.10.0.84
+numpy==1.26.4

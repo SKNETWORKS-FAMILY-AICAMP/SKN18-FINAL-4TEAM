@@ -151,14 +151,28 @@ const startRecording = async () => {
 /* -----------------------------
    ⏹녹음 종료
 ----------------------------- */
-const stopRecording = async () => {
-  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+const stopRecording = () => {
+  return new Promise((resolve) => {
+    if (!mediaRecorder || mediaRecorder.state === "inactive") {
+      console.log("이미 녹음 중이 아님");
+      resolve();
+      return;
+    }
+
+    // ⬇️ 여기서 onstop에서 Blob 만들고 resolve
+    mediaRecorder.onstop = () => {
+      audioBlob.value = new Blob(audioChunks, { type: "audio/webm" });
+      console.log("🎤 녹음 완료:", audioBlob.value);
+      if (audioStream) {
+        audioStream.getTracks().forEach((t) => t.stop());
+        audioStream = null;
+      }
+      resolve();
+    };
+
     mediaRecorder.stop();
-  }
-  if (audioStream) {
-    audioStream.getTracks().forEach((t) => t.stop());
-  }
-  console.log("⏹ 녹음 종료됨");
+    console.log("⏹ 녹음 종료 요청");
+  });
 };
 
 /* -----------------------------

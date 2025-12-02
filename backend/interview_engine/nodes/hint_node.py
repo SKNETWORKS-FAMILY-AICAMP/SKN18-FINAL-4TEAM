@@ -5,7 +5,7 @@ from langchain.chat_models import init_chat_model
 
 def hint_agent(state: InterviewState) -> InterviewState:
     """
-    Hint Agent.
+    Hint Agent입니다.
 
     사용하는 state 필드:
       - current_user_code: 현재 사용자 코드
@@ -23,6 +23,7 @@ def hint_agent(state: InterviewState) -> InterviewState:
     problem_algorithm_category = state.get("problem_algorithm_category", "")
     current_user_code = state.get("current_user_code", "")
     hint_trigger = state.get("hint_trigger", "manual")
+    problem_description = state.get("problem_description", "")
     hint_count = int(state.get("hint_count", 0))
 
     if hint_trigger == "manual":
@@ -42,7 +43,7 @@ def hint_agent(state: InterviewState) -> InterviewState:
 
     system_prompt = (
         "당신은 라이브 코딩 인터뷰의 Hint Agent입니다.\n\n"
-        "[문제 정보]\n"
+        f"- 문제 정보: {problem_description}\n"
         f"- 알고리즘 카테고리: {problem_algorithm_category or '알려지지 않음'}\n"
         f"- 힌트 트리거: {hint_trigger}\n"
         f"- 지금까지 제공된 힌트 개수: {hint_count}\n\n"

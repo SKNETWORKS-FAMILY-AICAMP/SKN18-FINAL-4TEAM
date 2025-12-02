@@ -70,7 +70,12 @@
           </div>
         </header>
         <div class="editor-body">
-          <CodeEditor v-model="code" :mode="cmMode" />
+          <CodeEditor
+            v-model="code"
+            :mode="cmMode"
+            @editor-keydown="handleEditorKeydown"
+            @editor-copy="handleCopy"
+          />
         </div>
         <footer class="editor-footer">
           <button type="button" class="run-button">실행하기</button>
@@ -141,6 +146,16 @@ const videoRef = ref(null);
 const cameraError = ref("");
 let mediaStream = null;
 let antiCheatTimer = null;
+let webcamMonitor = null;
+let keyTimestamps = [];
+let lastAbnormalAlert = 0;
+let lastCopyAlert = 0;
+let lastCameraStatus = "ok";
+
+const KEY_WINDOW_MS = 2000;
+const KEY_THRESHOLD = 12;
+const ABNORMAL_COOLDOWN_MS = 8000;
+const COPY_COOLDOWN_MS = 4000;
 
 const clearAntiCheatTimer = () => {
   if (antiCheatTimer) {
@@ -172,6 +187,64 @@ const handlePaste = () => {
   showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 감지되었습니다.");
 };
 
+const handleCopy = () => {
+  const now = Date.now();
+  if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
+  lastCopyAlert = now;
+  showAntiCheat("copyDetected", "코드 편집기에서 복사 동작이 감지되었습니다.");
+};
+
+const handleEditorKeydown = (event) => {
+  const now = Date.now();
+  if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "c") {
+    handleCopy();
+    return;
+  }
+
+  keyTimestamps.push(now);
+  keyTimestamps = keyTimestamps.filter((ts) => now - ts <= KEY_WINDOW_MS);
+
+  if (
+    keyTimestamps.length >= KEY_THRESHOLD &&
+    now - lastAbnormalAlert >= ABNORMAL_COOLDOWN_MS
+  ) {
+    lastAbnormalAlert = now;
+    showAntiCheat(
+      "abnormalInput",
+      `최근 ${KEY_WINDOW_MS / 1000}초간 ${keyTimestamps.length}회의 빠른 키 입력이 감지되었습니다.`
+    );
+  }
+};
+
+const startWebcamMonitor = () => {
+  if (webcamMonitor) {
+    clearInterval(webcamMonitor);
+    webcamMonitor = null;
+  }
+  webcamMonitor = setInterval(() => {
+    const hasLiveTrack =
+      mediaStream &&
+      mediaStream.getVideoTracks().some((track) => track.readyState === "live");
+
+    if (!hasLiveTrack) {
+      cameraError.value = "웹캠 연결이 중단되었습니다.";
+      if (lastCameraStatus !== "blocked") {
+        showAntiCheat("cameraBlocked", cameraError.value);
+        lastCameraStatus = "blocked";
+      }
+    } else {
+      lastCameraStatus = "ok";
+    }
+  }, 5000);
+};
+
+const stopWebcamMonitor = () => {
+  if (webcamMonitor) {
+    clearInterval(webcamMonitor);
+    webcamMonitor = null;
+  }
+};
+
 onMounted(async () => {
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -183,10 +256,20 @@ onMounted(async () => {
       video: { width: 640, height: 360 },
       audio: false
     });
+
+    mediaStream.getVideoTracks().forEach((track) => {
+      track.onended = () => {
+        cameraError.value = "웹캠 연결이 중단되었습니다.";
+        showAntiCheat("cameraBlocked", cameraError.value);
+        lastCameraStatus = "blocked";
+      };
+    });
+
     if (videoRef.value) {
       videoRef.value.srcObject = mediaStream;
       await videoRef.value.play();
     }
+    startWebcamMonitor();
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
     showAntiCheat("cameraBlocked", cameraError.value);
@@ -196,6 +279,7 @@ onMounted(async () => {
   window.addEventListener("blur", handleWindowBlur);
   document.addEventListener("visibilitychange", handleVisibilityChange);
   document.addEventListener("paste", handlePaste);
+  document.addEventListener("copy", handleCopy);
 });
 
 onBeforeUnmount(() => {
@@ -203,9 +287,11 @@ onBeforeUnmount(() => {
     mediaStream.getTracks().forEach((t) => t.stop());
     mediaStream = null;
   }
+  stopWebcamMonitor();
   window.removeEventListener("blur", handleWindowBlur);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", handlePaste);
+  document.removeEventListener("copy", handleCopy);
   clearAntiCheatTimer();
 });
 </script>

@@ -33,26 +33,33 @@
         <section class="problem-pane">
           <header class="pane-header">
             <span class="pane-title">문제 설명</span>
+            <span v-if="isLoading" class="small-label">불러오는 중...</span>
           </header>
           <div class="problem-body">
-            <h2 class="problem-title">유연근무제</h2>
-            <p class="problem-text">
-              프로그래머스 사이트를 운영하는 그렙에서는 재택근무와 함께 출근 희망 시간을
-              자유롭게 정하는 유연근무제를 시행하고 있습니다. 제도 정착을 위해 오늘부터 일
-              주일 동안 각자 설정한 출근 희망 시간에 맞춰 늦지 않고 출근한 직원에게 상품을
-              주는 이벤트를 진행하려 합니다.
-            </p>
-            <p class="problem-text">
-              직원들은 앞으로 자신이 설정한 출근 희망 시간 ±10분 까지 여유롭게 출근해야
-              합니다. 예를 들어 출근 희망 시간이 9시 58분인 직원은 10시 8분까지 출근해야
-              합니다. 단, 토요일, 일요일의 출근 시간은 이벤트에 영향을 끼치지 않습니다.
-            </p>
-            <h3 class="problem-subtitle">입력 형식</h3>
-            <ul class="problem-list">
-              <li>첫 줄에 직원 수 <code>n</code>이 주어집니다.</li>
-              <li>둘째 줄에는 직원별 희망 출근 시간을 나타내는 배열 <code>schedules</code>가 주어집니다.</li>
-              <li>셋째 줄에는 실제 출근 기록을 담은 2차원 배열 <code>timelogs</code>가 주어집니다.</li>
-            </ul>
+            <p v-if="loadError" class="error-text">{{ loadError }}</p>
+            <template v-else-if="problem">
+              <h2 class="problem-title">{{ problem.title }}</h2>
+              <p class="problem-text">{{ problem.summary }}</p>
+              <p
+                v-for="(line, idx) in problem.description"
+                :key="`desc-${idx}`"
+                class="problem-text"
+              >
+                {{ line }}
+              </p>
+              <h3 class="problem-subtitle">입력 형식</h3>
+              <ul class="problem-list">
+                <li v-for="(line, idx) in problem.input_format" :key="`input-${idx}`">
+                  {{ line }}
+                </li>
+              </ul>
+
+              <div class="tts-block" v-if="langgraphError || ttsError">
+                <p v-if="langgraphError" class="error-text">LangGraph 오류: {{ langgraphError }}</p>
+                <p v-if="ttsError" class="error-text">TTS 오류: {{ ttsError }}</p>
+              </div>
+            </template>
+            <p v-else class="problem-text">문제를 불러오는 중입니다...</p>
           </div>
         </section>
       </div>
@@ -87,10 +94,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
@@ -107,6 +116,20 @@ const {
   setState: setAntiCheatState,
   resetState: resetAntiCheatState
 } = useAntiCheatStatus();
+
+const isLoading = ref(true);
+const loadError = ref("");
+const problem = ref(null);
+const introText = ref("");
+const ttsAudioSrc = ref("");
+const ttsError = ref("");
+const langgraphError = ref("");
+const ttsAudioRef = ref(null);
+const ttsInlinePlayer = ref(null);
+const needManualPlay = ref(false);
+const ttsChunks = ref([]);
+const currentChunkIdx = ref(0);
+let inlineOnEnded = null;
 
 watch(selectedLanguage, (lang) => {
   code.value = languageTemplates[lang];
@@ -245,7 +268,91 @@ const stopWebcamMonitor = () => {
   }
 };
 
+const playTts = async () => {
+  if (!ttsAudioRef.value) return;
+  try {
+    needManualPlay.value = false;
+    await ttsAudioRef.value.play();
+  } catch (err) {
+    // 브라우저 오토플레이 차단 시 수동 재생 유도
+    needManualPlay.value = true;
+    console.warn("TTS auto-play blocked:", err);
+  }
+};
+
+const playTtsInline = async () => {
+  if (!ttsAudioSrc.value) return;
+  if (!ttsInlinePlayer.value) {
+    ttsInlinePlayer.value = new Audio();
+    ttsInlinePlayer.value.playsInline = true;
+    ttsInlinePlayer.value.autoplay = true;
+    ttsInlinePlayer.value.loop = false;
+    inlineOnEnded = async () => {
+      const nextIdx = currentChunkIdx.value + 1;
+      if (nextIdx >= ttsChunks.value.length) return;
+      currentChunkIdx.value = nextIdx;
+      await setAudioByIndex(nextIdx);
+    };
+    ttsInlinePlayer.value.addEventListener("ended", () => {
+      void inlineOnEnded?.();
+    });
+  }
+  try {
+    ttsInlinePlayer.value.src = ttsAudioSrc.value;
+    needManualPlay.value = false;
+    await ttsInlinePlayer.value.play();
+  } catch (err) {
+    needManualPlay.value = true;
+    console.warn("Inline TTS auto-play blocked:", err);
+  }
+};
+
+const setAudioByIndex = async (idx) => {
+  const chunk = ttsChunks.value[idx];
+  if (!chunk) return false;
+  ttsAudioSrc.value = `data:audio/mp3;base64,${chunk}`;
+  await nextTick();
+  await playTtsInline();
+  return true;
+};
+
+const loadSession = async () => {
+  isLoading.value = true;
+  loadError.value = "";
+  try {
+    const resp = await fetch(`${API_BASE}/api/coding-test/session/`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || "세션 데이터를 불러오지 못했습니다.");
+    }
+
+    problem.value = data.problem;
+    introText.value = data.langgraph?.current_question_text || "";
+    langgraphError.value = data.langgraph?.error || "";
+    ttsError.value = data.tts?.error || "";
+
+    const chunkList = Array.isArray(data.tts?.chunks) ? data.tts.chunks : [];
+    const audioList = chunkList
+      .map((item) => item?.audio_base64)
+      .filter(Boolean);
+    ttsChunks.value = audioList;
+    currentChunkIdx.value = 0;
+
+    if (audioList.length > 0) {
+      await setAudioByIndex(0);
+    } else {
+      ttsAudioSrc.value = "";
+    }
+  } catch (err) {
+    console.error(err);
+    loadError.value = err.message || "세션 데이터를 불러오지 못했습니다.";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 onMounted(async () => {
+  await loadSession();
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
@@ -431,6 +538,26 @@ onBeforeUnmount(() => {
   padding-left: 18px;
   font-size: 13px;
   color: #d1d5db;
+}
+
+.small-label {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.error-text {
+  color: #fca5a5;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.tts-block {
+  margin-top: 16px;
+}
+
+.tts-audio {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .editor-header {

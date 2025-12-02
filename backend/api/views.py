@@ -1,7 +1,6 @@
 from datetime import timedelta
 import secrets
 import string
-
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -10,6 +9,9 @@ from django.contrib.auth.hashers import check_password, make_password
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
+
+from interview_engine.graph import graph
+from tts_client import generate_interview_audio_batch
 
 from .email_utils import send_verification_code, verify_code
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
@@ -51,6 +53,77 @@ def roadmap(request):
         ]
     }
     return JsonResponse(data)
+
+
+class LiveCodingSessionView(APIView):
+    def get(self, request):
+        problem = {
+            "id": "flexible_work",
+            "title": "유연근무제",
+            "summary": "출근 희망 시간 ±10분 내 출근 여부를 판별하는 문제",
+            "description": [
+                "프로그래머스 사이트를 운영하는 그렙에서는 재택근무와 함께 출근 희망 시간을 "
+                "자유롭게 정하는 유연근무제를 시행하고 있습니다.",
+                "직원들은 자신이 설정한 출근 희망 시간 ±10분 사이에 출근해야 하며, "
+                "토요일/일요일의 출근 기록은 평가에서 제외됩니다.",
+            ],
+            "input_format": [
+                "첫 줄에 직원 수 n이 주어집니다.",
+                "둘째 줄에는 직원별 희망 출근 시간을 나타내는 배열 schedules가 주어집니다.",
+                "셋째 줄에는 실제 출근 기록을 담은 2차원 배열 timelogs가 주어집니다.",
+            ],
+            "languages": ["python3", "java", "c", "cpp"],
+        }
+
+        # LangGraph로 문제 인트로 멘트 생성
+        user_name = request.query_params.get("user_name") or "지원자"
+        langgraph_state = {
+            "user_name": user_name,
+            "problem_description": " ".join([problem["summary"]] + problem["description"]),
+            "event_type": "init",
+            "await_human": False,
+        }
+
+        langgraph_result = {}
+        graph_error = ""
+        try:
+            langgraph_result = graph.invoke(langgraph_state)
+        except Exception as e:
+            graph_error = str(e)
+            langgraph_result["problem_intro_error"] = graph_error
+
+        intro_text = langgraph_result.get("current_question_text")
+
+        # TTS 생성
+        tts_payload = {}
+        if intro_text:
+            try:
+                tts_result = generate_interview_audio_batch(intro_text)
+                tts_payload = {
+                    "first_audio_time": tts_result.get("first_audio_time"),
+                    "total_time": tts_result.get("total_time"),
+                    "chunks": tts_result.get("audio_chunks", []),
+                }
+            except Exception as e:
+                tts_payload = {"error": str(e)}
+        else:
+            tts_payload = {
+                "error": langgraph_result.get("problem_intro_error") or "intro_text_missing"
+            }
+
+        return Response(
+            {
+                "status": "ready",
+                "problem": problem,
+                "langgraph": {
+                    "current_question_text": intro_text,
+                    "state": langgraph_result,
+                    "error": graph_error or langgraph_result.get("problem_intro_error"),
+                },
+                "tts": tts_payload,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class SignupView(APIView):

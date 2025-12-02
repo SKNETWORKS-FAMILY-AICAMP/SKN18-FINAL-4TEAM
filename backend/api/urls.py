@@ -1,21 +1,23 @@
 from django.urls import path
 from .views import EmailSendView, EmailVerifyView, GoogleAuthView, SignupView, health, roadmap
+
 from .views import (
     EmailSendView,
     EmailVerifyView,
     FindIdView,
     FindPasswordView,
     GoogleAuthView,
+    LiveCodingSessionView,
     LoginView,
     SignupView,
     UserIdCheckView,
     health,
     roadmap,
 )
-
 urlpatterns = [
     path("health/", health, name="health"),
     path("roadmap/", roadmap, name="roadmap"),
+    path("coding-test/session/", LiveCodingSessionView.as_view(), name="coding-session"),
     path("auth/signup/", SignupView.as_view(), name="signup"),
     path("auth/user-id/check/", UserIdCheckView.as_view(), name="user-id-check"),
     path("auth/login/", LoginView.as_view(), name="login"),

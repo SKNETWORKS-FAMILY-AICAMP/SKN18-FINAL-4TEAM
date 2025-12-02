@@ -8,7 +8,7 @@
           <br />
           Live Coding Test!
         </h1>
-        <RouterLink to="/coding-test/session" class="start-btn">테스트 시작</RouterLink>
+        <RouterLink to="/coding-test/settings" class="start-btn">테스트 시작</RouterLink>
       </div>
       <div class="hero-visual">
         <img :src="typingLogo" alt="Live coding illustration" class="hero-image" />

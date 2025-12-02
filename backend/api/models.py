@@ -2,7 +2,7 @@ from django.db import models
 
 
 class User(models.Model):
-  user_id = models.AutoField(primary_key=True)
+  user_id = models.CharField(primary_key=True, max_length=50, db_column="user_id")
   email = models.EmailField(unique=True)
   name = models.CharField(max_length=50)
   phone_number = models.CharField(max_length=30, unique=True, null=True, blank=True)
@@ -12,7 +12,7 @@ class User(models.Model):
   updated_at = models.DateTimeField(null=True, blank=True)
 
   class Meta:
-    managed = False  # 테이블은 init.sql에서 생성됨
+    managed = False
     db_table = "users"
 
 
@@ -27,7 +27,7 @@ class AuthIdentity(models.Model):
   created_at = models.DateTimeField(null=True, blank=True)
 
   class Meta:
-    managed = False  # 테이블은 init.sql에서 생성됨
+    managed = False
     db_table = "auth_identities"
     unique_together = (("provider", "provider_user_id"), ("user", "provider"))
 

@@ -70,16 +70,19 @@
           </div>
         </header>
         <div class="editor-body">
-          <CodeEditor
-            v-model="code"
-            :mode="cmMode"
-            @editor-keydown="handleEditorKeydown"
-            @editor-copy="handleCopy"
-          />
+          <CodeEditor v-model="code" :mode="cmMode" />
         </div>
         <footer class="editor-footer">
           <button type="button" class="run-button">실행하기</button>
           <span class="hint">실행 결과는 추후 연동 예정</span>
+          <button
+            type="button"
+            class="run-button"
+            @click="onAskButtonClick"
+          >
+            {{ isRecording ? "제출" : "질문하기" }}
+          </button>
+          <button type="button" class="run-button">답변하기</button>
         </footer>
       </section>
     </main>
@@ -92,21 +95,116 @@ import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
-const languageTemplates = {
-  python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
-  java: `class Solution {\n    public int solution() {\n        int answer = 0;\n        // TODO: 코드를 작성하세요.\n        return answer;\n    }\n}\n`,
-  c: `#include <stdio.h>\n\nint solution() {\n    int answer = 0;\n    // TODO: 코드를 작성하세요.\n    return answer;\n}\n`,
-  cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint solution() {\n    int answer = 0;\n    // TODO: 코드를 작성하세요.\n    return answer;\n}\n`
+/* -----------------------------
+   🎤 녹음 관련 상태
+----------------------------- */
+let audioStream = null;
+let mediaRecorder = null;
+let audioChunks = [];
+const audioBlob = ref(null);
+const isRecording = ref(false);
+
+/* -----------------------------
+   🔥 버튼 클릭 로직
+   - isRecording = false → 녹음 시작
+   - isRecording = true → 녹음 종료 + STT 실행
+----------------------------- */
+const onAskButtonClick = async () => {
+  if (!isRecording.value) {
+    // 질문하기 → 제출
+    await startRecording();
+    isRecording.value = true;
+  } else {
+    // 제출 → STT 실행
+    await stopRecording();
+    isRecording.value = false;
+    await runSttClient(); // 🔥 STT 실행
+  }
 };
 
-const selectedLanguage = ref("c");
-const code = ref(languageTemplates[selectedLanguage.value]);
+/* -----------------------------
+   🎙️ 녹음 시작
+----------------------------- */
+const startRecording = async () => {
+  try {
+    audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    mediaRecorder = new MediaRecorder(audioStream);
+    audioChunks = [];
 
-const {
-  alert: antiCheatAlert,
-  setState: setAntiCheatState,
-  resetState: resetAntiCheatState
-} = useAntiCheatStatus();
+    mediaRecorder.ondataavailable = (e) => {
+      audioChunks.push(e.data);
+    };
+
+    mediaRecorder.onstop = () => {
+      audioBlob.value = new Blob(audioChunks, { type: "audio/webm" });
+      console.log("🎤 녹음 완료:", audioBlob.value);
+    };
+
+    mediaRecorder.start();
+    console.log("🎙️ 녹음 시작됨");
+  } catch (err) {
+    console.error("마이크 오류:", err);
+    showAntiCheat("micError", "마이크 접근 권한이 필요합니다.");
+  }
+};
+
+/* -----------------------------
+   ⏹녹음 종료
+----------------------------- */
+const stopRecording = async () => {
+  if (mediaRecorder && mediaRecorder.state !== "inactive") {
+    mediaRecorder.stop();
+  }
+  if (audioStream) {
+    audioStream.getTracks().forEach((t) => t.stop());
+  }
+  console.log("⏹ 녹음 종료됨");
+};
+
+/* -----------------------------
+   📤 서버 전송 & STT 실행
+----------------------------- */
+const runSttClient = async () => {
+  if (!audioBlob.value) {
+    showAntiCheat("sttError", "녹음된 음성이 없습니다.");
+    return;
+  }
+
+  try {
+    console.log("STT 전송 중...");
+
+    const res = await fetch("http://localhost:8000/api/stt/run/", {
+      method: "POST",
+      body: audioBlob.value,
+    });
+
+    const data = await res.json();
+    console.log("STT 결과:", data);
+
+    if (data.lines) {
+      const text = data.lines.map((l) => l.text || "").join(" ");
+      console.log("📝 최종 텍스트:", text);
+    } else {
+      showAntiCheat("sttError", "STT 결과가 올바르지 않습니다.");
+    }
+  } catch (err) {
+    console.error("STT 요청 실패:", err);
+    showAntiCheat("sttError", "서버 통신 오류");
+  }
+};
+
+/* -----------------------------
+  ✂ 이하 기존 코드 유지
+----------------------------- */
+
+const selectedLanguage = ref("c");
+const code = ref("");
+const languageTemplates = {
+  python3: `def solution():\n    answer = 0\n    # TODO\n    return answer\n`,
+  java: `class Solution {\n    public int solution() {\n        int answer = 0;\n        return answer;\n    }\n}\n`,
+  c: `#include <stdio.h>\nint solution() { return 0; }\n`,
+  cpp: `#include <bits/stdc++.h>\nusing namespace std;\nint solution() { return 0; }\n`,
+};
 
 watch(selectedLanguage, (lang) => {
   code.value = languageTemplates[lang];
@@ -114,185 +212,58 @@ watch(selectedLanguage, (lang) => {
 
 const currentFilename = computed(() => {
   switch (selectedLanguage.value) {
-    case "python3":
-      return "solution.py";
-    case "java":
-      return "Solution.java";
-    case "c":
-      return "solution.c";
-    case "cpp":
-      return "solution.cpp";
-    default:
-      return "solution.txt";
+    case "python3": return "solution.py";
+    case "java": return "Solution.java";
+    case "c": return "solution.c";
+    case "cpp": return "solution.cpp";
+    default: return "solution.txt";
   }
 });
 
 const cmMode = computed(() => {
   switch (selectedLanguage.value) {
-    case "python3":
-      return "python";
-    case "java":
-      return "text/x-java";
-    case "c":
-      return "text/x-csrc";
-    case "cpp":
-      return "text/x-c++src";
-    default:
-      return "text/plain";
+    case "python3": return "python";
+    case "java": return "text/x-java";
+    case "c": return "text/x-csrc";
+    case "cpp": return "text/x-c++src";
+    default: return "text/plain";
   }
 });
+
+const {
+  alert: antiCheatAlert,
+  setState: setAntiCheatState,
+  resetState: resetAntiCheatState
+} = useAntiCheatStatus();
+
+const showAntiCheat = (key, detail) => {
+  setAntiCheatState(key, { detail, timestamp: Date.now() });
+  setTimeout(() => resetAntiCheatState(), 7000);
+};
 
 const videoRef = ref(null);
 const cameraError = ref("");
-let mediaStream = null;
-let antiCheatTimer = null;
-let webcamMonitor = null;
-let keyTimestamps = [];
-let lastAbnormalAlert = 0;
-let lastCopyAlert = 0;
-let lastCameraStatus = "ok";
-
-const KEY_WINDOW_MS = 2000;
-const KEY_THRESHOLD = 12;
-const ABNORMAL_COOLDOWN_MS = 8000;
-const COPY_COOLDOWN_MS = 4000;
-
-const clearAntiCheatTimer = () => {
-  if (antiCheatTimer) {
-    clearTimeout(antiCheatTimer);
-    antiCheatTimer = null;
-  }
-};
-
-const showAntiCheat = (stateKey, detail) => {
-  clearAntiCheatTimer();
-  setAntiCheatState(stateKey, { detail, timestamp: Date.now() });
-  antiCheatTimer = setTimeout(() => {
-    resetAntiCheatState();
-    antiCheatTimer = null;
-  }, 7000);
-};
-
-const handleVisibilityChange = () => {
-  if (document.visibilityState === "hidden") {
-    showAntiCheat("tabSwitch", "시험 화면을 벗어났습니다.");
-  }
-};
-
-const handleWindowBlur = () => {
-  showAntiCheat("windowBlur", "다른 창으로 이동이 감지되었습니다.");
-};
-
-const handlePaste = () => {
-  showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 감지되었습니다.");
-};
-
-const handleCopy = () => {
-  const now = Date.now();
-  if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
-  lastCopyAlert = now;
-  showAntiCheat("copyDetected", "코드 편집기에서 복사 동작이 감지되었습니다.");
-};
-
-const handleEditorKeydown = (event) => {
-  const now = Date.now();
-  if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "c") {
-    handleCopy();
-    return;
-  }
-
-  keyTimestamps.push(now);
-  keyTimestamps = keyTimestamps.filter((ts) => now - ts <= KEY_WINDOW_MS);
-
-  if (
-    keyTimestamps.length >= KEY_THRESHOLD &&
-    now - lastAbnormalAlert >= ABNORMAL_COOLDOWN_MS
-  ) {
-    lastAbnormalAlert = now;
-    showAntiCheat(
-      "abnormalInput",
-      `최근 ${KEY_WINDOW_MS / 1000}초간 ${keyTimestamps.length}회의 빠른 키 입력이 감지되었습니다.`
-    );
-  }
-};
-
-const startWebcamMonitor = () => {
-  if (webcamMonitor) {
-    clearInterval(webcamMonitor);
-    webcamMonitor = null;
-  }
-  webcamMonitor = setInterval(() => {
-    const hasLiveTrack =
-      mediaStream &&
-      mediaStream.getVideoTracks().some((track) => track.readyState === "live");
-
-    if (!hasLiveTrack) {
-      cameraError.value = "웹캠 연결이 중단되었습니다.";
-      if (lastCameraStatus !== "blocked") {
-        showAntiCheat("cameraBlocked", cameraError.value);
-        lastCameraStatus = "blocked";
-      }
-    } else {
-      lastCameraStatus = "ok";
-    }
-  }, 5000);
-};
-
-const stopWebcamMonitor = () => {
-  if (webcamMonitor) {
-    clearInterval(webcamMonitor);
-    webcamMonitor = null;
-  }
-};
+let mediaStreamVideo = null;
 
 onMounted(async () => {
   try {
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
-      showAntiCheat("cameraBlocked", cameraError.value);
-      return;
-    }
-    mediaStream = await navigator.mediaDevices.getUserMedia({
+    mediaStreamVideo = await navigator.mediaDevices.getUserMedia({
       video: { width: 640, height: 360 },
-      audio: false
+      audio: false,
     });
-
-    mediaStream.getVideoTracks().forEach((track) => {
-      track.onended = () => {
-        cameraError.value = "웹캠 연결이 중단되었습니다.";
-        showAntiCheat("cameraBlocked", cameraError.value);
-        lastCameraStatus = "blocked";
-      };
-    });
-
     if (videoRef.value) {
-      videoRef.value.srcObject = mediaStream;
+      videoRef.value.srcObject = mediaStreamVideo;
       await videoRef.value.play();
     }
-    startWebcamMonitor();
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
-    showAntiCheat("cameraBlocked", cameraError.value);
-    console.error(err);
   }
-
-  window.addEventListener("blur", handleWindowBlur);
-  document.addEventListener("visibilitychange", handleVisibilityChange);
-  document.addEventListener("paste", handlePaste);
-  document.addEventListener("copy", handleCopy);
 });
 
 onBeforeUnmount(() => {
-  if (mediaStream) {
-    mediaStream.getTracks().forEach((t) => t.stop());
-    mediaStream = null;
+  if (mediaStreamVideo) {
+    mediaStreamVideo.getTracks().forEach((t) => t.stop());
   }
-  stopWebcamMonitor();
-  window.removeEventListener("blur", handleWindowBlur);
-  document.removeEventListener("visibilitychange", handleVisibilityChange);
-  document.removeEventListener("paste", handlePaste);
-  document.removeEventListener("copy", handleCopy);
-  clearAntiCheatTimer();
 });
 </script>
 

@@ -42,3 +42,47 @@ class EmailVerification(models.Model):
 
   class Meta:
     db_table = "email_verifications"
+
+
+class CodingProblem(models.Model):
+  problem_id = models.IntegerField(primary_key=True)
+  problem = models.TextField()
+  difficulty = models.CharField(max_length=50)
+  category = models.CharField(max_length=100)
+
+  class Meta:
+    managed = False
+    db_table = "coding_problem"
+
+
+class CodingProblemLanguage(models.Model):
+  id = models.IntegerField(primary_key=True)
+  problem = models.ForeignKey(
+      CodingProblem,
+      on_delete=models.CASCADE,
+      db_column="problem_id",
+      related_name="languages",
+  )
+  function_name = models.CharField(max_length=255)
+  starter_code = models.TextField()
+  language = models.CharField(max_length=50)
+
+  class Meta:
+    managed = False
+    db_table = "coding_problem_language"
+
+
+class TestCase(models.Model):
+  id = models.IntegerField(primary_key=True)
+  problem = models.ForeignKey(
+      CodingProblem,
+      on_delete=models.CASCADE,
+      db_column="problem_id",
+      related_name="test_cases",
+  )
+  input_data = models.TextField(db_column="input")
+  output_data = models.TextField(db_column="output")
+
+  class Meta:
+    managed = False
+    db_table = "test_case"

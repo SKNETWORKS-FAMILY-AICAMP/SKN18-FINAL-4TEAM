@@ -26,6 +26,16 @@ export const ANTI_CHEAT_STATES = {
     message: "웹캠 모니터링이 꺼졌거나 가려졌습니다.",
     level: "critical"
   },
+  copyDetected: {
+    title: "복사 동작 감지",
+    message: "코드 편집기에서 복사 동작이 감지되었습니다.",
+    level: "warning"
+  },
+  abnormalInput: {
+    title: "비정상 입력 패턴 감지",
+    message: "비정상적으로 빠른 입력 패턴이 감지되었습니다.",
+    level: "warning"
+  },
   networkDrop: {
     title: "네트워크 불안정",
     message: "모니터링 연결이 일시적으로 불안정합니다.",

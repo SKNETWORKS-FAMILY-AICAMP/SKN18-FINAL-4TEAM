@@ -22,10 +22,11 @@ const props = defineProps({
   }
 });
 
-const emit = defineEmits(["update:modelValue"]);
+const emit = defineEmits(["update:modelValue", "editor-keydown", "editor-copy"]);
 
 const textarea = ref(null);
 let editor = null;
+let copyListenerCleanup = null;
 
 onMounted(() => {
   editor = CodeMirror.fromTextArea(textarea.value, {
@@ -47,6 +48,18 @@ onMounted(() => {
       emit("update:modelValue", val);
     }
   });
+
+  editor.on("keydown", (_cm, event) => {
+    emit("editor-keydown", event);
+  });
+
+  const wrapperEl = editor.getWrapperElement();
+  const handleCopy = (event) => emit("editor-copy", event);
+
+  if (wrapperEl && wrapperEl.addEventListener) {
+    wrapperEl.addEventListener("copy", handleCopy);
+    copyListenerCleanup = () => wrapperEl.removeEventListener("copy", handleCopy);
+  }
 });
 
 watch(
@@ -71,6 +84,10 @@ onBeforeUnmount(() => {
   if (editor) {
     editor.toTextArea();
     editor = null;
+  }
+  if (copyListenerCleanup) {
+    copyListenerCleanup();
+    copyListenerCleanup = null;
   }
 });
 </script>

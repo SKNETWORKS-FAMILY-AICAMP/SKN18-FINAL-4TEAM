@@ -13,7 +13,8 @@
             <div class="step-index">{{ item.id }}</div>
             <div class="step-label">{{ item.label }}</div>
             <span v-if="item.id === 2 && cameraPassed" class="pass-badge">통과</span>
-            <span v-if="item.id === 3 && micPassed" class="pass-badge">통과</span>
+            <!-- ✅ 마이크 + 스피커 둘 다 통과해야 3번에 뱃지 표시 -->
+            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge">통과</span>
           </li>
         </ol>
       </aside>
@@ -86,13 +87,14 @@
           </div>
         </div>
 
-        <!-- 3. 마이크 연결 -->
+        <!-- 3. 마이크/스피커 연결 -->
         <div v-else-if="currentStep === 3" class="step-panel">
           <h3 class="step-title">마이크 연결</h3>
           <p class="step-desc">
             아래 버튼을 눌러 마이크/스피커 테스트를 진행해 주세요. 몇 초 동안 말하면 자동으로 통과 여부를 판단합니다.
           </p>
 
+          <!-- 🎤 마이크 테스트 -->
           <div class="audio-test-box">
             <label class="audio-label">마이크 입력 레벨</label>
             <div class="audio-bar-wrapper">
@@ -106,14 +108,36 @@
             </div>
           </div>
 
+          <!-- 🔊 스피커 테스트 -->
+          <div class="speaker-test-box">
+            <label class="audio-label">스피커 테스트</label>
+            <div class="speaker-actions">
+              <button type="button" class="secondary-btn small" @click="playSpeakerTest">
+                테스트 음성 재생
+              </button>
+              <button
+                type="button"
+                class="secondary-btn small"
+                :disabled="!speakerTestPlayed"
+                @click="confirmSpeakerHeard"
+              >
+                소리가 들렸어요
+              </button>
+            </div>
+          </div>
+
           <p class="help-text">
             상태:
             <strong>
               {{
-                micPassed
-                  ? "마이크 통과 ✅"
+                micPassed && speakerPassed
+                  ? "마이크·스피커 통과 ✅"
                   : micChecking
                   ? "음성 분석 중... 말을 해보세요 🎤"
+                  : !micPassed
+                  ? "마이크 테스트 필요 ❗"
+                  : !speakerPassed
+                  ? "스피커 테스트 필요 ❗"
                   : "테스트 필요 ❗"
               }}
             </strong>
@@ -126,7 +150,7 @@
             </button>
             <button
               class="primary-btn"
-              :disabled="!micPassed"
+              :disabled="!micPassed || !speakerPassed"
               @click="goNext"
             >
               다음
@@ -150,7 +174,7 @@
             <button class="secondary-btn" @click="goPrev">이전</button>
             <button
               class="primary-btn"
-              :disabled="!cameraPassed || !micPassed"
+              :disabled="!cameraPassed || !micPassed || !speakerPassed"
               @click="startTest"
             >
               시작
@@ -207,18 +231,13 @@ const startCameraTest = async () => {
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
 
-    // video DOM 표시하도록 상태 변경
     cameraActive.value = true;
-
-    // DOM이 실제로 만들어질 때까지 기다림
     await nextTick();
 
-    // 이제 videoRef가 null이 아님
     if (videoRef.value) {
       videoRef.value.srcObject = cameraStream;
     }
 
-    // 밝기 체크 시작
     setTimeout(() => {
       checkCameraBrightness();
     }, 1000);
@@ -249,12 +268,10 @@ const checkCameraBrightness = () => {
 
     let total = 0;
     for (let i = 0; i < data.length; i += 4) {
-      // 간단한 밝기 값 (gray = (r+g+b)/3)
       total += (data[i] + data[i + 1] + data[i + 2]) / 3;
     }
     const avgBrightness = total / (width * height);
 
-    // 임계값 약 30 이상이면 "어두운 화면이 아니다"라고 보고 통과
     cameraPassed.value = avgBrightness > 30;
   } catch (e) {
     cameraPassed.value = false;
@@ -286,7 +303,6 @@ const startMicTest = async () => {
   micPassed.value = false;
   micChecking.value = true;
 
-  // 이전 것들 정리
   stopMic();
 
   try {
@@ -301,11 +317,11 @@ const startMicTest = async () => {
 
     const dataArray = new Uint8Array(analyser.fftSize);
 
-    let sumRms = 0;      // 모든 프레임의 rms 합
-    let frameCount = 0;  // 측정한 프레임 수
-    let maxVolume = 0;   // (옵션) 최고 볼륨 – 참고용
+    let sumRms = 0;
+    let frameCount = 0;
+    let maxVolume = 0;
 
-    const AVG_RMS_THRESHOLD = 20; // ✅ 5초 평균 rms 기준 (말하기 톤 정도)
+    const AVG_RMS_THRESHOLD = 3; // 여유 있게 설정
 
     const updateLevel = () => {
       if (!analyser) return;
@@ -316,14 +332,12 @@ const startMicTest = async () => {
         const v = dataArray[i] - 128;
         sum += v * v;
       }
-      const rms = Math.sqrt(sum / dataArray.length); // 0~약 90
+      const rms = Math.sqrt(sum / dataArray.length);
 
-      // 평균 계산용 누적
       sumRms += rms;
       frameCount += 1;
       maxVolume = Math.max(maxVolume, rms);
 
-      // UI용 레벨 (0~100)
       micLevel.value = Math.min(100, Math.round((rms / 60) * 100));
 
       micAnimationId = requestAnimationFrame(updateLevel);
@@ -331,24 +345,21 @@ const startMicTest = async () => {
 
     updateLevel();
 
-    // 🔴 5초 동안 측정 후 평균값으로 통과 여부 결정
     micCheckTimeout = setTimeout(() => {
       micChecking.value = false;
 
       const avgRms = frameCount > 0 ? sumRms / frameCount : 0;
       console.log("avgRms:", avgRms, "maxVolume:", maxVolume);
 
-      // ✅ 5초 동안의 평균 말하기 크기가 기준 이상일 때 통과
       micPassed.value = avgRms > AVG_RMS_THRESHOLD;
 
-      stopMic(false); // 스트림은 끊되 마지막 레벨은 그대로 남김
-    }, 5000); // 5000ms = 5초
+      stopMic(false);
+    }, 5000);
   } catch (e) {
     micChecking.value = false;
     alert("마이크 접근이 거부되었습니다. 브라우저 권한 설정을 확인해 주세요.");
   }
 };
-
 
 const stopMic = (resetLevel = true) => {
   if (micAnimationId) {
@@ -370,6 +381,32 @@ const stopMic = (resetLevel = true) => {
   if (resetLevel) {
     micLevel.value = 0;
   }
+};
+
+/* ----- 스피커 체크 ----- */
+const speakerPassed = ref(false);
+const speakerTestPlayed = ref(false);
+
+const playSpeakerTest = () => {
+  speakerTestPlayed.value = true;
+
+  // Web Audio API로 1초짜리 비프음 재생
+  const ctx = new (window.AudioContext || window.webkitAudioContext)();
+  const osc = ctx.createOscillator();
+  osc.type = "sine";
+  osc.frequency.value = 880; // 880Hz 비프음
+
+  osc.connect(ctx.destination);
+  osc.start();
+
+  setTimeout(() => {
+    osc.stop();
+    ctx.close();
+  }, 1000);
+};
+
+const confirmSpeakerHeard = () => {
+  speakerPassed.value = true;
 };
 
 /* ----- 마지막: 테스트 시작 ----- */
@@ -591,6 +628,22 @@ onBeforeUnmount(() => {
 .audio-level-text {
   font-size: 12px;
   color: #4b5563;
+}
+
+/* 스피커 테스트 */
+.speaker-test-box {
+  margin-top: 16px;
+}
+
+.speaker-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.secondary-btn.small {
+  padding: 6px 12px;
+  font-size: 12px;
 }
 
 /* 공통 */

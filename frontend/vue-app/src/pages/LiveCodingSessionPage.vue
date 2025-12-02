@@ -92,6 +92,8 @@ import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
   java: `class Solution {\n    public int solution() {\n        int answer = 0;\n        // TODO: 코드를 작성하세요.\n        return answer;\n    }\n}\n`,
@@ -147,6 +149,7 @@ const cameraError = ref("");
 let mediaStream = null;
 let antiCheatTimer = null;
 let webcamMonitor = null;
+let mediapipeInterval = null;
 let keyTimestamps = [];
 let lastAbnormalAlert = 0;
 let lastCopyAlert = 0;
@@ -192,6 +195,55 @@ const handleCopy = () => {
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
   showAntiCheat("copyDetected", "코드 편집기에서 복사 동작이 감지되었습니다.");
+};
+
+const sendFrameForMediapipe = async () => {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 180;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 360;
+  const scale = Math.min(canvas.width / vw, canvas.height / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  const dx = (canvas.width - dw) / 2;
+  const dy = (canvas.height - dh) / 2;
+
+  ctx.drawImage(video, dx, dy, dw, dh);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append("image", blob, "frame.jpg");
+
+    try {
+      const resp = await fetch(`${BACKEND_BASE}/mediapipe/analyze/`, {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        console.error("mediapipe analyze error:", data);
+        return;
+      }
+
+      if (data.is_cheating) {
+        const detail =
+          data.reason || "카메라 분석 결과 의심스러운 행동이 감지되었습니다.";
+        showAntiCheat("mediapipeCheat", detail);
+      }
+    } catch (err) {
+      console.error("mediapipe analyze request failed:", err);
+    }
+  }, "image/jpeg", 0.6);
 };
 
 const handleEditorKeydown = (event) => {
@@ -270,6 +322,9 @@ onMounted(async () => {
       await videoRef.value.play();
     }
     startWebcamMonitor();
+    mediapipeInterval = setInterval(() => {
+      void sendFrameForMediapipe();
+    }, 5000);
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
     showAntiCheat("cameraBlocked", cameraError.value);
@@ -288,6 +343,10 @@ onBeforeUnmount(() => {
     mediaStream = null;
   }
   stopWebcamMonitor();
+  if (mediapipeInterval) {
+    clearInterval(mediapipeInterval);
+    mediapipeInterval = null;
+  }
   window.removeEventListener("blur", handleWindowBlur);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", handlePaste);

@@ -14,7 +14,13 @@ from rest_framework.views import APIView
 from .email_utils import send_verification_code, verify_code
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
-from .models import AuthIdentity, User
+from .models import (
+    AuthIdentity,
+    CodingProblem,
+    CodingProblemLanguage,
+    TestCase,
+    User,
+)
 from .serializers import SignupSerializer
 
 
@@ -51,6 +57,48 @@ def roadmap(request):
         ]
     }
     return JsonResponse(data)
+
+
+class RandomCodingProblemView(APIView):
+    """
+    coding_problem + coding_problem_language 조합에서 언어별 랜덤 문제를 반환합니다.
+    기본 언어는 python 입니다.
+    """
+
+    def get(self, request):
+        language = (request.query_params.get("language") or "python").lower()
+        problem_lang = (
+            CodingProblemLanguage.objects.select_related("problem")
+            .prefetch_related("problem__test_cases")
+            .filter(language__iexact=language)
+            .order_by("?")
+            .first()
+        )
+
+        if not problem_lang:
+            return Response(
+                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        problem = problem_lang.problem
+        test_cases = [
+            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
+        ]
+
+        return Response(
+            {
+                "problem_id": problem.problem_id,
+                "problem": problem.problem,
+                "difficulty": problem.difficulty,
+                "category": problem.category,
+                "language": problem_lang.language,
+                "function_name": problem_lang.function_name,
+                "starter_code": problem_lang.starter_code,
+                "test_cases": test_cases,
+            }
+        )
 
 
 class SignupView(APIView):

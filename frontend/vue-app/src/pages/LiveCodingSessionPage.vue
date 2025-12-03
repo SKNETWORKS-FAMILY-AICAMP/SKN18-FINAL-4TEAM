@@ -33,32 +33,33 @@
         <section class="problem-pane">
           <header class="pane-header">
             <span class="pane-title">문제 설명</span>
+            <span v-if="isLoading" class="small-label">불러오는 중...</span>
           </header>
           <div class="problem-body">
-            <div v-if="isLoadingProblem" class="problem-status">문제를 불러오는 중입니다.</div>
-            <div v-else-if="problemError" class="problem-status error">
-              <p>{{ problemError }}</p>
-              <button type="button" class="retry-button" @click="fetchRandomProblem">다시 시도</button>
-            </div>
-            <div v-else-if="problemData" class="problem-content">
-              <h2 class="problem-title">실전 문제</h2>
-              <p v-for="(para, idx) in problemParagraphs" :key="idx" class="problem-text">
-                {{ para }}
+            <p v-if="loadError" class="error-text">{{ loadError }}</p>
+            <template v-else-if="problem">
+              <h2 class="problem-title">{{ problem.title }}</h2>
+              <p class="problem-text">{{ problem.summary }}</p>
+              <p
+                v-for="(line, idx) in problem.description"
+                :key="`desc-${idx}`"
+                class="problem-text"
+              >
+                {{ line }}
               </p>
+              <h3 class="problem-subtitle">입력 형식</h3>
+              <ul class="problem-list">
+                <li v-for="(line, idx) in problem.input_format" :key="`input-${idx}`">
+                  {{ line }}
+                </li>
+              </ul>
 
-              <div v-if="displayedTestCases.length" class="testcase-block">
-                <h3 class="problem-subtitle">예시 테스트 케이스</h3>
-                <ul class="testcase-list">
-                  <li v-for="tc in displayedTestCases" :key="tc.id" class="testcase-item">
-                    <div class="testcase-label">입력</div>
-                    <pre>{{ tc.input }}</pre>
-                    <div class="testcase-label">출력</div>
-                    <pre>{{ tc.output }}</pre>
-                  </li>
-                </ul>
+              <div class="tts-block" v-if="langgraphError || ttsError">
+                <p v-if="langgraphError" class="error-text">LangGraph 오류: {{ langgraphError }}</p>
+                <p v-if="ttsError" class="error-text">TTS 오류: {{ ttsError }}</p>
               </div>
-            </div>
-            <div v-else class="problem-status">표시할 문제가 없습니다.</div>
+            </template>
+            <p v-else class="problem-text">문제를 불러오는 중입니다...</p>
           </div>
         </section>
       </div>
@@ -93,12 +94,12 @@
 </template>
 
 <script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
@@ -118,6 +119,20 @@ const {
   setState: setAntiCheatState,
   resetState: resetAntiCheatState
 } = useAntiCheatStatus();
+
+const isLoading = ref(true);
+const loadError = ref("");
+const problem = ref(null);
+const introText = ref("");
+const ttsAudioSrc = ref("");
+const ttsError = ref("");
+const langgraphError = ref("");
+const ttsAudioRef = ref(null);
+const ttsInlinePlayer = ref(null);
+const needManualPlay = ref(false);
+const ttsChunks = ref([]);
+const currentChunkIdx = ref(0);
+let inlineOnEnded = null;
 
 watch(selectedLanguage, (lang) => {
   if (lang === "python3" && problemData.value?.starter_code) {
@@ -352,8 +367,91 @@ const stopWebcamMonitor = () => {
   }
 };
 
+const playTts = async () => {
+  if (!ttsAudioRef.value) return;
+  try {
+    needManualPlay.value = false;
+    await ttsAudioRef.value.play();
+  } catch (err) {
+    // 브라우저 오토플레이 차단 시 수동 재생 유도
+    needManualPlay.value = true;
+    console.warn("TTS auto-play blocked:", err);
+  }
+};
+
+const playTtsInline = async () => {
+  if (!ttsAudioSrc.value) return;
+  if (!ttsInlinePlayer.value) {
+    ttsInlinePlayer.value = new Audio();
+    ttsInlinePlayer.value.playsInline = true;
+    ttsInlinePlayer.value.autoplay = true;
+    ttsInlinePlayer.value.loop = false;
+    inlineOnEnded = async () => {
+      const nextIdx = currentChunkIdx.value + 1;
+      if (nextIdx >= ttsChunks.value.length) return;
+      currentChunkIdx.value = nextIdx;
+      await setAudioByIndex(nextIdx);
+    };
+    ttsInlinePlayer.value.addEventListener("ended", () => {
+      void inlineOnEnded?.();
+    });
+  }
+  try {
+    ttsInlinePlayer.value.src = ttsAudioSrc.value;
+    needManualPlay.value = false;
+    await ttsInlinePlayer.value.play();
+  } catch (err) {
+    needManualPlay.value = true;
+    console.warn("Inline TTS auto-play blocked:", err);
+  }
+};
+
+const setAudioByIndex = async (idx) => {
+  const chunk = ttsChunks.value[idx];
+  if (!chunk) return false;
+  ttsAudioSrc.value = `data:audio/mp3;base64,${chunk}`;
+  await nextTick();
+  await playTtsInline();
+  return true;
+};
+
+const loadSession = async () => {
+  isLoading.value = true;
+  loadError.value = "";
+  try {
+    const resp = await fetch(`${API_BASE}/api/coding-test/session/`);
+    const data = await resp.json();
+    if (!resp.ok) {
+      throw new Error(data.detail || "세션 데이터를 불러오지 못했습니다.");
+    }
+
+    problem.value = data.problem;
+    introText.value = data.langgraph?.current_question_text || "";
+    langgraphError.value = data.langgraph?.error || "";
+    ttsError.value = data.tts?.error || "";
+
+    const chunkList = Array.isArray(data.tts?.chunks) ? data.tts.chunks : [];
+    const audioList = chunkList
+      .map((item) => item?.audio_base64)
+      .filter(Boolean);
+    ttsChunks.value = audioList;
+    currentChunkIdx.value = 0;
+
+    if (audioList.length > 0) {
+      await setAudioByIndex(0);
+    } else {
+      ttsAudioSrc.value = "";
+    }
+  } catch (err) {
+    console.error(err);
+    loadError.value = err.message || "세션 데이터를 불러오지 못했습니다.";
+  } finally {
+    isLoading.value = false;
+  }
+};
+
 onMounted(async () => {
-  void fetchRandomProblem();
+  await loadSession();
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
@@ -586,48 +684,24 @@ onBeforeUnmount(() => {
   color: #d1d5db;
 }
 
-.testcase-block {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #1f2937;
-}
-
-.testcase-list {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0 0;
-  display: grid;
-  gap: 10px;
-}
-
-.testcase-item {
-  border: 1px solid #1f2937;
-  background: #0c1221;
-  border-radius: 12px;
-  padding: 10px;
-}
-
-.testcase-label {
-  font-size: 11px;
-  color: #9ca3af;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.testcase-item pre {
-  background: #0f172a;
-  border-radius: 10px;
-  padding: 8px;
-  color: #e5e7eb;
+.small-label {
   font-size: 12px;
-  white-space: pre-wrap;
-  margin: 0 0 8px;
-  overflow-x: auto;
+  color: #9ca3af;
 }
 
-.testcase-item pre:last-of-type {
-  margin-bottom: 0;
+.error-text {
+  color: #fca5a5;
+  font-size: 13px;
+  margin: 0 0 8px;
+}
+
+.tts-block {
+  margin-top: 16px;
+}
+
+.tts-audio {
+  margin-top: 8px;
+  width: 100%;
 }
 
 .editor-header {

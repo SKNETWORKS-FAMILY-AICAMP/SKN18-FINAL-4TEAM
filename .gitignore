@@ -1,6 +1,9 @@
 .venv
+.env
+.langgraph_api
+agent.egg-info
+__pycache__
 */postgres-data
 */*/node_modules
 backend/*/__pycache__
 backend/*/migrations
-.env

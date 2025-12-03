@@ -3,12 +3,20 @@ from __future__ import annotations
 from dataclasses import dataclass, asdict
 from typing import Any, Dict, Optional, Tuple
 
-import cv2
-import mediapipe as mp
-import numpy as np
+try:
+    import cv2
+    import mediapipe as mp
+    import numpy as np
+    IMPORT_ERROR = None
+except ImportError as e:
+    # 필수 의존성이 없을 때 서버 기동이 막히지 않도록 늦은 오류로 처리
+    IMPORT_ERROR = e
+    cv2 = None  # type: ignore
+    mp = None  # type: ignore
+    np = None  # type: ignore
 
 
-mp_face_mesh = mp.solutions.face_mesh
+mp_face_mesh = mp.solutions.face_mesh if mp else None
 
 
 @dataclass
@@ -39,6 +47,9 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
     """
     HTTP로 전달된 바이트 이미지를 OpenCV BGR 이미지로 디코딩합니다.
     """
+
+    if IMPORT_ERROR:
+        raise ValueError(f"영상 분석 모듈(cv2/mediapipe) 미설치: {IMPORT_ERROR}")
 
     nparr = np.frombuffer(image_bytes, np.uint8)
     img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
@@ -226,6 +237,9 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
       - 최종 시선(FINAL_LR/UD)이 CENTER가 아니면 화면 이탈 가능성 → is_cheating = True
       - 그렇지 않으면 정상 → is_cheating = False
     """
+
+    if IMPORT_ERROR:
+        raise ValueError(f"영상 분석 모듈(cv2/mediapipe) 미설치: {IMPORT_ERROR}")
 
     img_bgr = _decode_image(image_bytes)
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)

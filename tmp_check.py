@@ -1,99 +1,5 @@
-<template>
-  <div class="session-page">
-    <AntiCheatAlert
-      :visible="antiCheatAlert.visible"
-      :state="antiCheatAlert.state"
-      :title="antiCheatAlert.title"
-      :description="antiCheatAlert.description"
-      :level="antiCheatAlert.level"
-      :timestamp="antiCheatAlert.timestamp"
-      @dismiss="resetAntiCheatState"
-    />
-    <header class="session-header">
-      <h1>JobTory Live Coding</h1>
-      <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
-    </header>
 
-    <main class="session-main">
-      <div class="left-column">
-        <section class="camera-pane">
-          <header class="pane-header">
-            <span class="pane-title">캠 미리보기</span>
-          </header>
-          <div class="camera-body">
-            <div class="camera-placeholder">
-              <video ref="videoRef" autoplay playsinline muted></video>
-            </div>
-            <p class="camera-message">
-              {{ cameraError || "현재 웹캠으로 녹화 중입니다." }}
-            </p>
-          </div>
-        </section>
-
-        <section class="problem-pane">
-          <header class="pane-header">
-            <span class="pane-title">문제 설명</span>
-          </header>
-          <div class="problem-body">
-            <div v-if="isLoadingProblem" class="problem-status">문제를 불러오는 중입니다.</div>
-            <div v-else-if="problemError" class="problem-status error">
-              <p>{{ problemError }}</p>
-              <button type="button" class="retry-button" @click="fetchRandomProblem">다시 시도</button>
-            </div>
-            <div v-else-if="problemData" class="problem-content">
-              <h2 class="problem-title">실전 문제</h2>
-              <p v-for="(para, idx) in problemParagraphs" :key="idx" class="problem-text">
-                {{ para }}
-              </p>
-
-              <div v-if="displayedTestCases.length" class="testcase-block">
-                <h3 class="problem-subtitle">예시 테스트 케이스</h3>
-                <ul class="testcase-list">
-                  <li v-for="tc in displayedTestCases" :key="tc.id" class="testcase-item">
-                    <div class="testcase-label">입력</div>
-                    <pre>{{ tc.input }}</pre>
-                    <div class="testcase-label">출력</div>
-                    <pre>{{ tc.output }}</pre>
-                  </li>
-                </ul>
-              </div>
-            </div>
-            <div v-else class="problem-status">표시할 문제가 없습니다.</div>
-          </div>
-        </section>
-      </div>
-
-      <section class="editor-pane">
-        <header class="pane-header editor-header">
-          <div class="tab">{{ currentFilename }}</div>
-          <div class="editor-options">
-            <select v-model="selectedLanguage" class="lang-select">
-              <option value="python3">Python3</option>
-              <option value="java">Java</option>
-              <option value="c">C</option>
-              <option value="cpp">C++</option>
-            </select>
-          </div>
-        </header>
-        <div class="editor-body">
-          <CodeEditor
-            v-model="code"
-            :mode="cmMode"
-            @editor-keydown="handleEditorKeydown"
-            @editor-copy="handleCopy"
-          />
-        </div>
-        <footer class="editor-footer">
-          <button type="button" class="run-button">실행하기</button>
-          <span class="hint">실행 결과는 추후 연동 예정</span>
-        </footer>
-      </section>
-    </main>
-  </div>
-</template>
-
-<script setup>
-import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
@@ -112,6 +18,16 @@ const code = ref(languageTemplates[selectedLanguage.value]);
 const problemData = ref(null);
 const isLoadingProblem = ref(false);
 const problemError = ref("");
+const introText = ref("");
+const ttsError = ref("");
+const langgraphError = ref("");
+const ttsAudioSrc = ref("");
+const ttsInlinePlayer = ref(null);
+const needManualPlay = ref(false);
+const ttsChunks = ref([]);
+const currentChunkIdx = ref(0);
+let inlineOnEnded = null;
+let userInteractListener = null;
 
 const {
   alert: antiCheatAlert,
@@ -141,29 +57,87 @@ const displayedTestCases = computed(() => {
   return problemData.value.test_cases.slice(0, 3);
 });
 
+const playTtsInline = async () => {
+  if (!ttsAudioSrc.value) return;
+  if (!ttsInlinePlayer.value) {
+    ttsInlinePlayer.value = new Audio();
+    ttsInlinePlayer.value.playsInline = true;
+    ttsInlinePlayer.value.autoplay = true;
+    ttsInlinePlayer.value.loop = false;
+    inlineOnEnded = async () => {
+      const nextIdx = currentChunkIdx.value + 1;
+      if (nextIdx >= ttsChunks.value.length) return;
+      currentChunkIdx.value = nextIdx;
+      await setAudioByIndex(nextIdx);
+    };
+    ttsInlinePlayer.value.addEventListener("ended", () => {
+      void inlineOnEnded?.();
+    });
+  }
+  try {
+    ttsInlinePlayer.value.src = ttsAudioSrc.value;
+    needManualPlay.value = false;
+    await ttsInlinePlayer.value.play();
+  } catch (err) {
+    needManualPlay.value = true;
+    console.warn("Inline TTS auto-play blocked:", err);
+  }
+};
+
+const setAudioByIndex = async (idx) => {
+  const chunk = ttsChunks.value[idx];
+  if (!chunk) return false;
+  ttsAudioSrc.value = `data:audio/mp3;base64,${chunk}`;
+  await nextTick();
+  await playTtsInline();
+  return true;
+};
+
+const tryResumeTts = async () => {
+  if (!needManualPlay.value || !ttsAudioSrc.value) return;
+  await playTtsInline();
+};
+
 const fetchRandomProblem = async () => {
   isLoadingProblem.value = true;
   problemError.value = "";
 
   try {
-    const resp = await fetch(`${BACKEND_BASE}/api/coding-problems/random/?language=python`);
+    const resp = await fetch(`${BACKEND_BASE}/api/coding-test/session/?language=python`);
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      throw new Error(data?.detail || "문제를 불러오지 못했습니다.");
+      throw new Error(data?.detail || "세션 데이터를 불러오지 못했습니다.");
     }
 
-    problemData.value = data;
+    problemData.value = data.problem;
     if (selectedLanguage.value !== "python3") {
       selectedLanguage.value = "python3";
     }
-    if (data.starter_code) {
-      code.value = data.starter_code;
+    if (data.problem?.starter_code) {
+      code.value = data.problem.starter_code;
     } else if (selectedLanguage.value === "python3") {
       code.value = languageTemplates.python3;
     }
+
+    introText.value = data.langgraph?.current_question_text || "";
+    langgraphError.value = data.langgraph?.error || "";
+    ttsError.value = data.tts?.error || "";
+
+    const chunkList = Array.isArray(data.tts?.chunks) ? data.tts.chunks : [];
+    const audioList = chunkList
+      .map((item) => (typeof item === "string" ? item : item?.audio_base64))
+      .filter(Boolean);
+    ttsChunks.value = audioList;
+    currentChunkIdx.value = 0;
+
+    if (audioList.length > 0) {
+      await setAudioByIndex(0);
+    } else {
+      ttsAudioSrc.value = "";
+    }
   } catch (err) {
     console.error(err);
-    problemError.value = err?.message || "문제를 불러오지 못했습니다.";
+    problemError.value = err?.message || "세션 데이터를 불러오지 못했습니다.";
   } finally {
     isLoadingProblem.value = false;
   }
@@ -391,6 +365,10 @@ onMounted(async () => {
   document.addEventListener("visibilitychange", handleVisibilityChange);
   document.addEventListener("paste", handlePaste);
   document.addEventListener("copy", handleCopy);
+  userInteractListener = () => {
+    void tryResumeTts();
+  };
+  document.addEventListener("click", userInteractListener);
 });
 
 onBeforeUnmount(() => {
@@ -407,296 +385,9 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", handlePaste);
   document.removeEventListener("copy", handleCopy);
+  if (userInteractListener) {
+    document.removeEventListener("click", userInteractListener);
+    userInteractListener = null;
+  }
   clearAntiCheatTimer();
 });
-</script>
-
-<style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap");
-
-.session-page {
-  min-height: 100vh;
-  display: flex;
-  flex-direction: column;
-  background: #111827;
-  color: #e5e7eb;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.session-header {
-  padding: 14px 28px;
-  border-bottom: 1px solid #1f2937;
-  display: flex;
-  align-items: baseline;
-  gap: 12px;
-}
-
-.session-header h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.session-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #9ca3af;
-}
-
-.session-main {
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr);
-  gap: 1px;
-  background: #030712;
-}
-
-.left-column {
-  display: flex;
-  flex-direction: column;
-}
-
-.camera-pane,
-.problem-pane,
-.editor-pane {
-  display: flex;
-  flex-direction: column;
-  background: #020617;
-}
-
-.pane-header {
-  padding: 10px 18px;
-  border-bottom: 1px solid #1e293b;
-  font-size: 13px;
-  color: #9ca3af;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.pane-title {
-  font-weight: 600;
-}
-
-.problem-body {
-  padding: 16px 20px 20px;
-  overflow-y: auto;
-}
-
-.retry-button {
-  padding: 6px 12px;
-  border-radius: 8px;
-  border: 1px solid #1f2937;
-  background: #0f172a;
-  color: #e5e7eb;
-  font-size: 12px;
-  cursor: pointer;
-  transition: background 0.15s ease, transform 0.15s ease;
-}
-
-.retry-button:hover {
-  background: #111827;
-  transform: translateY(-1px);
-}
-
-.problem-status {
-  border: 1px solid #1e293b;
-  background: #0b1220;
-  color: #cbd5e1;
-  padding: 12px;
-  border-radius: 12px;
-  font-size: 13px;
-  text-align: center;
-}
-
-.problem-status.error {
-  border-color: #4b2835;
-  color: #fca5a5;
-  background: #190c11;
-}
-
-.problem-content {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.camera-body {
-  flex: 0 0 auto;
-  padding: 12px 18px 8px;
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: center;
-}
-
-.camera-placeholder {
-  width: auto;
-  height: auto;
-  border-radius: 16px;
-  border: 1px solid #374151;
-  overflow: hidden;
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: radial-gradient(circle at 0 0, #020617, #020617 40%, #020617);
-}
-
-.camera-placeholder video {
-  width: 260px;
-  aspect-ratio: 16 / 9;
-  border-radius: 14px;
-  object-fit: cover;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.7);
-}
-
-.camera-placeholder .camera-message {
-  font-size: 5px;
-  color: #e5e7eb;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 4px 5px;
-  border-radius: 999px;
-  margin-top: 6px;
-}
-
-.problem-title {
-  margin: 0 0 12px;
-  font-size: 18px;
-  color: #f9fafb;
-}
-
-.problem-subtitle {
-  margin: 16px 0 6px;
-  font-size: 14px;
-  color: #e5e7eb;
-}
-
-.problem-text {
-  margin: 0 0 10px;
-  font-size: 13px;
-  line-height: 1.6;
-  color: #d1d5db;
-}
-
-.problem-list {
-  margin: 0;
-  padding-left: 18px;
-  font-size: 13px;
-  color: #d1d5db;
-}
-
-.testcase-block {
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid #1f2937;
-}
-
-.testcase-list {
-  list-style: none;
-  padding: 0;
-  margin: 8px 0 0;
-  display: grid;
-  gap: 10px;
-}
-
-.testcase-item {
-  border: 1px solid #1f2937;
-  background: #0c1221;
-  border-radius: 12px;
-  padding: 10px;
-}
-
-.testcase-label {
-  font-size: 11px;
-  color: #9ca3af;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-
-.testcase-item pre {
-  background: #0f172a;
-  border-radius: 10px;
-  padding: 8px;
-  color: #e5e7eb;
-  font-size: 12px;
-  white-space: pre-wrap;
-  margin: 0 0 8px;
-  overflow-x: auto;
-}
-
-.testcase-item pre:last-of-type {
-  margin-bottom: 0;
-}
-
-.editor-header {
-  justify-content: space-between;
-}
-
-.tab {
-  padding: 4px 10px;
-  border-radius: 999px;
-  background: #0f172a;
-  font-size: 12px;
-  color: #e5e7eb;
-}
-
-.editor-options {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-.lang-select {
-  background: transparent;
-  border: none;
-  color: #9ca3af;
-  font-size: 12px;
-  padding: 2px 4px;
-  outline: none;
-}
-
-.lang-select option {
-  color: #0f172a;
-}
-
-.editor-body {
-  flex: 1;
-  padding: 12px 16px 0;
-  background: #020617;
-}
-
-.editor-footer {
-  padding: 8px 18px 12px;
-  border-top: 1px solid #1f2937;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.run-button {
-  padding: 6px 14px;
-  border-radius: 999px;
-  border: none;
-  background: #22c55e;
-  color: #022c22;
-  font-size: 13px;
-  font-weight: 700;
-  cursor: pointer;
-}
-
-.hint {
-  font-size: 12px;
-  color: #9ca3af;
-}
-
-@media (max-width: 900px) {
-  .session-main {
-    grid-template-columns: 1fr;
-  }
-
-  .code-editor {
-    height: 260px;
-  }
-}
-</style>

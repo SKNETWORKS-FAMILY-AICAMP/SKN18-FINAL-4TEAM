@@ -57,7 +57,3 @@ def create_graph_flow():
     graph.add_edge("final_eval_agent", END)    
     
     return  graph.compile()
-
-
-
-graph = create_graph_flow()

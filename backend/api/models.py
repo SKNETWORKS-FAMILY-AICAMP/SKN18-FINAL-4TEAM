@@ -30,6 +30,9 @@ class AuthIdentity(models.Model):
     managed = False
     db_table = "auth_identities"
     unique_together = (("provider", "provider_user_id"), ("user", "provider"))
+    indexes = [
+      models.Index(fields=["provider", "provider_user_id"], name="auth_id_provider_user_idx"),
+    ]
 
 
 class EmailVerification(models.Model):

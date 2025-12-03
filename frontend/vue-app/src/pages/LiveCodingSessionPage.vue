@@ -79,8 +79,9 @@
             type="button"
             class="run-button"
             @click="onAskButtonClick"
+            :disabled="isSttRunning"
           >
-            {{ isRecording ? "제출" : "질문하기" }}
+            {{ isSttRunning ? "분석 중..." : (isRecording ? "제출" : "질문하기") }}
           </button>
           <button type="button" class="run-button">답변하기</button>
         </footer>
@@ -103,6 +104,8 @@ let mediaRecorder = null;
 let audioChunks = [];
 const audioBlob = ref(null);
 const isRecording = ref(false);
+//STT 진행 중 여부
+const isSttRunning = ref(false);
 
 /* -----------------------------
    🔥 버튼 클릭 로직
@@ -110,15 +113,24 @@ const isRecording = ref(false);
    - isRecording = true → 녹음 종료 + STT 실행
 ----------------------------- */
 const onAskButtonClick = async () => {
+  // STT 처리 중일 땐 아예 무시
+  if (isSttRunning.value) return;
+
   if (!isRecording.value) {
-    // 질문하기 → 제출
+    // 질문하기 → 녹음 시작
     await startRecording();
     isRecording.value = true;
   } else {
-    // 제출 → STT 실행
+    // 제출 → 녹음 종료 + STT 실행
     await stopRecording();
     isRecording.value = false;
-    await runSttClient(); // 🔥 STT 실행
+
+    isSttRunning.value = true;      // 🔥 STT 시작
+    try {
+      await runSttClient();         // STT 끝날 때까지 버튼 비활성화
+    } finally {
+      isSttRunning.value = false;   // 🔥 STT 종료 후 다시 활성화
+    }
   }
 };
 
@@ -185,10 +197,10 @@ const runSttClient = async () => {
   }
 
   try {
-    console.log("STT 전송 중...");
-
     const res = await fetch("http://localhost:8000/api/stt/run/", {
       method: "POST",
+      // raw PCM/웹엠 바이트 그대로 보낼 거라 헤더 안 넣는 게 안전
+      // headers: { "Content-Type": "application/octet-stream" },
       body: audioBlob.value,
     });
 
@@ -196,8 +208,8 @@ const runSttClient = async () => {
     console.log("STT 결과:", data);
 
     if (data.lines) {
-      const text = data.lines.map((l) => l.text || "").join(" ");
-      console.log("📝 최종 텍스트:", text);
+      const text = data.lines.map(l => l.text || "").join(" ");
+      console.log("최종 텍스트:", text);
     } else {
       showAntiCheat("sttError", "STT 결과가 올바르지 않습니다.");
     }
@@ -206,6 +218,7 @@ const runSttClient = async () => {
     showAntiCheat("sttError", "서버 통신 오류");
   }
 };
+
 
 /* -----------------------------
   ✂ 이하 기존 코드 유지

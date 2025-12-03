@@ -7,6 +7,7 @@ from .views import (
     FindPasswordView,
     GoogleAuthView,
     LoginView,
+    RandomCodingProblemView,
     SignupView,
     UserIdCheckView,
     health,
@@ -24,4 +25,5 @@ urlpatterns = [
     path("auth/email/send/", EmailSendView.as_view(), name="email-send"),
     path("auth/email/verify/", EmailVerifyView.as_view(), name="email-verify"),
     path("auth/google/", GoogleAuthView.as_view(), name="google-auth"),
+    path("coding-problems/random/", RandomCodingProblemView.as_view(), name="coding-problem-random"),
 ]

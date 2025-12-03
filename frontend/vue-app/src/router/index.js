@@ -10,6 +10,7 @@ import SignUpTermsPage from "../pages/SignUpTermsPage.vue";
 import SignUpPersonalPage from "../pages/SignUpPersonalPage.vue";
 import SignUpCompanyPage from "../pages/SignUpCompanyPage.vue";
 import MyPage from "../pages/MyPage.vue";
+import LiveCodingSettingPage from "../pages/LiveCodingSettingPage.vue";
 
 const routes = [
   { path: "/", name: "home", component: MainPage },
@@ -19,6 +20,7 @@ const routes = [
   { path: "/signup/personal", name: "signup-personal", component: SignUpPersonalPage },
   { path: "/signup/company", name: "signup-company", component: SignUpCompanyPage },
   { path: "/coding-test", name: "coding-test", component: LiveCodingPage },
+  { path: "/coding-test/settings", name: "coding-settings", component: LiveCodingSettingPage },
   { path: "/coding-test/session", name: "coding-session", component: LiveCodingSessionPage },
   { path: "/interview", name: "interview", component: InterviewPage },
   { path: "/mypage", name: "mypage", component: MyPage, meta: { requiresAuth: true } }

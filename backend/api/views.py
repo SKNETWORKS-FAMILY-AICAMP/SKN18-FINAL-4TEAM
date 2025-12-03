@@ -98,8 +98,7 @@ class RandomCodingProblemView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
-            }
-        )
+            })
 
 class LiveCodingSessionView(APIView):
     def get(self, request):

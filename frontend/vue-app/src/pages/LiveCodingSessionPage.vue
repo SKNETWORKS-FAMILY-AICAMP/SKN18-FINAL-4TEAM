@@ -35,6 +35,7 @@
             <span class="pane-title">문제 설명</span>
           </header>
           <div class="problem-body">
+<<<<<<< HEAD
             <div v-if="isLoadingProblem" class="problem-status">문제를 불러오는 중입니다.</div>
             <div v-else-if="problemError" class="problem-status error">
               <p>{{ problemError }}</p>
@@ -59,6 +60,32 @@
               </div>
             </div>
             <div v-else class="problem-status">표시할 문제가 없습니다.</div>
+=======
+            <p v-if="loadError" class="error-text">{{ loadError }}</p>
+            <template v-else-if="problem">
+              <h2 class="problem-title">{{ problem.title }}</h2>
+              <p class="problem-text">{{ problem.summary }}</p>
+              <p
+                v-for="(line, idx) in problem.description"
+                :key="`desc-${idx}`"
+                class="problem-text"
+              >
+                {{ line }}
+              </p>
+              <h3 class="problem-subtitle">입력 형식</h3>
+              <ul class="problem-list">
+                <li v-for="(line, idx) in problem.input_format" :key="`input-${idx}`">
+                  {{ line }}
+                </li>
+              </ul>
+
+              <div class="tts-block" v-if="langgraphError || ttsError">
+                <p v-if="langgraphError" class="error-text">LangGraph 오류: {{ langgraphError }}</p>
+                <p v-if="ttsError" class="error-text">TTS 오류: {{ ttsError }}</p>
+              </div>
+            </template>
+            <p v-else class="problem-text">문제를 불러오는 중입니다...</p>
+>>>>>>> ee415ccefc7569f7aff7901b5811fd750c6b3bf5
           </div>
         </section>
       </div>
@@ -98,7 +125,11 @@ import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
+<<<<<<< HEAD
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+=======
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+>>>>>>> ee415ccefc7569f7aff7901b5811fd750c6b3bf5
 
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
@@ -421,7 +452,11 @@ const stopWebcamMonitor = () => {
 };
 
 onMounted(async () => {
+<<<<<<< HEAD
   void fetchRandomProblem();
+=======
+  await loadSession();
+>>>>>>> ee415ccefc7569f7aff7901b5811fd750c6b3bf5
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
@@ -662,6 +697,7 @@ onBeforeUnmount(() => {
   color: #d1d5db;
 }
 
+<<<<<<< HEAD
 .testcase-block {
   margin-top: 10px;
   padding-top: 10px;

@@ -6,6 +6,7 @@ from interview_engine.nodes.hint_node import hint_agent
 from interview_engine.nodes.question_generation_node import question_generation_agent
 from interview_engine.nodes.final_eval_node import final_eval_agent
 from interview_engine.nodes.answer_classify import answer_classify_agent
+from interview_engine.nodes.code_quality_node import code_quality_agent
 from interview_engine.conditional_edges import route_loop
 
 def session_manager(state: InterviewState) -> InterviewState:
@@ -23,6 +24,7 @@ def create_graph_flow():
     
     # chapter 2: Coding
     graph.add_node("hint_agent", hint_agent)
+    graph.add_node("code_quality_agent", code_quality_agent)
     graph.add_node("question_generation_agent", question_generation_agent)
     
     # chapter3: Evaluation
@@ -38,6 +40,7 @@ def create_graph_flow():
             "problem_intro_agent": "problem_intro_agent",
             "answer_classify_agent":"answer_classify_agent",
             "problem_solving_eval_agent": "problem_solving_eval_agent",
+            "code_quality_agent":"code_quality_agent",
             "hint_agent":"hint_agent",
             "question_generation_agent":"question_generation_agent",
             "final_eval_agent":"final_eval_agent",
@@ -48,6 +51,7 @@ def create_graph_flow():
     # 워커 노드들은 일을 끝내고 항상 main_loop로 돌아온다
     graph.add_edge("problem_intro_agent", "session_manager")
     graph.add_edge("problem_solving_eval_agent", "session_manager")
+    graph.add_edge("code_quality_agent","session_manager")
     graph.add_edge("hint_agent","session_manager")
     graph.add_edge("question_generation_agent","session_manager")
     graph.add_edge("final_eval_agent", END)    

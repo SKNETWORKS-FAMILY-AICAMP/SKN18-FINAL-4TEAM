@@ -35,7 +35,6 @@
             <span class="pane-title">문제 설명</span>
           </header>
           <div class="problem-body">
-<<<<<<< HEAD
             <div v-if="isLoadingProblem" class="problem-status">문제를 불러오는 중입니다.</div>
             <div v-else-if="problemError" class="problem-status error">
               <p>{{ problemError }}</p>
@@ -60,32 +59,6 @@
               </div>
             </div>
             <div v-else class="problem-status">표시할 문제가 없습니다.</div>
-=======
-            <p v-if="loadError" class="error-text">{{ loadError }}</p>
-            <template v-else-if="problem">
-              <h2 class="problem-title">{{ problem.title }}</h2>
-              <p class="problem-text">{{ problem.summary }}</p>
-              <p
-                v-for="(line, idx) in problem.description"
-                :key="`desc-${idx}`"
-                class="problem-text"
-              >
-                {{ line }}
-              </p>
-              <h3 class="problem-subtitle">입력 형식</h3>
-              <ul class="problem-list">
-                <li v-for="(line, idx) in problem.input_format" :key="`input-${idx}`">
-                  {{ line }}
-                </li>
-              </ul>
-
-              <div class="tts-block" v-if="langgraphError || ttsError">
-                <p v-if="langgraphError" class="error-text">LangGraph 오류: {{ langgraphError }}</p>
-                <p v-if="ttsError" class="error-text">TTS 오류: {{ ttsError }}</p>
-              </div>
-            </template>
-            <p v-else class="problem-text">문제를 불러오는 중입니다...</p>
->>>>>>> ee415ccefc7569f7aff7901b5811fd750c6b3bf5
           </div>
         </section>
       </div>
@@ -120,16 +93,12 @@
 </template>
 
 <script setup>
-import { computed, nextTick, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
-<<<<<<< HEAD
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
-=======
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
->>>>>>> ee415ccefc7569f7aff7901b5811fd750c6b3bf5
 
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
@@ -143,16 +112,6 @@ const code = ref(languageTemplates[selectedLanguage.value]);
 const problemData = ref(null);
 const isLoadingProblem = ref(false);
 const problemError = ref("");
-const introText = ref("");
-const ttsError = ref("");
-const langgraphError = ref("");
-const ttsAudioSrc = ref("");
-const ttsInlinePlayer = ref(null);
-const needManualPlay = ref(false);
-const ttsChunks = ref([]);
-const currentChunkIdx = ref(0);
-let inlineOnEnded = null;
-let userInteractListener = null;
 
 const {
   alert: antiCheatAlert,
@@ -182,87 +141,29 @@ const displayedTestCases = computed(() => {
   return problemData.value.test_cases.slice(0, 3);
 });
 
-const playTtsInline = async () => {
-  if (!ttsAudioSrc.value) return;
-  if (!ttsInlinePlayer.value) {
-    ttsInlinePlayer.value = new Audio();
-    ttsInlinePlayer.value.playsInline = true;
-    ttsInlinePlayer.value.autoplay = true;
-    ttsInlinePlayer.value.loop = false;
-    inlineOnEnded = async () => {
-      const nextIdx = currentChunkIdx.value + 1;
-      if (nextIdx >= ttsChunks.value.length) return;
-      currentChunkIdx.value = nextIdx;
-      await setAudioByIndex(nextIdx);
-    };
-    ttsInlinePlayer.value.addEventListener("ended", () => {
-      void inlineOnEnded?.();
-    });
-  }
-  try {
-    ttsInlinePlayer.value.src = ttsAudioSrc.value;
-    needManualPlay.value = false;
-    await ttsInlinePlayer.value.play();
-  } catch (err) {
-    needManualPlay.value = true;
-    console.warn("Inline TTS auto-play blocked:", err);
-  }
-};
-
-const setAudioByIndex = async (idx) => {
-  const chunk = ttsChunks.value[idx];
-  if (!chunk) return false;
-  ttsAudioSrc.value = `data:audio/mp3;base64,${chunk}`;
-  await nextTick();
-  await playTtsInline();
-  return true;
-};
-
-const tryResumeTts = async () => {
-  if (!needManualPlay.value || !ttsAudioSrc.value) return;
-  await playTtsInline();
-};
-
 const fetchRandomProblem = async () => {
   isLoadingProblem.value = true;
   problemError.value = "";
 
   try {
-    const resp = await fetch(`${BACKEND_BASE}/api/coding-test/session/?language=python`);
+    const resp = await fetch(`${BACKEND_BASE}/api/coding-problems/random/?language=python`);
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      throw new Error(data?.detail || "세션 데이터를 불러오지 못했습니다.");
+      throw new Error(data?.detail || "문제를 불러오지 못했습니다.");
     }
 
-    problemData.value = data.problem;
+    problemData.value = data;
     if (selectedLanguage.value !== "python3") {
       selectedLanguage.value = "python3";
     }
-    if (data.problem?.starter_code) {
-      code.value = data.problem.starter_code;
+    if (data.starter_code) {
+      code.value = data.starter_code;
     } else if (selectedLanguage.value === "python3") {
       code.value = languageTemplates.python3;
     }
-
-    introText.value = data.langgraph?.current_question_text || "";
-    langgraphError.value = data.langgraph?.error || "";
-    ttsError.value = data.tts?.error || "";
-
-    const chunkList = Array.isArray(data.tts?.chunks) ? data.tts.chunks : [];
-    const audioList = chunkList
-      .map((item) => (typeof item === "string" ? item : item?.audio_base64))
-      .filter(Boolean);
-    ttsChunks.value = audioList;
-    currentChunkIdx.value = 0;
-
-    if (audioList.length > 0) {
-      await setAudioByIndex(0);
-    } else {
-      ttsAudioSrc.value = "";
-    }
   } catch (err) {
     console.error(err);
-    problemError.value = err?.message || "세션 데이터를 불러오지 못했습니다.";
+    problemError.value = err?.message || "문제를 불러오지 못했습니다.";
   } finally {
     isLoadingProblem.value = false;
   }
@@ -452,11 +353,7 @@ const stopWebcamMonitor = () => {
 };
 
 onMounted(async () => {
-<<<<<<< HEAD
   void fetchRandomProblem();
-=======
-  await loadSession();
->>>>>>> ee415ccefc7569f7aff7901b5811fd750c6b3bf5
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
@@ -494,10 +391,6 @@ onMounted(async () => {
   document.addEventListener("visibilitychange", handleVisibilityChange);
   document.addEventListener("paste", handlePaste);
   document.addEventListener("copy", handleCopy);
-  userInteractListener = () => {
-    void tryResumeTts();
-  };
-  document.addEventListener("click", userInteractListener);
 });
 
 onBeforeUnmount(() => {
@@ -514,10 +407,6 @@ onBeforeUnmount(() => {
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", handlePaste);
   document.removeEventListener("copy", handleCopy);
-  if (userInteractListener) {
-    document.removeEventListener("click", userInteractListener);
-    userInteractListener = null;
-  }
   clearAntiCheatTimer();
 });
 </script>
@@ -697,7 +586,6 @@ onBeforeUnmount(() => {
   color: #d1d5db;
 }
 
-<<<<<<< HEAD
 .testcase-block {
   margin-top: 10px;
   padding-top: 10px;

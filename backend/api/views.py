@@ -10,19 +10,13 @@ from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from interview_engine.graph import graph
+from interview_engine.graph import create_graph_flow
 from tts_client import generate_interview_audio_batch
 
 from .email_utils import send_verification_code, verify_code
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
-from .models import (
-    AuthIdentity,
-    CodingProblem,
-    CodingProblemLanguage,
-    TestCase,
-    User,
-)
+from .models import AuthIdentity, CodingProblemLanguage, TestCase, User
 from .serializers import SignupSerializer
 
 
@@ -59,6 +53,7 @@ def roadmap(request):
         ]
     }
     return JsonResponse(data)
+
 
 class RandomCodingProblemView(APIView):
     """
@@ -98,46 +93,19 @@ class RandomCodingProblemView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
-            })
+            }
+        )
 
 class LiveCodingSessionView(APIView):
     def get(self, request):
-        language = (request.query_params.get("language") or "python").lower()
-        problem_lang = (
-            CodingProblemLanguage.objects.select_related("problem")
-            .prefetch_related("problem__test_cases")
-            .filter(language__iexact=language)
-            .order_by("?")
-            .first()
-        )
-
-        if not problem_lang:
-            return Response(
-                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        problem_obj = problem_lang.problem
-        test_cases = [
-            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-            for tc in (problem_obj.test_cases.all() if hasattr(problem_obj, "test_cases") else [])
-        ]
-        problem_payload = {
-            "problem_id": problem_obj.problem_id,
-            "problem": problem_obj.problem,
-            "difficulty": problem_obj.difficulty,
-            "category": problem_obj.category,
-            "language": problem_lang.language,
-            "function_name": problem_lang.function_name,
-            "starter_code": problem_lang.starter_code,
-            "test_cases": test_cases,
-        }
+        # 랜덤 문제를 바로 추출하지 않고, 클라이언트가 전달한 problem을 그대로 사용
+        problem_payload = request.data.get("problem") if request.method == "POST" else None
 
         # LangGraph로 문제 인트로 멘트 생성
         user_name = request.query_params.get("user_name") or "지원자"
         langgraph_state = {
             "user_name": user_name,
-            "problem_description": problem_obj.problem,
+            "problem_data": (problem_payload or {}).get("problem") or "",
             "event_type": "init",
             "await_human": False,
         }
@@ -145,7 +113,7 @@ class LiveCodingSessionView(APIView):
         langgraph_result = {}
         graph_error = ""
         try:
-            langgraph_result = graph.invoke(langgraph_state)
+            langgraph_result = create_graph_flow.invoke(langgraph_state)
         except Exception as e:
             graph_error = str(e)
             langgraph_result["problem_intro_error"] = graph_error

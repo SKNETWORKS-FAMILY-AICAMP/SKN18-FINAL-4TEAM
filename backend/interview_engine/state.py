@@ -13,7 +13,7 @@ class InterviewState(TypedDict, total=False):
     user_name: str
     
     # 문제 
-    problem_description: str
+    problem_data: str
     
     # 1번 agent
     problem_intro_error: str

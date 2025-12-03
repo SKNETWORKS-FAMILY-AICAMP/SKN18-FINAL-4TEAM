@@ -76,7 +76,12 @@
           </div>
         </header>
         <div class="editor-body">
-          <CodeEditor v-model="code" :mode="cmMode" />
+          <CodeEditor
+            v-model="code"
+            :mode="cmMode"
+            @editor-keydown="handleEditorKeydown"
+            @editor-copy="handleCopy"
+          />
         </div>
         <footer class="editor-footer">
           <button type="button" class="run-button">실행하기</button>
@@ -104,7 +109,12 @@ import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const {
+  alert: antiCheatAlert,
+  setState: setAntiCheatState,
+  resetState: resetAntiCheatState,
+} = useAntiCheatStatus();
+
 
 /* -----------------------------
    🎤 녹음 관련 상태
@@ -233,18 +243,18 @@ const runSttClient = async () => {
 /* -----------------------------
   ✂ 이하 기존 코드 유지
 ----------------------------- */
-
+const languageTemplates = {
+  python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
+  java: `class Solution {\n    public int solution() {\n        int answer = 0;\n        // TODO: 코드를 작성하세요.\n        return answer;\n    }\n}\n`,
+  c: `#include <stdio.h>\n\nint solution() {\n    int answer = 0;\n    // TODO: 코드를 작성하세요.\n    return answer;\n}\n`,
+  cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint solution() {\n    int answer = 0;\n    // TODO: 코드를 작성하세요.\n    return answer;\n}\n`
+}
 const selectedLanguage = ref("python3");
 const code = ref(languageTemplates[selectedLanguage.value]);
 const problemData = ref(null);
 const isLoadingProblem = ref(false);
 const problemError = ref("");
 
-const {
-  alert: antiCheatAlert,
-  setState: setAntiCheatState,
-  resetState: resetAntiCheatState
-} = useAntiCheatStatus();
 
 watch(selectedLanguage, (lang) => {
   if (lang === "python3" && problemData.value?.starter_code) {
@@ -316,16 +326,6 @@ const cmMode = computed(() => {
   }
 });
 
-const {
-  alert: antiCheatAlert,
-  setState: setAntiCheatState,
-  resetState: resetAntiCheatState
-} = useAntiCheatStatus();
-
-const showAntiCheat = (key, detail) => {
-  setAntiCheatState(key, { detail, timestamp: Date.now() });
-  setTimeout(() => resetAntiCheatState(), 7000);
-};
 
 const videoRef = ref(null);
 const cameraError = ref("");
@@ -483,12 +483,12 @@ const stopWebcamMonitor = () => {
 onMounted(async () => {
   void fetchRandomProblem();
   try {
-    mediaStreamVideo = await navigator.mediaDevices.getUserMedia({
+    mediaStream = await navigator.mediaDevices.getUserMedia({
       video: { width: 640, height: 360 },
       audio: false,
     });
     if (videoRef.value) {
-      videoRef.value.srcObject = mediaStreamVideo;
+      videoRef.value.srcObject = mediaStream ;
       await videoRef.value.play();
     }
     startWebcamMonitor();
@@ -501,8 +501,8 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
-  if (mediaStreamVideo) {
-    mediaStreamVideo.getTracks().forEach((t) => t.stop());
+  if (mediaStream) {
+    mediaStream.getTracks().forEach((t) => t.stop());
   }
   stopWebcamMonitor();
   if (mediapipeInterval) {

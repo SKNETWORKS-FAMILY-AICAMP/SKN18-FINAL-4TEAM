@@ -41,6 +41,11 @@ export const ANTI_CHEAT_STATES = {
     message: "모니터링 연결이 일시적으로 불안정합니다.",
     level: "info"
   },
+  mediapipeCheat: {
+    title: "행동 기반 부정행위 감지",
+    message: "카메라 분석 결과 의심스러운 행동이 감지되었습니다.",
+    level: "warning"
+  },
   unknown: {
     title: "감지 알림",
     message: "확인되지 않은 행동이 감지되었습니다.",

@@ -4,13 +4,13 @@ CREATE TABLE IF NOT EXISTS coding_problem (
     problem_id   SERIAL PRIMARY KEY,
     problem      TEXT         NOT NULL,
     difficulty   VARCHAR(50)  NOT NULL,
-    category     VARCHAR(100) NOT NULL
+    category     VARCHAR(500) NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS coding_problem_language (
     id           SERIAL       PRIMARY KEY,
     problem_id   INT          NOT NULL,
-    function_name VARCHAR(100) NOT NULL,
+    function_name VARCHAR(500) NOT NULL,
     starter_code  TEXT         NOT NULL,
     language      VARCHAR(50)  NOT NULL,
     CONSTRAINT fk_coding_problem_language_problem

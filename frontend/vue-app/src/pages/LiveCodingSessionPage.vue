@@ -36,30 +36,30 @@
             <span v-if="isLoading" class="small-label">불러오는 중...</span>
           </header>
           <div class="problem-body">
-            <p v-if="loadError" class="error-text">{{ loadError }}</p>
-            <template v-else-if="problem">
-              <h2 class="problem-title">{{ problem.title }}</h2>
-              <p class="problem-text">{{ problem.summary }}</p>
-              <p
-                v-for="(line, idx) in problem.description"
-                :key="`desc-${idx}`"
-                class="problem-text"
-              >
-                {{ line }}
+            <div v-if="isLoadingProblem" class="problem-status">문제를 불러오는 중입니다.</div>
+            <div v-else-if="problemError" class="problem-status error">
+              <p>{{ problemError }}</p>
+              <button type="button" class="retry-button" @click="fetchRandomProblem">다시 시도</button>
+            </div>
+            <div v-else-if="problemData" class="problem-content">
+              <h2 class="problem-title">실전 문제</h2>
+              <p v-for="(para, idx) in problemParagraphs" :key="idx" class="problem-text">
+                {{ para }}
               </p>
-              <h3 class="problem-subtitle">입력 형식</h3>
-              <ul class="problem-list">
-                <li v-for="(line, idx) in problem.input_format" :key="`input-${idx}`">
-                  {{ line }}
-                </li>
-              </ul>
 
-              <div class="tts-block" v-if="langgraphError || ttsError">
-                <p v-if="langgraphError" class="error-text">LangGraph 오류: {{ langgraphError }}</p>
-                <p v-if="ttsError" class="error-text">TTS 오류: {{ ttsError }}</p>
+              <div v-if="displayedTestCases.length" class="testcase-block">
+                <h3 class="problem-subtitle">예시 테스트 케이스</h3>
+                <ul class="testcase-list">
+                  <li v-for="tc in displayedTestCases" :key="tc.id" class="testcase-item">
+                    <div class="testcase-label">입력</div>
+                    <pre>{{ tc.input }}</pre>
+                    <div class="testcase-label">출력</div>
+                    <pre>{{ tc.output }}</pre>
+                  </li>
+                </ul>
               </div>
-            </template>
-            <p v-else class="problem-text">문제를 불러오는 중입니다...</p>
+            </div>
+            <div v-else class="problem-status">표시할 문제가 없습니다.</div>
           </div>
         </section>
       </div>
@@ -99,7 +99,11 @@ import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
+<<<<<<< HEAD
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+=======
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+>>>>>>> origin/dev
 
 const languageTemplates = {
   python3: `def solution():\n    answer = 0\n    # TODO: 코드를 작성하세요.\n    return answer\n`,
@@ -108,8 +112,11 @@ const languageTemplates = {
   cpp: `#include <bits/stdc++.h>\nusing namespace std;\n\nint solution() {\n    int answer = 0;\n    // TODO: 코드를 작성하세요.\n    return answer;\n}\n`
 };
 
-const selectedLanguage = ref("c");
+const selectedLanguage = ref("python3");
 const code = ref(languageTemplates[selectedLanguage.value]);
+const problemData = ref(null);
+const isLoadingProblem = ref(false);
+const problemError = ref("");
 
 const {
   alert: antiCheatAlert,
@@ -132,8 +139,54 @@ const currentChunkIdx = ref(0);
 let inlineOnEnded = null;
 
 watch(selectedLanguage, (lang) => {
-  code.value = languageTemplates[lang];
+  if (lang === "python3" && problemData.value?.starter_code) {
+    code.value = problemData.value.starter_code;
+    return;
+  }
+  code.value = languageTemplates[lang] || languageTemplates.python3;
 });
+
+const problemParagraphs = computed(() => {
+  if (!problemData.value?.problem) return [];
+  return problemData.value.problem
+    .replace(/\r\n?/g, "\n")
+    .split(/\n{2,}/)         
+    .map((p) => p.replace(/\n/g, " ").trim())
+    .filter(Boolean);
+});
+
+const displayedTestCases = computed(() => {
+  if (!problemData.value?.test_cases?.length) return [];
+  return problemData.value.test_cases.slice(0, 3);
+});
+
+const fetchRandomProblem = async () => {
+  isLoadingProblem.value = true;
+  problemError.value = "";
+
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/coding-problems/random/?language=python`);
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.detail || "문제를 불러오지 못했습니다.");
+    }
+
+    problemData.value = data;
+    if (selectedLanguage.value !== "python3") {
+      selectedLanguage.value = "python3";
+    }
+    if (data.starter_code) {
+      code.value = data.starter_code;
+    } else if (selectedLanguage.value === "python3") {
+      code.value = languageTemplates.python3;
+    }
+  } catch (err) {
+    console.error(err);
+    problemError.value = err?.message || "문제를 불러오지 못했습니다.";
+  } finally {
+    isLoadingProblem.value = false;
+  }
+};
 
 const currentFilename = computed(() => {
   switch (selectedLanguage.value) {
@@ -170,6 +223,7 @@ const cameraError = ref("");
 let mediaStream = null;
 let antiCheatTimer = null;
 let webcamMonitor = null;
+let mediapipeInterval = null;
 let keyTimestamps = [];
 let lastAbnormalAlert = 0;
 let lastCopyAlert = 0;
@@ -215,6 +269,55 @@ const handleCopy = () => {
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
   showAntiCheat("copyDetected", "코드 편집기에서 복사 동작이 감지되었습니다.");
+};
+
+const sendFrameForMediapipe = async () => {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 180;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 360;
+  const scale = Math.min(canvas.width / vw, canvas.height / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  const dx = (canvas.width - dw) / 2;
+  const dy = (canvas.height - dh) / 2;
+
+  ctx.drawImage(video, dx, dy, dw, dh);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append("image", blob, "frame.jpg");
+
+    try {
+      const resp = await fetch(`${BACKEND_BASE}/mediapipe/analyze/`, {
+        method: "POST",
+        body: formData
+      });
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        console.error("mediapipe analyze error:", data);
+        return;
+      }
+
+      if (data.is_cheating) {
+        const detail =
+          data.reason || "카메라 분석 결과 의심스러운 행동이 감지되었습니다.";
+        showAntiCheat("mediapipeCheat", detail);
+      }
+    } catch (err) {
+      console.error("mediapipe analyze request failed:", err);
+    }
+  }, "image/jpeg", 0.6);
 };
 
 const handleEditorKeydown = (event) => {
@@ -352,7 +455,11 @@ const loadSession = async () => {
 };
 
 onMounted(async () => {
+<<<<<<< HEAD
   await loadSession();
+=======
+  void fetchRandomProblem();
+>>>>>>> origin/dev
   try {
     if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
       cameraError.value = "이 브라우저에서는 웹캠을 사용할 수 없습니다.";
@@ -377,6 +484,9 @@ onMounted(async () => {
       await videoRef.value.play();
     }
     startWebcamMonitor();
+    mediapipeInterval = setInterval(() => {
+      void sendFrameForMediapipe();
+    }, 5000);
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
     showAntiCheat("cameraBlocked", cameraError.value);
@@ -395,6 +505,10 @@ onBeforeUnmount(() => {
     mediaStream = null;
   }
   stopWebcamMonitor();
+  if (mediapipeInterval) {
+    clearInterval(mediapipeInterval);
+    mediapipeInterval = null;
+  }
   window.removeEventListener("blur", handleWindowBlur);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", handlePaste);
@@ -475,6 +589,44 @@ onBeforeUnmount(() => {
   overflow-y: auto;
 }
 
+.retry-button {
+  padding: 6px 12px;
+  border-radius: 8px;
+  border: 1px solid #1f2937;
+  background: #0f172a;
+  color: #e5e7eb;
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.retry-button:hover {
+  background: #111827;
+  transform: translateY(-1px);
+}
+
+.problem-status {
+  border: 1px solid #1e293b;
+  background: #0b1220;
+  color: #cbd5e1;
+  padding: 12px;
+  border-radius: 12px;
+  font-size: 13px;
+  text-align: center;
+}
+
+.problem-status.error {
+  border-color: #4b2835;
+  color: #fca5a5;
+  background: #190c11;
+}
+
+.problem-content {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
 .camera-body {
   flex: 0 0 auto;
   padding: 12px 18px 8px;
@@ -540,6 +692,7 @@ onBeforeUnmount(() => {
   color: #d1d5db;
 }
 
+<<<<<<< HEAD
 .small-label {
   font-size: 12px;
   color: #9ca3af;
@@ -558,6 +711,50 @@ onBeforeUnmount(() => {
 .tts-audio {
   margin-top: 8px;
   width: 100%;
+=======
+.testcase-block {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #1f2937;
+}
+
+.testcase-list {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+  display: grid;
+  gap: 10px;
+}
+
+.testcase-item {
+  border: 1px solid #1f2937;
+  background: #0c1221;
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.testcase-label {
+  font-size: 11px;
+  color: #9ca3af;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.testcase-item pre {
+  background: #0f172a;
+  border-radius: 10px;
+  padding: 8px;
+  color: #e5e7eb;
+  font-size: 12px;
+  white-space: pre-wrap;
+  margin: 0 0 8px;
+  overflow-x: auto;
+}
+
+.testcase-item pre:last-of-type {
+  margin-bottom: 0;
+>>>>>>> origin/dev
 }
 
 .editor-header {

@@ -27,8 +27,12 @@
           <span class="chevron">&#9662;</span>
         </button>
         <div class="dropdown-menu" v-show="isDropdownOpen">
-          <RouterLink to="/login" class="dropdown-link" @click="isDropdownOpen = false">로그인</RouterLink>
-          <RouterLink to="/signup" class="dropdown-link" @click="isDropdownOpen = false">회원가입</RouterLink>
+          <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="isDropdownOpen = false">
+            로그인
+          </RouterLink>
+          <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="isDropdownOpen = false">
+            회원가입
+          </RouterLink>
         </div>
       </div>
     </header>

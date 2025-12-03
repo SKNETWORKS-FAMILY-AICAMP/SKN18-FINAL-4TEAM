@@ -23,4 +23,11 @@ class InterviewState(TypedDict, total=False):
     tts_error: str
     
     # 2번 agent
-    
+    submitted_code: str
+    code: str
+    language: str
+    code_quality_rubric: str
+    code_quality_summary: str
+    code_quality_feedback: List[str]
+    code_quality_score: float
+    code_quality_error: str

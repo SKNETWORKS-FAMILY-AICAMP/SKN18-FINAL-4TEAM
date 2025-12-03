@@ -130,8 +130,9 @@ watch(selectedLanguage, (lang) => {
 const problemParagraphs = computed(() => {
   if (!problemData.value?.problem) return [];
   return problemData.value.problem
-    .split(/\n+/)
-    .map((p) => p.trim())
+    .replace(/\r\n?/g, "\n")
+    .split(/\n{2,}/)         
+    .map((p) => p.replace(/\n/g, " ").trim())
     .filter(Boolean);
 });
 

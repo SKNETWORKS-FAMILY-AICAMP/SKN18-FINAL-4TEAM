@@ -281,6 +281,35 @@ const displayedTestCases = computed(() => {
   return problemData.value.test_cases.slice(0, 3);
 });
 
+const loadSavedCodeIfExists = async (sessionId, token, language) => {
+  try {
+    const params = new URLSearchParams({
+      session_id: String(sessionId),
+      language: String(language || ""),
+    });
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/session/code/?${params.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!resp.ok) {
+      return;
+    }
+
+    const data = await resp.json().catch(() => ({}));
+    if (data && typeof data.code === "string") {
+      code.value = data.code;
+    }
+  } catch (err) {
+    console.error("failed to load saved code snapshot", err);
+  }
+};
+
 const fetchRandomProblem = async () => {
   isLoadingProblem.value = true;
   problemError.value = "";
@@ -324,6 +353,9 @@ const fetchRandomProblem = async () => {
     } else if (selectedLanguage.value === "python3") {
       code.value = languageTemplates.python3;
     }
+
+    // 세션/언어별로 저장된 코드가 있다면 불러와서 이어서 작성할 수 있도록 합니다.
+    await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
   } catch (err) {
     console.error(err);
     problemError.value = err?.message || "문제를 불러오지 못했습니다.";
@@ -341,6 +373,45 @@ const currentFilename = computed(() => {
     default: return "solution.txt";
   }
 });
+
+let saveCodeTimer = null;
+
+const saveCodeSnapshot = async (content) => {
+  const sessionId = route.query.session_id;
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!sessionId || !token) return;
+
+  try {
+    await fetch(`${BACKEND_BASE}/api/livecoding/session/code/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        language: selectedLanguage.value,
+        code: content ?? "",
+      }),
+    });
+  } catch (err) {
+    console.error("failed to save code snapshot", err);
+  }
+};
+
+watch(
+  () => code.value,
+  (newCode) => {
+    // 사용자가 입력할 때마다 일정 시간(debounce) 후 서버에 스냅샷을 저장합니다.
+    if (saveCodeTimer) {
+      clearTimeout(saveCodeTimer);
+      saveCodeTimer = null;
+    }
+    saveCodeTimer = setTimeout(() => {
+      void saveCodeSnapshot(newCode);
+    }, 1500);
+  }
+);
 
 const cmMode = computed(() => {
   switch (selectedLanguage.value) {
@@ -607,6 +678,9 @@ onMounted(async () => {
 });
 
 onBeforeUnmount(() => {
+  // 페이지를 떠날 때 마지막 코드 스냅샷을 한 번 더 저장해 이어하기 진입 시 최대한 최근 코드가 복원되도록 합니다.
+  void saveCodeSnapshot(code.value);
+
   if (mediaStream) {
     mediaStream.getTracks().forEach((t) => t.stop());
   }
@@ -621,6 +695,10 @@ onBeforeUnmount(() => {
   document.removeEventListener("copy", copyListener, { capture: true });
   document.removeEventListener("mouseleave", handleMouseLeave);
   clearAntiCheatTimer();
+  if (saveCodeTimer) {
+    clearTimeout(saveCodeTimer);
+    saveCodeTimer = null;
+  }
 });
 </script>
 

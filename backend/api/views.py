@@ -1,6 +1,7 @@
 from datetime import timedelta
 import secrets
 import string
+import json
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -14,6 +15,10 @@ from rest_framework.views import APIView
 from .email_utils import send_verification_code, verify_code
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
+
+from .interview_utils import get_cached_graph, get_cached_llm
+from tts_client import generate_interview_audio_batch
+
 from .models import (
     AuthIdentity,
     CodingProblem,
@@ -59,6 +64,7 @@ def roadmap(request):
     return JsonResponse(data)
 
 
+
 class RandomCodingProblemView(APIView):
     """
     coding_problem + coding_problem_language 조합에서 언어별 랜덤 문제를 반환합니다.
@@ -99,6 +105,90 @@ class RandomCodingProblemView(APIView):
                 "test_cases": test_cases,
             }
         )
+
+
+class CodingProblemSessionInitView(APIView):
+    """
+    RandomCodingProblemView 결과를 langgraph 초기 state에 넣어 실행한 뒤 상태를 반환합니다.
+    - 프론트에서 RandomCodingProblemView 응답 전체를 POST 바디로 전달하면 DB 조회 없이 그대로 사용합니다.
+    """
+
+    def post(self, request):
+        payload = request.data or {}
+        # request.data가 문자열이면 JSON 파싱 시도
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                payload = {}
+
+        # RandomCodingProblemView 응답 전체를 그대로 보내면 problem 키 없이도 동작하도록 처리
+        problem_data = payload.get("problem") if isinstance(payload, dict) else None
+        if not problem_data and isinstance(payload, dict):
+            problem_data = payload
+
+
+        # langgraph 실행
+        init_state = {
+            "event_type": "init",
+            "problem_data": problem_data,
+            "await_human": False,
+        }
+
+        intro_text = None
+        intro_audio = None
+        graph_state = None
+        graph_error = None
+        tts_error = None
+
+        try:
+            graph = get_cached_graph()
+            graph_state = graph.invoke(init_state)
+            if isinstance(graph_state, dict):
+                intro_text = graph_state.get("tts_text")
+        except Exception as exc:  # noqa: BLE001
+            graph_error = str(exc)
+
+        # TTS 실행
+        if intro_text:
+            try:
+                tts_result = generate_interview_audio_batch(intro_text)
+                intro_audio = tts_result.get("audio_chunks")
+            except Exception as exc:  # noqa: BLE001
+                tts_error = str(exc)
+
+        return Response(
+            {
+                "problem": problem_data,
+                "intro_text": intro_text,
+                "intro_audio": intro_audio,
+                "graph_state": graph_state,
+                "graph_error": graph_error,
+                "tts_error": tts_error,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class WarmupLanggraphView(APIView):
+    """
+    Langgraph/LLM 모듈을 미리 로드하기 위한 워밍업 엔드포인트.
+    """
+
+    def get(self, request):
+        try:
+            # LLM 모듈 import 및 그래프 컴파일 시도
+            llm_instance = get_cached_llm()
+            graph = get_cached_graph()
+            # LLM은 import 시점에 초기화되므로 존재만 확인
+            _ = llm_instance
+            graph.get_graph()  # 실제 실행은 하지 않고 DAG만 준비
+            return Response({"status": "warmed"}, status=status.HTTP_200_OK)
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"status": "error", "detail": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class SignupView(APIView):

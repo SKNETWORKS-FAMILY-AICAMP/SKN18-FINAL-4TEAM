@@ -4,11 +4,14 @@ import asyncio
 import subprocess
 import tempfile
 import logging
+import json
 
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from rest_framework.response import Response
 
 from .stt_client import STTClient
+from api.interview_utils import get_cached_graph
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +53,7 @@ def run_stt(request):
             pcm_path,
         ]
         try:
-            proc = subprocess.run(
+            subprocess.run(
                 cmd,
                 check=True,
                 stdout=subprocess.PIPE,
@@ -78,10 +81,34 @@ def run_stt(request):
         finally:
             loop.close()
 
-        return JsonResponse({"lines": lines}, status=200)
+        # 5) langgraph 연동: STT 텍스트를 latest_user_text로 전달
+        intro_text = None
+        graph_error = None
+        text = " ".join((ln.get("text") or "").strip() for ln in lines if isinstance(ln, dict)).strip()
+        if text:
+            update_state = {
+                "event_type": "strategy_submit",  # answer_classify_agent 경로
+                "latest_user_text": text,
+                "await_human": False,
+            }
+            try:
+                graph = get_cached_graph()
+                result_state = graph.invoke(update_state)
+                intro_text = result_state.get("tts_text") if isinstance(result_state, dict) else None
+            except Exception as exc:  # noqa: BLE001
+                graph_error = str(exc)
+
+        return Response(
+            {
+                "lines": lines,
+                "intro_text": intro_text,
+                "graph_error": graph_error,
+            },
+            status=200,
+        )
 
     finally:
-        # 5) 임시 파일 정리
+        # 6) 임시 파일 정리
         for p in (webm_path, pcm_path):
             try:
                 if os.path.exists(p):

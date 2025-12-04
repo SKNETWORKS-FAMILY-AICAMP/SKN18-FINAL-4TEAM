@@ -187,11 +187,12 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from "vue";
+import { ref, onBeforeUnmount, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { nextTick } from "vue";
 
 const router = useRouter();
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 /* ----- 단계 ----- */
 const currentStep = ref(1);
@@ -214,6 +215,15 @@ const goNext = () => {
 
 const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
+};
+
+// Langgraph/LLM 워밍업 호출
+const warmupLanggraph = async () => {
+  try {
+    await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, { method: "GET" });
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
 };
 
 /* ----- 웹캠 체크 ----- */
@@ -418,6 +428,10 @@ const startTest = () => {
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();
+});
+
+onMounted(() => {
+  void warmupLanggraph();
 });
 </script>
 

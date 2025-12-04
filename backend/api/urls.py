@@ -3,6 +3,7 @@ from django.urls import path
 from .views import (
     EmailSendView,
     EmailVerifyView,
+    CodingProblemSessionInitView,
     FindIdView,
     FindPasswordView,
     GoogleAuthView,
@@ -10,6 +11,7 @@ from .views import (
     RandomCodingProblemView,
     SignupView,
     UserIdCheckView,
+    WarmupLanggraphView,
     health,
     roadmap,
 )
@@ -26,4 +28,10 @@ urlpatterns = [
     path("auth/email/verify/", EmailVerifyView.as_view(), name="email-verify"),
     path("auth/google/", GoogleAuthView.as_view(), name="google-auth"),
     path("coding-problems/random/", RandomCodingProblemView.as_view(), name="coding-problem-random"),
+    path(
+        "coding-problems/random/session/",
+        CodingProblemSessionInitView.as_view(),
+        name="coding-problem-random-session",
+    ),
+    path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
 ]

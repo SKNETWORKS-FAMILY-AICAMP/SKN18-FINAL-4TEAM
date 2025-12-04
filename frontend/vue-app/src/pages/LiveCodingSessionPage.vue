@@ -89,6 +89,13 @@
           <button
             type="button"
             class="run-button"
+            @click="onIntroPlay"
+          >
+            인트로 듣기
+          </button>
+          <button
+            type="button"
+            class="run-button"
             @click="onAskButtonClick"
             :disabled="isSttRunning"
           >
@@ -103,11 +110,14 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const route = useRoute();
+const router = useRouter();
 
 const {
   alert: antiCheatAlert,
@@ -124,6 +134,8 @@ let mediaRecorder = null;
 let audioChunks = [];
 const audioBlob = ref(null);
 const isRecording = ref(false);
+const introAudio = ref([]);
+const isLoadingIntro = ref(false);
 //STT 진행 중 여부
 const isSttRunning = ref(false);
 
@@ -210,6 +222,49 @@ const stopRecording = () => {
 /* -----------------------------
    📤 서버 전송 & STT 실행
 ----------------------------- */
+// intro 오디오 청크를 순서대로 재생
+const playAudioChunks = async (chunks = []) => {
+  for (const chunk of chunks) {
+    const b64 = chunk?.audio_base64;
+    if (!b64) continue;
+    const src = `data:audio/mp3;base64,${b64}`;
+    await new Promise((resolve) => {
+      const audio = new Audio(src);
+      audio.onended = resolve;
+      audio.onerror = resolve;
+      audio.play().catch(() => resolve());
+    });
+  }
+};
+
+const fetchIntroAudio = async (problemPayload, autoPlay = true) => {
+  isLoadingIntro.value = true;
+  try {
+    const sessionResp = await fetch(
+      `${BACKEND_BASE}/api/coding-problems/random/session/?language=python`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(problemPayload),
+      }
+    );
+    const sessionData = await sessionResp.json().catch(() => ({}));
+    if (!sessionResp.ok) {
+      throw new Error(sessionData?.detail || sessionData?.graph_error || sessionData?.tts_error || "인트로 생성에 실패했습니다.");
+    }
+    if (Array.isArray(sessionData.intro_audio) && sessionData.intro_audio.length) {
+      introAudio.value = sessionData.intro_audio;
+      if (autoPlay) {
+        void playAudioChunks(introAudio.value);
+      }
+    }
+  } catch (err) {
+    console.error("session init failed:", err);
+  } finally {
+    isLoadingIntro.value = false;
+  }
+};
+
 const runSttClient = async () => {
   if (!audioBlob.value) {
     showAntiCheat("sttError", "녹음된 음성이 없습니다.");
@@ -217,7 +272,7 @@ const runSttClient = async () => {
   }
 
   try {
-    const res = await fetch("http://localhost:8000/api/stt/run/", {
+    const res = await fetch(`${BACKEND_BASE}/api/stt/run/`, {
       method: "POST",
       // raw PCM/웹엠 바이트 그대로 보낼 거라 헤더 안 넣는 게 안전
       // headers: { "Content-Type": "application/octet-stream" },
@@ -226,6 +281,11 @@ const runSttClient = async () => {
 
     const data = await res.json();
     console.log("STT 결과:", data);
+
+    if (Array.isArray(data.intro_audio) && data.intro_audio.length) {
+      introAudio.value = data.intro_audio;
+      void playAudioChunks(introAudio.value);
+    }
 
     if (data.lines) {
       const text = data.lines.map(l => l.text || "").join(" ");
@@ -278,31 +338,119 @@ const displayedTestCases = computed(() => {
   return problemData.value.test_cases.slice(0, 3);
 });
 
+const loadSavedCodeIfExists = async (sessionId, token, language) => {
+  try {
+    const params = new URLSearchParams({
+      session_id: String(sessionId),
+      language: String(language || ""),
+    });
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/session/code/?${params.toString()}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!resp.ok) {
+      return;
+    }
+
+    const data = await resp.json().catch(() => ({}));
+    if (data && typeof data.code === "string") {
+      code.value = data.code;
+    }
+  } catch (err) {
+    console.error("failed to load saved code snapshot", err);
+  }
+};
+
 const fetchRandomProblem = async () => {
   isLoadingProblem.value = true;
   problemError.value = "";
 
-  try {
+  const fetchRandomOnly = async () => {
     const resp = await fetch(`${BACKEND_BASE}/api/coding-problems/random/?language=python`);
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       throw new Error(data?.detail || "문제를 불러오지 못했습니다.");
     }
-
     problemData.value = data;
     if (selectedLanguage.value !== "python3") {
       selectedLanguage.value = "python3";
     }
-    if (data.starter_code) {
-      code.value = data.starter_code;
-    } else if (selectedLanguage.value === "python3") {
+    if (problemData.value?.starter_code) {
+      code.value = problemData.value.starter_code;
+    } else {
       code.value = languageTemplates.python3;
+    }
+  };
+
+  try {
+    const sessionId = route.query.session_id;
+    const token = localStorage.getItem("jobtory_access_token");
+
+    if (sessionId && token) {
+      const resp = await fetch(
+        `${BACKEND_BASE}/api/livecoding/session/?session_id=${encodeURIComponent(
+          sessionId
+        )}`,
+        {
+          method: "GET",
+          headers: {
+            Authorization: `Bearer ${token}`
+          }
+        }
+      );
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        throw new Error(data?.detail || "세션 정보를 불러오지 못했습니다.");
+      }
+
+      problemData.value = data;
+
+      if (selectedLanguage.value !== "python3") {
+        selectedLanguage.value = "python3";
+      }
+      if (problemData.value?.starter_code) {
+        code.value = problemData.value.starter_code;
+      } else {
+        code.value = languageTemplates.python3;
+      }
+
+      await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
+    } else {
+      await fetchRandomOnly();
+    }
+
+    // 문제 데이터를 기반으로 intro 음성 생성 시도
+    if (problemData.value) {
+      await fetchIntroAudio(problemData.value);
     }
   } catch (err) {
     console.error(err);
-    problemError.value = err?.message || "문제를 불러오지 못했습니다.";
+    try {
+      await fetchRandomOnly();
+      if (problemData.value) {
+        await fetchIntroAudio(problemData.value);
+      }
+    } catch (fallbackErr) {
+      problemError.value = fallbackErr?.message || "문제를 불러오지 못했습니다.";
+    }
   } finally {
     isLoadingProblem.value = false;
+  }
+};
+
+const onIntroPlay = () => {
+  if (problemData.value) {
+    // 버튼 클릭 시 CodingProblemSessionInitView 호출 → TTS 오디오 새로 가져와 재생
+    void fetchIntroAudio(problemData.value, true);
+  } else if (introAudio.value?.length) {
+    void playAudioChunks(introAudio.value);
   }
 };
 
@@ -315,6 +463,45 @@ const currentFilename = computed(() => {
     default: return "solution.txt";
   }
 });
+
+let saveCodeTimer = null;
+
+const saveCodeSnapshot = async (content) => {
+  const sessionId = route.query.session_id;
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!sessionId || !token) return;
+
+  try {
+    await fetch(`${BACKEND_BASE}/api/livecoding/session/code/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        language: selectedLanguage.value,
+        code: content ?? "",
+      }),
+    });
+  } catch (err) {
+    console.error("failed to save code snapshot", err);
+  }
+};
+
+watch(
+  () => code.value,
+  (newCode) => {
+    // 사용자가 입력할 때마다 일정 시간(debounce) 후 서버에 스냅샷을 저장합니다.
+    if (saveCodeTimer) {
+      clearTimeout(saveCodeTimer);
+      saveCodeTimer = null;
+    }
+    saveCodeTimer = setTimeout(() => {
+      void saveCodeSnapshot(newCode);
+    }, 1500);
+  }
+);
 
 const cmMode = computed(() => {
   switch (selectedLanguage.value) {
@@ -337,11 +524,16 @@ let keyTimestamps = [];
 let lastAbnormalAlert = 0;
 let lastCopyAlert = 0;
 let lastCameraStatus = "ok";
+const offscreenCount = ref(0);
+const isForceEnding = ref(false);
+let lastOffscreenAlert = 0;
 
 const KEY_WINDOW_MS = 2000;
 const KEY_THRESHOLD = 12;
 const ABNORMAL_COOLDOWN_MS = 8000;
 const COPY_COOLDOWN_MS = 4000;
+const OFFSCREEN_LIMIT = 5;
+const OFFSCREEN_COOLDOWN_MS = 1500; // blur/visibility/mouseleave가 연달아 올 때 중복 카운트 방지
 
 const clearAntiCheatTimer = () => {
   if (antiCheatTimer) {
@@ -359,25 +551,65 @@ const showAntiCheat = (stateKey, detail) => {
   }, 7000);
 };
 
+const registerOffscreenInfraction = (stateKey, baseDetail) => {
+  const now = Date.now();
+  // 같은 전환으로 blur/visibility/mouseleave가 연달아 올 때 한 번만 카운트
+  if (now - lastOffscreenAlert < OFFSCREEN_COOLDOWN_MS) {
+    return;
+  }
+  lastOffscreenAlert = now;
+
+  offscreenCount.value += 1;
+  const withCount = `${baseDetail} (누적 ${offscreenCount.value}/${OFFSCREEN_LIMIT})`;
+  showAntiCheat(stateKey, withCount);
+
+  if (offscreenCount.value >= OFFSCREEN_LIMIT) {
+    void forceEndSession("anti-cheat: offscreen threshold exceeded");
+  }
+};
+
+const forceEndSession = async (reason = "") => {
+  if (isForceEnding.value) return;
+  isForceEnding.value = true;
+
+  try {
+    const token = localStorage.getItem("jobtory_access_token");
+    const sessionId = route.query.session_id;
+    if (token) {
+      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ session_id: sessionId, reason })
+      }).catch(() => {});
+    }
+  } finally {
+    localStorage.removeItem("jobtory_livecoding_session_id");
+    router.replace({ name: "home", query: { alert: "anti-cheat" } });
+  }
+};
+
 const handleVisibilityChange = () => {
   if (document.visibilityState === "hidden") {
-    showAntiCheat("tabSwitch", "시험 화면을 벗어났습니다.");
+    registerOffscreenInfraction("tabSwitch", "시험 화면을 벗어났습니다.");
   }
 };
 
 const handleWindowBlur = () => {
-  showAntiCheat("windowBlur", "다른 창으로 이동이 감지되었습니다.");
+  registerOffscreenInfraction("windowBlur", "다른 창으로 이동이 감지되었습니다.");
 };
 
 const handlePaste = () => {
-  showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 감지되었습니다.");
+  showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 차단되었습니다.");
 };
 
 const handleCopy = () => {
   const now = Date.now();
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
-  showAntiCheat("copyDetected", "코드 편집기에서 복사 동작이 감지되었습니다.");
+  showAntiCheat("copyDetected", "복사 동작이 차단되었습니다.");
 };
 
 const sendFrameForMediapipe = async () => {
@@ -407,7 +639,14 @@ const sendFrameForMediapipe = async () => {
     formData.append("image", blob, "frame.jpg");
 
     try {
-      const resp = await fetch(`${BACKEND_BASE}/mediapipe/analyze/`, {
+      const sessionId = route.query.session_id;
+      const url = sessionId
+        ? `${BACKEND_BASE}/mediapipe/analyze/?session_id=${encodeURIComponent(
+            sessionId
+          )}`
+        : `${BACKEND_BASE}/mediapipe/analyze/`;
+
+      const resp = await fetch(url, {
         method: "POST",
         body: formData
       });
@@ -432,7 +671,13 @@ const sendFrameForMediapipe = async () => {
 const handleEditorKeydown = (event) => {
   const now = Date.now();
   if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "c") {
+    event.preventDefault();
     handleCopy();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "v") {
+    event.preventDefault();
+    handlePaste();
     return;
   }
 
@@ -473,6 +718,22 @@ const startWebcamMonitor = () => {
   }, 5000);
 };
 
+const handleMouseLeave = (event) => {
+  if (!event.relatedTarget) {
+    registerOffscreenInfraction("windowBlur", "마우스가 시험 화면 밖으로 이동했습니다.");
+  }
+};
+
+const pasteListener = (e) => {
+  e.preventDefault();
+  handlePaste();
+};
+
+const copyListener = (e) => {
+  e.preventDefault();
+  handleCopy();
+};
+
 const stopWebcamMonitor = () => {
   if (webcamMonitor) {
     clearInterval(webcamMonitor);
@@ -498,9 +759,18 @@ onMounted(async () => {
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
   }
+
+  window.addEventListener("blur", handleWindowBlur);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  document.addEventListener("paste", pasteListener, { capture: true });
+  document.addEventListener("copy", copyListener, { capture: true });
+  document.addEventListener("mouseleave", handleMouseLeave);
 });
 
 onBeforeUnmount(() => {
+  // 페이지를 떠날 때 마지막 코드 스냅샷을 한 번 더 저장해 이어하기 진입 시 최대한 최근 코드가 복원되도록 합니다.
+  void saveCodeSnapshot(code.value);
+
   if (mediaStream) {
     mediaStream.getTracks().forEach((t) => t.stop());
   }
@@ -511,9 +781,14 @@ onBeforeUnmount(() => {
   }
   window.removeEventListener("blur", handleWindowBlur);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
-  document.removeEventListener("paste", handlePaste);
-  document.removeEventListener("copy", handleCopy);
+  document.removeEventListener("paste", pasteListener, { capture: true });
+  document.removeEventListener("copy", copyListener, { capture: true });
+  document.removeEventListener("mouseleave", handleMouseLeave);
   clearAntiCheatTimer();
+  if (saveCodeTimer) {
+    clearTimeout(saveCodeTimer);
+    saveCodeTimer = null;
+  }
 });
 </script>
 

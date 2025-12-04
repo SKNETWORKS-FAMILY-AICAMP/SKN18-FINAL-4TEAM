@@ -322,9 +322,36 @@ const handleSubmit = async () => {
         birthdate
       })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const detail = data?.detail || Object.values(data || {})[0] || "가입에 실패했습니다.";
+      // 필드별 에러 메시지(이메일/아이디/전화번호 중복 등)를 최대한 친절하게 추출
+      let detail = data?.detail;
+      if (!detail && data) {
+        const messages = [];
+        if (Array.isArray(data.email) && data.email.length) {
+          messages.push(data.email[0]);
+        }
+        if (Array.isArray(data.user_id) && data.user_id.length) {
+          messages.push(data.user_id[0]);
+        }
+        if (Array.isArray(data.phone_number) && data.phone_number.length) {
+          messages.push(data.phone_number[0]);
+        }
+
+        if (!messages.length) {
+          const firstKey = Object.keys(data)[0];
+          const firstVal = data[firstKey];
+          if (Array.isArray(firstVal) && firstVal.length) {
+            detail = firstVal[0];
+          } else if (typeof firstVal === "string") {
+            detail = firstVal;
+          }
+        } else {
+          detail = messages.join("\n");
+        }
+      }
+      detail = detail || "가입에 실패했습니다.";
+      window.alert(detail);
       throw new Error(detail);
     }
     message.value = "가입이 완료되었습니다. 로그인 페이지로 이동합니다.";

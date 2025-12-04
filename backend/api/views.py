@@ -7,6 +7,7 @@ from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
+import jwt
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -174,6 +175,53 @@ class LoginView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class UserMeView(APIView):
+    """
+    단순 JWT 검증 후 사용자 프로필 반환.
+    """
+
+    def get(self, request):
+        auth_header = request.headers.get("Authorization")
+        if not auth_header or not auth_header.lower().startswith("bearer "):
+            return Response({"detail": "인증 정보가 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        token = auth_header.split(" ", 1)[1].strip()
+        try:
+            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
+        except jwt.ExpiredSignatureError:
+            return Response({"detail": "토큰이 만료되었습니다."}, status=status.HTTP_401_UNAUTHORIZED)
+        except jwt.InvalidTokenError:
+            return Response({"detail": "유효하지 않은 토큰입니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user_id = payload.get("sub")
+        if not user_id:
+            return Response({"detail": "유효하지 않은 토큰입니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        user = User.objects.filter(user_id=user_id).first()
+        if not user:
+            return Response({"detail": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(
+            {
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.phone_number,
+                "birthdate": user.birthdate,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class LogoutView(APIView):
+    """
+    클라이언트 측 토큰 제거용 엔드포인트 (서버 상태 없음).
+    """
+
+    def post(self, request):
+        return Response({"detail": "logged_out"}, status=status.HTTP_200_OK)
 
 
 class EmailSendView(APIView):

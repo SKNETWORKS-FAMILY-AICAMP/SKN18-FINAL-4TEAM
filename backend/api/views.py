@@ -530,6 +530,144 @@ class LiveCodingStartView(APIView):
         )
 
 
+class LiveCodingCodeSnapshotView(APIView):
+    """
+    라이브 코딩 세션 중 작성 중인 코드를 Redis(cache)에 지속적으로 저장/조회하는 엔드포인트.
+    - POST: 코드 스냅샷 저장
+      body: { "session_id": "...", "language": "python3", "code": "..." }
+    - GET: 마지막(또는 언어별 마지막) 코드 스냅샷 조회
+      query: ?session_id=...&language=python3 (language는 선택)
+    """
+
+    def _get_and_validate_meta(self, user, session_id: str):
+        if not session_id:
+            return None, Response(
+                {"detail": "session_id가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return None, Response(
+                {"detail": "해당 세션 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        if str(meta.get("user_id")) != str(getattr(user, "user_id", None)):
+            return None, Response(
+                {"detail": "이 세션에 접근할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        return meta, None
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "코드를 저장하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        session_id = request.data.get("session_id")
+        code = request.data.get("code")
+        language = (request.data.get("language") or "").lower() or None
+
+        if code is None:
+            return Response(
+                {"detail": "code 필드는 비워둘 수 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        meta, error_response = self._get_and_validate_meta(user, session_id)
+        if error_response is not None:
+            return error_response
+
+        # language가 명시되지 않은 경우 세션 메타의 언어를 사용
+        if not language:
+            language = (meta.get("language") or "").lower() or None
+
+        snapshot = {
+            "code": str(code),
+            "language": language,
+            "saved_at": timezone.now().isoformat(),
+        }
+
+        key = f"livecoding:{session_id}:code"
+        data = cache.get(key) or {}
+        history = data.get("history") or []
+        history.append(snapshot)
+
+        # 메모리 보호를 위해 최대 200개까지만 유지
+        if len(history) > 200:
+            history = history[-200:]
+
+        data["latest"] = snapshot
+        data["history"] = history
+
+        # 세션 메타 TTL(기본 1시간)과 동일하게 유지
+        cache.set(key, data, timeout=60 * 60)
+
+        return Response(
+            {"saved": True, "snapshot": snapshot},
+            status=status.HTTP_201_CREATED,
+        )
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "코드를 조회하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        session_id = request.query_params.get("session_id")
+        requested_language = (request.query_params.get("language") or "").lower()
+
+        meta, error_response = self._get_and_validate_meta(user, session_id)
+        if error_response is not None:
+            return error_response
+
+        key = f"livecoding:{session_id}:code"
+        data = cache.get(key)
+        if not data:
+            return Response(
+                {"detail": "저장된 코드 스냅샷이 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        history = data.get("history") or []
+        latest = data.get("latest") or {}
+
+        # 언어가 지정된 경우 해당 언어의 마지막 스냅샷을 우선적으로 반환
+        snapshot = None
+        if requested_language and history:
+            for item in reversed(history):
+                if (item.get("language") or "").lower() == requested_language:
+                    snapshot = item
+                    break
+
+        if snapshot is None:
+            snapshot = latest
+
+        if not snapshot:
+            return Response(
+                {"detail": "저장된 코드 스냅샷이 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        return Response(
+            {
+                "session_id": session_id,
+                "language": snapshot.get("language") or meta.get("language"),
+                "code": snapshot.get("code") or "",
+                "saved_at": snapshot.get("saved_at"),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
 class LiveCodingSessionView(APIView):
     """
     Redis에 저장된 라이브 코딩 세션 정보를 가져오는 엔드포인트.
@@ -718,9 +856,11 @@ class LiveCodingEndSessionView(APIView):
             )
 
         meta_key = f"livecoding:{session_id}:meta"
+        code_key = f"livecoding:{session_id}:code"
 
-        # 메타/매핑 제거
+        # 메타/코드/매핑 제거
         cache.delete(meta_key)
+        cache.delete(code_key)
         cache.delete(mapping_key)
 
         # STT 버퍼도 함께 정리

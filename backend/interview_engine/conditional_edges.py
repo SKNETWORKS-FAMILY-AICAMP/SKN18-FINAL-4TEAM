@@ -8,9 +8,15 @@ def route_loop(state:InterviewState) -> str:
     
     if etype == "init":
         return  "problem_intro_agent"
+    
     elif etype == "strategy_submit":
         return  "answer_classify_agent"
-        
+    
+    elif etype == "code_init":
+        return "code_quality_agent"
+    
+    elif etype == "hint_request":
+        return "hint_agent"    
     
     return 'idle'
 

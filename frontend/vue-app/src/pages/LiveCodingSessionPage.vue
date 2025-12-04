@@ -89,13 +89,6 @@
           <button
             type="button"
             class="run-button"
-            @click="onIntroPlay"
-          >
-            인트로 듣기
-          </button>
-          <button
-            type="button"
-            class="run-button"
             @click="onAskButtonClick"
             :disabled="isSttRunning"
           >
@@ -134,8 +127,6 @@ let mediaRecorder = null;
 let audioChunks = [];
 const audioBlob = ref(null);
 const isRecording = ref(false);
-const introAudio = ref([]);
-const isLoadingIntro = ref(false);
 //STT 진행 중 여부
 const isSttRunning = ref(false);
 
@@ -222,49 +213,6 @@ const stopRecording = () => {
 /* -----------------------------
    📤 서버 전송 & STT 실행
 ----------------------------- */
-// intro 오디오 청크를 순서대로 재생
-const playAudioChunks = async (chunks = []) => {
-  for (const chunk of chunks) {
-    const b64 = chunk?.audio_base64;
-    if (!b64) continue;
-    const src = `data:audio/mp3;base64,${b64}`;
-    await new Promise((resolve) => {
-      const audio = new Audio(src);
-      audio.onended = resolve;
-      audio.onerror = resolve;
-      audio.play().catch(() => resolve());
-    });
-  }
-};
-
-const fetchIntroAudio = async (problemPayload, autoPlay = true) => {
-  isLoadingIntro.value = true;
-  try {
-    const sessionResp = await fetch(
-      `${BACKEND_BASE}/api/coding-problems/random/session/?language=python`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(problemPayload),
-      }
-    );
-    const sessionData = await sessionResp.json().catch(() => ({}));
-    if (!sessionResp.ok) {
-      throw new Error(sessionData?.detail || sessionData?.graph_error || sessionData?.tts_error || "인트로 생성에 실패했습니다.");
-    }
-    if (Array.isArray(sessionData.intro_audio) && sessionData.intro_audio.length) {
-      introAudio.value = sessionData.intro_audio;
-      if (autoPlay) {
-        void playAudioChunks(introAudio.value);
-      }
-    }
-  } catch (err) {
-    console.error("session init failed:", err);
-  } finally {
-    isLoadingIntro.value = false;
-  }
-};
-
 const runSttClient = async () => {
   if (!audioBlob.value) {
     showAntiCheat("sttError", "녹음된 음성이 없습니다.");
@@ -272,7 +220,7 @@ const runSttClient = async () => {
   }
 
   try {
-    const res = await fetch(`${BACKEND_BASE}/api/stt/run/`, {
+    const res = await fetch("http://localhost:8000/api/stt/run/", {
       method: "POST",
       // raw PCM/웹엠 바이트 그대로 보낼 거라 헤더 안 넣는 게 안전
       // headers: { "Content-Type": "application/octet-stream" },
@@ -281,11 +229,6 @@ const runSttClient = async () => {
 
     const data = await res.json();
     console.log("STT 결과:", data);
-
-    if (Array.isArray(data.intro_audio) && data.intro_audio.length) {
-      introAudio.value = data.intro_audio;
-      void playAudioChunks(introAudio.value);
-    }
 
     if (data.lines) {
       const text = data.lines.map(l => l.text || "").join(" ");
@@ -398,6 +341,7 @@ const fetchRandomProblem = async () => {
     if (!resp.ok) {
       throw new Error(data?.detail || "세션 정보를 불러오지 못했습니다.");
     }
+
     problemData.value = data;
 
     // 항상 python3 기준으로 시작 코드 설정
@@ -406,7 +350,6 @@ const fetchRandomProblem = async () => {
     }
     if (problemData.value?.starter_code) {
       code.value = problemData.value.starter_code;
-
     } else if (selectedLanguage.value === "python3") {
       code.value = languageTemplates.python3;
     }
@@ -415,25 +358,9 @@ const fetchRandomProblem = async () => {
     await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
   } catch (err) {
     console.error(err);
-    try {
-      await fetchRandomOnly();
-      if (problemData.value) {
-        await fetchIntroAudio(problemData.value);
-      }
-    } catch (fallbackErr) {
-      problemError.value = fallbackErr?.message || "문제를 불러오지 못했습니다.";
-    }
+    problemError.value = err?.message || "문제를 불러오지 못했습니다.";
   } finally {
     isLoadingProblem.value = false;
-  }
-};
-
-const onIntroPlay = () => {
-  if (problemData.value) {
-    // 버튼 클릭 시 CodingProblemSessionInitView 호출 → TTS 오디오 새로 가져와 재생
-    void fetchIntroAudio(problemData.value, true);
-  } else if (introAudio.value?.length) {
-    void playAudioChunks(introAudio.value);
   }
 };
 

@@ -103,13 +103,14 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute } from "vue-router";
+import { useRoute, useRouter } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const route = useRoute();
+const router = useRouter();
 
 const {
   alert: antiCheatAlert,
@@ -362,11 +363,16 @@ let keyTimestamps = [];
 let lastAbnormalAlert = 0;
 let lastCopyAlert = 0;
 let lastCameraStatus = "ok";
+const offscreenCount = ref(0);
+const isForceEnding = ref(false);
+let lastOffscreenAlert = 0;
 
 const KEY_WINDOW_MS = 2000;
 const KEY_THRESHOLD = 12;
 const ABNORMAL_COOLDOWN_MS = 8000;
 const COPY_COOLDOWN_MS = 4000;
+const OFFSCREEN_LIMIT = 5;
+const OFFSCREEN_COOLDOWN_MS = 1500; // blur/visibility/mouseleave가 연달아 올 때 중복 카운트 방지
 
 const clearAntiCheatTimer = () => {
   if (antiCheatTimer) {
@@ -384,25 +390,65 @@ const showAntiCheat = (stateKey, detail) => {
   }, 7000);
 };
 
+const registerOffscreenInfraction = (stateKey, baseDetail) => {
+  const now = Date.now();
+  // 같은 전환으로 blur/visibility/mouseleave가 연달아 올 때 한 번만 카운트
+  if (now - lastOffscreenAlert < OFFSCREEN_COOLDOWN_MS) {
+    return;
+  }
+  lastOffscreenAlert = now;
+
+  offscreenCount.value += 1;
+  const withCount = `${baseDetail} (누적 ${offscreenCount.value}/${OFFSCREEN_LIMIT})`;
+  showAntiCheat(stateKey, withCount);
+
+  if (offscreenCount.value >= OFFSCREEN_LIMIT) {
+    void forceEndSession("anti-cheat: offscreen threshold exceeded");
+  }
+};
+
+const forceEndSession = async (reason = "") => {
+  if (isForceEnding.value) return;
+  isForceEnding.value = true;
+
+  try {
+    const token = localStorage.getItem("jobtory_access_token");
+    const sessionId = route.query.session_id;
+    if (token) {
+      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ session_id: sessionId, reason })
+      }).catch(() => {});
+    }
+  } finally {
+    localStorage.removeItem("jobtory_livecoding_session_id");
+    router.replace({ name: "home", query: { alert: "anti-cheat" } });
+  }
+};
+
 const handleVisibilityChange = () => {
   if (document.visibilityState === "hidden") {
-    showAntiCheat("tabSwitch", "시험 화면을 벗어났습니다.");
+    registerOffscreenInfraction("tabSwitch", "시험 화면을 벗어났습니다.");
   }
 };
 
 const handleWindowBlur = () => {
-  showAntiCheat("windowBlur", "다른 창으로 이동이 감지되었습니다.");
+  registerOffscreenInfraction("windowBlur", "다른 창으로 이동이 감지되었습니다.");
 };
 
 const handlePaste = () => {
-  showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 감지되었습니다.");
+  showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 차단되었습니다.");
 };
 
 const handleCopy = () => {
   const now = Date.now();
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
-  showAntiCheat("copyDetected", "코드 편집기에서 복사 동작이 감지되었습니다.");
+  showAntiCheat("copyDetected", "복사 동작이 차단되었습니다.");
 };
 
 const sendFrameForMediapipe = async () => {
@@ -464,7 +510,13 @@ const sendFrameForMediapipe = async () => {
 const handleEditorKeydown = (event) => {
   const now = Date.now();
   if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "c") {
+    event.preventDefault();
     handleCopy();
+    return;
+  }
+  if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "v") {
+    event.preventDefault();
+    handlePaste();
     return;
   }
 
@@ -505,6 +557,22 @@ const startWebcamMonitor = () => {
   }, 5000);
 };
 
+const handleMouseLeave = (event) => {
+  if (!event.relatedTarget) {
+    registerOffscreenInfraction("windowBlur", "마우스가 시험 화면 밖으로 이동했습니다.");
+  }
+};
+
+const pasteListener = (e) => {
+  e.preventDefault();
+  handlePaste();
+};
+
+const copyListener = (e) => {
+  e.preventDefault();
+  handleCopy();
+};
+
 const stopWebcamMonitor = () => {
   if (webcamMonitor) {
     clearInterval(webcamMonitor);
@@ -530,6 +598,12 @@ onMounted(async () => {
   } catch (err) {
     cameraError.value = "웹캠 권한을 허용해 주세요.";
   }
+
+  window.addEventListener("blur", handleWindowBlur);
+  document.addEventListener("visibilitychange", handleVisibilityChange);
+  document.addEventListener("paste", pasteListener, { capture: true });
+  document.addEventListener("copy", copyListener, { capture: true });
+  document.addEventListener("mouseleave", handleMouseLeave);
 });
 
 onBeforeUnmount(() => {
@@ -543,8 +617,9 @@ onBeforeUnmount(() => {
   }
   window.removeEventListener("blur", handleWindowBlur);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
-  document.removeEventListener("paste", handlePaste);
-  document.removeEventListener("copy", handleCopy);
+  document.removeEventListener("paste", pasteListener, { capture: true });
+  document.removeEventListener("copy", copyListener, { capture: true });
+  document.removeEventListener("mouseleave", handleMouseLeave);
   clearAntiCheatTimer();
 });
 </script>

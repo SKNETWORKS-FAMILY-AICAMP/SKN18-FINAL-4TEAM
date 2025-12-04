@@ -7,12 +7,19 @@ from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
+from django.core.cache import cache
+from rest_framework import status, permissions
 import jwt
-from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from .email_utils import send_verification_code, verify_code
+from .throttling import (
+    EmailActionRateThrottle,
+    LoginRateThrottle,
+    PasswordResetRateThrottle,
+)
+from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
 from .models import (
@@ -66,6 +73,8 @@ class RandomCodingProblemView(APIView):
     기본 언어는 python 입니다.
     """
 
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request):
         language = (request.query_params.get("language") or "python").lower()
         problem_lang = (
@@ -103,6 +112,8 @@ class RandomCodingProblemView(APIView):
 
 
 class SignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         serializer = SignupSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
@@ -130,6 +141,8 @@ class UserIdCheckView(APIView):
       400 BAD REQUEST: {"detail": "..."} (user_id 미입력 등)
     """
 
+    permission_classes = [permissions.AllowAny]
+
     def get(self, request):
         user_id = request.query_params.get("user_id")
         if not user_id:
@@ -143,6 +156,9 @@ class UserIdCheckView(APIView):
 
 
 class LoginView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [LoginRateThrottle]
+
     def post(self, request):
         identifier = request.data.get("user_id") or request.data.get("email")
         password = request.data.get("password")
@@ -225,6 +241,9 @@ class LogoutView(APIView):
 
 
 class EmailSendView(APIView):
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [EmailActionRateThrottle]
+
     def post(self, request):
         email = request.data.get("email")
         if not email:
@@ -234,6 +253,8 @@ class EmailSendView(APIView):
 
 
 class EmailVerifyView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         email = request.data.get("email")
         code = request.data.get("code")
@@ -250,6 +271,9 @@ class FindIdView(APIView):
     이메일을 기준으로 user_id를 찾는 간단한 엔드포인트.
     실제 서비스에서는 보안상 이메일 발송 방식으로 변경하는 것이 좋습니다.
     """
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [EmailActionRateThrottle]
 
     def post(self, request):
         email = request.data.get("email")
@@ -278,6 +302,9 @@ class FindPasswordView(APIView):
     이름, 아이디, 이메일을 기준으로 사용자를 찾고
     임시 비밀번호를 이메일로 발송한 뒤 해당 비밀번호로 갱신합니다.
     """
+
+    permission_classes = [permissions.AllowAny]
+    throttle_classes = [PasswordResetRateThrottle]
 
     def post(self, request):
         name = request.data.get("name")
@@ -346,6 +373,8 @@ class FindPasswordView(APIView):
 
 
 class GoogleAuthView(APIView):
+    permission_classes = [permissions.AllowAny]
+
     def post(self, request):
         code = request.data.get("code")
         if not code:
@@ -424,3 +453,281 @@ class GoogleAuthView(APIView):
                 "token_type": "bearer",
             }
         )
+
+
+class LiveCodingStartView(APIView):
+    """
+    라이브 코딩 세션을 시작하면서 세션 메타 정보를 저장하는 엔드포인트.
+    - Authorization: Bearer <access_token> (LoginView/GoogleAuthView에서 발급한 토큰)
+    - 요청 본문(optional): {"language": "python"} 등
+    - 저장되는 키: livecoding:{session_id}:meta
+      값: { state, problem_id, user_id, session_id }
+    """
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "라이브 코딩을 시작하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        language = (request.data.get("language") or "python").lower()
+        problem_lang = (
+            CodingProblemLanguage.objects.select_related("problem")
+            .prefetch_related("problem__test_cases")
+            .filter(language__iexact=language)
+            .order_by("?")
+            .first()
+        )
+
+        if not problem_lang:
+            return Response(
+                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        problem = problem_lang.problem
+        session_id = secrets.token_hex(16)
+
+        test_cases = [
+            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
+        ]
+
+        # Redis(캐시)에 저장할 세션 메타 정보
+        meta = {
+            "state": "ready",
+            "problem_id": problem.problem_id,
+            "user_id": user.user_id,
+            "session_id": session_id,
+            "language": problem_lang.language,
+        }
+
+        # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
+        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60 * 60)
+        # 유저별 현재 진행 중인 세션 매핑
+        cache.set(
+            f"livecoding:user:{user.user_id}:current_session",
+            session_id,
+            timeout=60 * 60,
+        )
+
+        return Response(
+            {
+                "session_id": session_id,
+                "state": meta["state"],
+                "user_id": meta["user_id"],
+                "problem_id": meta["problem_id"],
+                "problem": problem.problem,
+                "difficulty": problem.difficulty,
+                "category": problem.category,
+                "language": problem_lang.language,
+                "function_name": problem_lang.function_name,
+                "starter_code": problem_lang.starter_code,
+                "test_cases": test_cases,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
+
+class LiveCodingSessionView(APIView):
+    """
+    Redis에 저장된 라이브 코딩 세션 정보를 가져오는 엔드포인트.
+    - Authorization: Bearer <access_token>
+    - query: ?session_id=<sid>
+    - 응답: LiveCodingStartView와 동일한 형태의 문제/세션 정보
+    """
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "세션 정보를 조회하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            return Response(
+                {"detail": "session_id 쿼리 파라미터가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        meta_key = f"livecoding:{session_id}:meta"
+
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response(
+                {"detail": "해당 세션 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # 다른 사용자의 세션에 접근하지 못하도록 검증
+        if meta.get("user_id") != str(user.user_id):
+            return Response(
+                {"detail": "이 세션에 접근할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        problem_id = meta.get("problem_id")
+        language = meta.get("language")
+
+        qs = (
+            CodingProblemLanguage.objects.select_related("problem")
+            .prefetch_related("problem__test_cases")
+            .filter(problem__problem_id=problem_id)
+        )
+        if language:
+            qs = qs.filter(language__iexact=language)
+
+        problem_lang = qs.first()
+        if not problem_lang:
+            return Response(
+                {"detail": "세션의 문제 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        problem = problem_lang.problem
+        test_cases = [
+            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
+        ]
+
+        return Response(
+            {
+                "session_id": session_id,
+                "state": meta.get("state"),
+                "user_id": meta.get("user_id"),
+                "problem_id": meta.get("problem_id"),
+                "problem": problem.problem,
+                "difficulty": problem.difficulty,
+                "category": problem.category,
+                "language": problem_lang.language,
+                "function_name": problem_lang.function_name,
+                "starter_code": problem_lang.starter_code,
+                "test_cases": test_cases,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class LiveCodingActiveSessionView(APIView):
+    """
+    현재 로그인한 사용자의 진행 중인 라이브 코딩 세션을 Redis에서 조회하는 엔드포인트.
+    - Authorization: Bearer <access_token>
+    - 응답: 세션이 있으면 LiveCodingSessionView와 동일한 구조, 없으면 404
+    """
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "세션 정보를 조회하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        # 유저별 현재 세션 ID 조회
+        mapping_key = f"livecoding:user:{user.user_id}:current_session"
+        session_id = cache.get(mapping_key)
+        if not session_id:
+            return Response(
+                {"detail": "진행 중인 라이브 코딩 세션이 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        meta_key = f"livecoding:{session_id}:meta"
+
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response(
+                {"detail": "세션 메타 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # 다른 사용자의 세션에 접근하지 못하도록 검증
+        if meta.get("user_id") != str(user.user_id):
+            return Response(
+                {"detail": "이 세션에 접근할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        problem_id = meta.get("problem_id")
+        language = meta.get("language")
+
+        qs = (
+            CodingProblemLanguage.objects.select_related("problem")
+            .prefetch_related("problem__test_cases")
+            .filter(problem__problem_id=problem_id)
+        )
+        if language:
+            qs = qs.filter(language__iexact=language)
+
+        problem_lang = qs.first()
+        if not problem_lang:
+            return Response(
+                {"detail": "세션의 문제 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        problem = problem_lang.problem
+        test_cases = [
+            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
+        ]
+
+        return Response(
+            {
+                "session_id": session_id,
+                "state": meta.get("state"),
+                "user_id": meta.get("user_id"),
+                "problem_id": meta.get("problem_id"),
+                "problem": problem.problem,
+                "difficulty": problem.difficulty,
+                "category": problem.category,
+                "language": problem_lang.language,
+                "function_name": problem_lang.function_name,
+                "starter_code": problem_lang.starter_code,
+                "test_cases": test_cases,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class LiveCodingEndSessionView(APIView):
+    """
+    현재 로그인한 사용자의 진행 중인 라이브 코딩 세션을 종료(삭제)하는 엔드포인트.
+    - Authorization: Bearer <access_token>
+    - Redis에서 메타/매핑/STT 버퍼를 제거합니다.
+    """
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "세션을 종료하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        mapping_key = f"livecoding:user:{user.user_id}:current_session"
+        session_id = cache.get(mapping_key)
+        if not session_id:
+            # 이미 종료된 상태로 간주
+            return Response(
+                {"detail": "진행 중인 라이브 코딩 세션이 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        meta_key = f"livecoding:{session_id}:meta"
+
+        # 메타/매핑 제거
+        cache.delete(meta_key)
+        cache.delete(mapping_key)
+
+        # STT 버퍼도 함께 정리
+        try:
+            clear_utterances(str(session_id))
+        except Exception:
+            # 정리 실패는 치명적이지 않으므로 무시
+            pass
+
+        return Response(status=status.HTTP_204_NO_CONTENT)

@@ -103,11 +103,13 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { useRoute } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const route = useRoute();
 
 const {
   alert: antiCheatAlert,
@@ -283,18 +285,41 @@ const fetchRandomProblem = async () => {
   problemError.value = "";
 
   try {
-    const resp = await fetch(`${BACKEND_BASE}/api/coding-problems/random/?language=python`);
+    const sessionId = route.query.session_id;
+    const token = localStorage.getItem("jobtory_access_token");
+
+    if (!sessionId) {
+      throw new Error("세션 ID가 없습니다. 라이브 코딩을 다시 시작해 주세요.");
+    }
+    if (!token) {
+      throw new Error("로그인이 필요합니다. 다시 로그인해 주세요.");
+    }
+
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/session/?session_id=${encodeURIComponent(
+        sessionId
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      throw new Error(data?.detail || "문제를 불러오지 못했습니다.");
+      throw new Error(data?.detail || "세션 정보를 불러오지 못했습니다.");
     }
 
     problemData.value = data;
+
+    // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
       selectedLanguage.value = "python3";
     }
-    if (data.starter_code) {
-      code.value = data.starter_code;
+    if (problemData.value?.starter_code) {
+      code.value = problemData.value.starter_code;
     } else if (selectedLanguage.value === "python3") {
       code.value = languageTemplates.python3;
     }
@@ -407,7 +432,14 @@ const sendFrameForMediapipe = async () => {
     formData.append("image", blob, "frame.jpg");
 
     try {
-      const resp = await fetch(`${BACKEND_BASE}/mediapipe/analyze/`, {
+      const sessionId = route.query.session_id;
+      const url = sessionId
+        ? `${BACKEND_BASE}/mediapipe/analyze/?session_id=${encodeURIComponent(
+            sessionId
+          )}`
+        : `${BACKEND_BASE}/mediapipe/analyze/`;
+
+      const resp = await fetch(url, {
         method: "POST",
         body: formData
       });

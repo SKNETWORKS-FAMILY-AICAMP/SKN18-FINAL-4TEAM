@@ -1,4 +1,5 @@
 from django.urls import path
+from . import views
 
 from .views import (
     EmailSendView,
@@ -17,6 +18,7 @@ from .views import (
     SignupView,
     UserIdCheckView,
     UserMeView,
+    ProfileView,
     health,
     roadmap,
 )
@@ -44,4 +46,6 @@ urlpatterns = [
         LiveCodingCodeSnapshotView.as_view(),
         name="livecoding-session-code",
     ),
+    path("user/profile/", ProfileView.as_view(), name="profile"),
+    path("interview/ask/", views.interview_ask, name="interview-ask"),
 ]

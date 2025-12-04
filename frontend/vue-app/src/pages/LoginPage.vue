@@ -200,6 +200,17 @@ const findPwEmail = ref("");
 const toastMessage = ref("");
 const toastVisible = ref(false);
 let toastTimer = null;
+const handleGlobalKeydown = (event) => {
+  if (event.key === "Escape") {
+    if (isFindIdOpen.value) {
+      closeFindId();
+      return;
+    }
+    if (isFindPasswordOpen.value) {
+      closeFindPassword();
+    }
+  }
+};
 
 const showToast = (msg, duration = 2400) => {
   toastMessage.value = msg;
@@ -212,6 +223,7 @@ const showToast = (msg, duration = 2400) => {
 
 onUnmounted(() => {
   if (toastTimer) clearTimeout(toastTimer);
+  document.removeEventListener("keydown", handleGlobalKeydown);
 });
 
 const togglePassword = () => {
@@ -383,6 +395,7 @@ const handleGoogleCallback = async () => {
 };
 
 onMounted(() => {
+  document.addEventListener("keydown", handleGlobalKeydown);
   void handleGoogleCallback();
 });
 

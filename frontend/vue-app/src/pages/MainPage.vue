@@ -121,19 +121,27 @@
         <div class="email-logo">JOBTORY</div>
       </div>
     </section>
+
+    <ForcedExitAlert
+      :visible="showForcedExit"
+      @close="showForcedExit = false"
+    />
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, onUnmounted, ref } from "vue";
-import { RouterLink, useRouter } from "vue-router";
+import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
+import ForcedExitAlert from "../components/ForcedExitAlert.vue";
 
+const route = useRoute();
 const router = useRouter();
 const { isAuthenticated, user, fetchProfile, logout } = useAuth();
 const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false);
 const isLoggingOut = ref(false);
+const showForcedExit = ref(false);
 
 const userName = computed(() => user.value?.name || "회원");
 
@@ -158,9 +166,19 @@ const syncProfile = () => {
   }
 };
 
+const checkForcedAlert = () => {
+  if (route.query.alert === "anti-cheat") {
+    showForcedExit.value = true;
+    const cleanedQuery = { ...route.query };
+    delete cleanedQuery.alert;
+    router.replace({ name: "home", query: cleanedQuery });
+  }
+};
+
 onMounted(() => {
   window.addEventListener("storage", syncProfile);
   syncProfile();
+  checkForcedAlert();
 });
 
 onUnmounted(() => {

@@ -8,11 +8,17 @@
       <section class="card">
         <h1 class="title">Sign in</h1>
 
-        <div class="form-grid">
+        <form class="form-grid" @submit.prevent="handleSubmit" @keydown.enter.prevent="handleEnter">
           <div class="field-block">
             <label class="field-label">아이디</label>
             <div class="field-line">
-              <input v-model="username" class="field-input" type="text" placeholder="아이디" />
+              <input
+                ref="usernameInput"
+                v-model="username"
+                class="field-input"
+                type="text"
+                placeholder="아이디"
+              />
               <button type="button" class="pill-button" @click="handleCheckUsername">중복확인</button>
             </div>
             <p v-if="usernameStatus === 'ok'" class="hint-text success">사용 가능한 아이디입니다.</p>
@@ -57,9 +63,16 @@
           <div class="field-block">
             <label class="field-label">이메일</label>
             <div class="field-line email-line">
-              <input v-model="emailLocal" class="field-input email-local" type="text" placeholder="username" />
+              <input
+                ref="emailLocalInput"
+                v-model="emailLocal"
+                class="field-input email-local"
+                type="text"
+                placeholder="username"
+              />
               <span class="at">@</span>
               <input
+                ref="emailDomainInputRef"
                 v-model="emailDomainInput"
                 class="field-input email-domain-input"
                 type="text"
@@ -113,7 +126,13 @@
           <div class="field-block">
             <label class="field-label">인증번호</label>
             <div class="field-line">
-              <input v-model="emailCode" class="field-input" type="text" placeholder="인증번호 입력" />
+              <input
+                ref="emailCodeInput"
+                v-model="emailCode"
+                class="field-input"
+                type="text"
+                placeholder="인증번호 입력"
+              />
               <button
                 type="button"
                 class="pill-button"
@@ -124,11 +143,12 @@
               </button>
             </div>
           </div>
-        </div>
-
-        <button type="button" class="submit-button" :disabled="pending" @click="handleSubmit">
-          {{ pending ? "가입 중..." : "회원가입" }}
-        </button>
+          <div class="form-actions">
+            <button type="submit" class="submit-button" :disabled="pending" formnovalidate>
+              {{ pending ? "가입 중..." : "회원가입" }}
+            </button>
+          </div>
+        </form>
       </section>
     </main>
   </div>
@@ -140,6 +160,10 @@ import { useRouter } from "vue-router";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const router = useRouter();
+const usernameInput = ref(null);
+const emailLocalInput = ref(null);
+const emailDomainInputRef = ref(null);
+const emailCodeInput = ref(null);
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 70 }, (_, i) => currentYear - i);
@@ -238,6 +262,23 @@ const buildBirthdate = () => {
   return `${birthYear.value}-${month}-${day}`;
 };
 
+const handleEnter = () => {
+  const active = document.activeElement;
+  if (active === usernameInput.value) {
+    handleCheckUsername();
+    return;
+  }
+  if (active === emailLocalInput.value || active === emailDomainInputRef.value) {
+    handleSendEmailCode();
+    return;
+  }
+  if (active === emailCodeInput.value) {
+    handleVerifyEmailCode();
+    return;
+  }
+  handleSubmit();
+};
+
 const handleSubmit = async () => {
   message.value = "";
 
@@ -322,9 +363,36 @@ const handleSubmit = async () => {
         birthdate
       })
     });
-    const data = await res.json();
+    const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const detail = data?.detail || Object.values(data || {})[0] || "가입에 실패했습니다.";
+      // 필드별 에러 메시지(이메일/아이디/전화번호 중복 등)를 최대한 친절하게 추출
+      let detail = data?.detail;
+      if (!detail && data) {
+        const messages = [];
+        if (Array.isArray(data.email) && data.email.length) {
+          messages.push(data.email[0]);
+        }
+        if (Array.isArray(data.user_id) && data.user_id.length) {
+          messages.push(data.user_id[0]);
+        }
+        if (Array.isArray(data.phone_number) && data.phone_number.length) {
+          messages.push(data.phone_number[0]);
+        }
+
+        if (!messages.length) {
+          const firstKey = Object.keys(data)[0];
+          const firstVal = data[firstKey];
+          if (Array.isArray(firstVal) && firstVal.length) {
+            detail = firstVal[0];
+          } else if (typeof firstVal === "string") {
+            detail = firstVal;
+          }
+        } else {
+          detail = messages.join("\n");
+        }
+      }
+      detail = detail || "가입에 실패했습니다.";
+      window.alert(detail);
       throw new Error(detail);
     }
     message.value = "가입이 완료되었습니다. 로그인 페이지로 이동합니다.";
@@ -476,6 +544,13 @@ const handleVerifyEmailCode = async () => {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   column-gap: 72px;
   row-gap: 24px;
+}
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: center;
+  margin-top: 12px;
 }
 
 .field-block {

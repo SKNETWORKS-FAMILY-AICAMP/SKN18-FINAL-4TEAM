@@ -8,7 +8,26 @@
           <br />
           Live Coding Test!
         </h1>
-        <RouterLink to="/coding-test/settings" class="start-btn">테스트 시작</RouterLink>
+        <button type="button" class="start-btn" @click="handleStartClick">테스트 시작</button>
+        <div v-if="showSessionChoice" class="session-choice">
+          <p>이전에 진행하던 라이브 코딩 세션이 있습니다.</p>
+          <div class="session-choice-buttons">
+            <button
+              type="button"
+              class="session-choice-button session-choice-button--primary"
+              @click="handleResumeSession"
+            >
+              이어하기
+            </button>
+            <button
+              type="button"
+              class="session-choice-button session-choice-button--ghost"
+              @click="handleStartNewSession"
+            >
+              새로 시작
+            </button>
+          </div>
+        </div>
       </div>
       <div class="hero-visual">
         <img :src="typingLogo" alt="Live coding illustration" class="hero-image" />
@@ -42,9 +61,155 @@
 </template>
 
 <script setup>
-import { RouterLink } from "vue-router";
+import { computed, onMounted, ref } from "vue";
+import { useRouter } from "vue-router";
 
+const router = useRouter();
 const typingLogo = new URL("../assets/mainpage_image2.png", import.meta.url).href;
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+
+const activeSessionId = ref(null);
+const showSessionChoice = ref(false);
+const isCheckingActiveSession = ref(false);
+const hasCheckedActiveSession = ref(false);
+
+const hasActiveSession = computed(() => !!activeSessionId.value);
+
+const loadActiveSession = async (token) => {
+  if (isCheckingActiveSession.value || hasCheckedActiveSession.value) return;
+  isCheckingActiveSession.value = true;
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/session/active/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`
+      }
+    });
+
+    if (!resp.ok) {
+      // 서버 기준으로는 진행 중인 세션이 없으므로
+      // 로컬에 남아 있는 세션 정보도 정리합니다.
+      activeSessionId.value = null;
+      localStorage.removeItem("jobtory_livecoding_session_id");
+      return;
+    }
+
+    const data = await resp.json().catch(() => ({}));
+    if (data && data.session_id) {
+      activeSessionId.value = data.session_id;
+      localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+    } else {
+      // 정상 응답이지만 session_id가 없으면 역시
+      // 유효한 진행 중 세션이 없다고 보고 정리합니다.
+      activeSessionId.value = null;
+      localStorage.removeItem("jobtory_livecoding_session_id");
+    }
+  } catch (err) {
+    console.error("failed to load active livecoding session", err);
+  } finally {
+    isCheckingActiveSession.value = false;
+    hasCheckedActiveSession.value = true;
+  }
+};
+
+onMounted(() => {
+  const storedSid = localStorage.getItem("jobtory_livecoding_session_id");
+  if (storedSid) {
+    activeSessionId.value = storedSid;
+  }
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) return;
+  void loadActiveSession(token);
+});
+
+const handleStartClick = async () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
+    router.push({ name: "login" });
+    return;
+  }
+
+  // 아직 진행 중 세션 여부를 체크하지 않았으면 한 번 확인하고 시작합니다.
+  if (!hasCheckedActiveSession.value) {
+    await loadActiveSession(token);
+  }
+
+  // 이미 진행 중인 세션이 있으면 이어하기/새로하기 선택 UI를 보여줍니다.
+  if (hasActiveSession.value) {
+    showSessionChoice.value = true;
+    return;
+  }
+
+  try {
+    await startNewSession(token);
+  } catch (err) {
+    console.error(err);
+    window.alert("라이브 코딩 세션 시작 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+  }
+};
+
+const handleResumeSession = () => {
+  if (!activeSessionId.value) {
+    showSessionChoice.value = false;
+    return;
+  }
+  showSessionChoice.value = false;
+  router.push({ name: "coding-session", query: { session_id: activeSessionId.value } });
+};
+
+const handleStartNewSession = async () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
+    router.push({ name: "login" });
+    return;
+  }
+
+  try {
+    // 기존 진행 중인 세션이 있으면 종료 요청
+    if (hasActiveSession.value) {
+      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }).catch(() => {});
+      activeSessionId.value = null;
+      localStorage.removeItem("jobtory_livecoding_session_id");
+    }
+
+    await startNewSession(token);
+  } catch (err) {
+    console.error(err);
+    window.alert("새로운 라이브 코딩 세션을 시작하는 중 오류가 발생했습니다.");
+  } finally {
+    showSessionChoice.value = false;
+  }
+};
+
+const startNewSession = async (token) => {
+  const resp = await fetch(`${BACKEND_BASE}/api/livecoding/start/`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`
+    },
+    body: JSON.stringify({})
+  });
+
+  const data = await resp.json().catch(() => ({}));
+
+  if (!resp.ok) {
+    const detail = data.detail || "라이브 코딩 세션을 시작하지 못했습니다.";
+    window.alert(detail);
+    return;
+  }
+
+  activeSessionId.value = data.session_id;
+  localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+  router.push({ name: "coding-session", query: { session_id: data.session_id } });
+};
 </script>
 
 <style scoped>
@@ -179,6 +344,43 @@ const typingLogo = new URL("../assets/mainpage_image2.png", import.meta.url).hre
 
 .feature-three {
   background: #c5b3f5;
+}
+
+.session-choice {
+  margin-top: 16px;
+  padding: 14px 18px;
+  border-radius: 12px;
+  background: rgba(15, 23, 42, 0.85);
+  color: #f9fafb;
+  display: inline-flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.session-choice-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.session-choice-button {
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.session-choice-button--primary {
+  background: #f97316;
+  color: #111827;
+}
+
+.session-choice-button--ghost {
+  background: transparent;
+  border: 1px solid rgba(249, 250, 251, 0.6);
+  color: #f9fafb;
 }
 
 @media (max-width: 640px) {

@@ -22,17 +22,39 @@
       </div>
       <h1 class="nav-logo">JOBTORY</h1>
       <div class="nav-dropdown">
-        <button class="nav-pill" @click="isDropdownOpen = !isDropdownOpen" aria-haspopup="true" :aria-expanded="isDropdownOpen">
-          <span>Dropdown</span>
+        <button
+          class="nav-pill"
+          @click="isDropdownOpen = !isDropdownOpen"
+          aria-haspopup="true"
+          :aria-expanded="isDropdownOpen"
+        >
+          <span>{{ isAuthenticated ? userName : "Dropdown" }}</span>
           <span class="chevron">&#9662;</span>
         </button>
         <div class="dropdown-menu" v-show="isDropdownOpen">
-          <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="isDropdownOpen = false">
-            로그인
-          </RouterLink>
-          <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="isDropdownOpen = false">
-            회원가입
-          </RouterLink>
+          <template v-if="isAuthenticated">
+            <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeDropdown">
+              마이페이지
+            </RouterLink>
+            <button
+              type="button"
+              class="dropdown-link dropdown-button"
+              :class="{ 'dropdown-button--loading': isLoggingOut }"
+              :disabled="isLoggingOut"
+              @click="handleLogout"
+            >
+              <span v-if="isLoggingOut" class="spinner" aria-hidden="true"></span>
+              <span>{{ isLoggingOut ? "로그아웃 중..." : "로그아웃" }}</span>
+            </button>
+          </template>
+          <template v-else>
+            <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeDropdown">
+              로그인
+            </RouterLink>
+            <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeDropdown">
+              회원가입
+            </RouterLink>
+          </template>
         </div>
       </div>
     </header>
@@ -99,15 +121,69 @@
         <div class="email-logo">JOBTORY</div>
       </div>
     </section>
+
+    <ForcedExitAlert
+      :visible="showForcedExit"
+      @close="showForcedExit = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ref } from "vue";
-import { RouterLink } from "vue-router";
+import { computed, onMounted, onUnmounted, ref } from "vue";
+import { RouterLink, useRoute, useRouter } from "vue-router";
+import { useAuth } from "../hooks/useAuth";
+import ForcedExitAlert from "../components/ForcedExitAlert.vue";
 
+const route = useRoute();
+const router = useRouter();
+const { isAuthenticated, user, fetchProfile, logout } = useAuth();
 const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false);
+const isLoggingOut = ref(false);
+const showForcedExit = ref(false);
+
+const userName = computed(() => user.value?.name || "회원");
+
+const closeDropdown = () => {
+  isDropdownOpen.value = false;
+};
+
+const handleLogout = async () => {
+  if (isLoggingOut.value) return;
+  isLoggingOut.value = true;
+  setTimeout(async () => {
+    await logout(); // 실제 세션 종료는 약간 뒤에 수행해 전환을 부드럽게
+    isLoggingOut.value = false;
+    closeDropdown();
+    void router.push({ name: "home" });
+  }, 360);
+};
+
+const syncProfile = () => {
+  if (isAuthenticated.value && !user.value) {
+    void fetchProfile();
+  }
+};
+
+const checkForcedAlert = () => {
+  if (route.query.alert === "anti-cheat") {
+    showForcedExit.value = true;
+    const cleanedQuery = { ...route.query };
+    delete cleanedQuery.alert;
+    router.replace({ name: "home", query: cleanedQuery });
+  }
+};
+
+onMounted(() => {
+  window.addEventListener("storage", syncProfile);
+  syncProfile();
+  checkForcedAlert();
+});
+
+onUnmounted(() => {
+  window.removeEventListener("storage", syncProfile);
+});
 
 const heroImage = new URL("../assets/mainpage_image1.png", import.meta.url).href;
 const heroImage2 = new URL("../assets/mainpage_image2.png", import.meta.url).href;
@@ -190,14 +266,48 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .dropdown-link {
   padding: 10px 14px;
   color: #111827;
-  font-size: 14px;
-  font-weight: 700;
+  font-size: 16px;
+  font-weight: 800;
   text-decoration: none;
   border-radius: 8px;
 }
 
+.dropdown-button {
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font: inherit;
+  font-size: 16px;
+  font-weight: 800;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .dropdown-link:hover {
   background: #f3f4f6;
+}
+
+.dropdown-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.dropdown-button--loading .spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #111827;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .hero {

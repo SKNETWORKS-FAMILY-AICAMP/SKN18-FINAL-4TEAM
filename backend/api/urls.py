@@ -8,10 +8,18 @@ from .views import (
     FindPasswordView,
     GoogleAuthView,
     LoginView,
+    LogoutView,
+    LiveCodingActiveSessionView,
+    LiveCodingEndSessionView,
+    LiveCodingStartView,
+    LiveCodingCodeSnapshotView,
+    LiveCodingSessionView,
     RandomCodingProblemView,
     SignupView,
     UserIdCheckView,
     WarmupLanggraphView,
+    UserMeView,
+
     health,
     roadmap,
 )
@@ -27,6 +35,8 @@ urlpatterns = [
     path("auth/email/send/", EmailSendView.as_view(), name="email-send"),
     path("auth/email/verify/", EmailVerifyView.as_view(), name="email-verify"),
     path("auth/google/", GoogleAuthView.as_view(), name="google-auth"),
+    path("auth/me/", UserMeView.as_view(), name="me"),
+    path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("coding-problems/random/", RandomCodingProblemView.as_view(), name="coding-problem-random"),
     path(
         "coding-problems/random/session/",
@@ -34,4 +44,13 @@ urlpatterns = [
         name="coding-problem-random-session",
     ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
+    path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
+    path("livecoding/session/", LiveCodingSessionView.as_view(), name="livecoding-session"),
+    path("livecoding/session/active/", LiveCodingActiveSessionView.as_view(), name="livecoding-session-active"),
+    path("livecoding/session/end/", LiveCodingEndSessionView.as_view(), name="livecoding-session-end"),
+    path(
+        "livecoding/session/code/",
+        LiveCodingCodeSnapshotView.as_view(),
+        name="livecoding-session-code",
+    ),
 ]

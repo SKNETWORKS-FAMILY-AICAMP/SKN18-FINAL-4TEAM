@@ -165,15 +165,23 @@
         </form>
       </div>
     </div>
+
+    <transition name="toast-fade">
+      <div v-if="toastVisible" class="toast">
+        {{ toastMessage }}
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
-import { onMounted, ref } from "vue";
+import { onMounted, onUnmounted, ref } from "vue";
 import { RouterLink, useRouter, useRoute } from "vue-router";
+import { useAuth } from "../hooks/useAuth";
 
 const router = useRouter();
 const route = useRoute();
+const { setSession, BACKEND_BASE } = useAuth();
 
 const showPassword = ref(false);
 const identifier = ref("");
@@ -189,12 +197,40 @@ const findPwName = ref("");
 const findPwUserId = ref("");
 const findPwEmail = ref("");
 
+const toastMessage = ref("");
+const toastVisible = ref(false);
+let toastTimer = null;
+const handleGlobalKeydown = (event) => {
+  if (event.key === "Escape") {
+    if (isFindIdOpen.value) {
+      closeFindId();
+      return;
+    }
+    if (isFindPasswordOpen.value) {
+      closeFindPassword();
+    }
+  }
+};
+
+const showToast = (msg, duration = 2400) => {
+  toastMessage.value = msg;
+  toastVisible.value = true;
+  if (toastTimer) clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => {
+    toastVisible.value = false;
+  }, duration);
+};
+
+onUnmounted(() => {
+  if (toastTimer) clearTimeout(toastTimer);
+  document.removeEventListener("keydown", handleGlobalKeydown);
+});
+
 const togglePassword = () => {
   showPassword.value = !showPassword.value;
 };
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 // Google 콘솔에 등록한 redirect URI와 정확히 일치하도록 고정
 // 로컬 개발 기준: http://localhost:5174/login
@@ -318,6 +354,7 @@ const handleGoogleCallback = async () => {
 
   isHandlingGoogle.value = true;
   errorMessage.value = "";
+  showToast("Google 로그인 중...");
 
   try {
     const resp = await fetch(`${BACKEND_BASE}/api/auth/google/`, {
@@ -331,24 +368,34 @@ const handleGoogleCallback = async () => {
     const data = await resp.json().catch(() => ({}));
 
     if (!resp.ok) {
-      errorMessage.value = data.detail || "Google 로그인에 실패했습니다.";
+      const detail = data.detail || "Google 로그인에 실패했습니다.";
+      errorMessage.value = detail;
+      showToast(detail);
       return;
     }
 
     if (data.access_token) {
-      localStorage.setItem("jobtory_access_token", data.access_token);
+      // 프로필은 콜백 응답으로 채우고, 화면은 즉시 이동
+      void setSession(data.access_token, {
+        user_id: data.user_id,
+        email: data.email,
+        name: data.name
+      });
     }
 
-    await router.replace({ path: "/", query: {} });
+    const redirectTo = route.query.redirect || "/";
+    router.replace({ path: redirectTo, query: {} });
   } catch (err) {
     console.error(err);
     errorMessage.value = "Google 로그인 처리 중 오류가 발생했습니다.";
+    showToast(errorMessage.value);
   } finally {
     isHandlingGoogle.value = false;
   }
 };
 
 onMounted(() => {
+  document.addEventListener("keydown", handleGlobalKeydown);
   void handleGoogleCallback();
 });
 
@@ -379,11 +426,15 @@ const handleSubmit = async () => {
     }
 
     if (data.access_token) {
-      localStorage.setItem("jobtory_access_token", data.access_token);
+      await setSession(data.access_token, {
+        user_id: data.user_id,
+        email: data.email,
+        name: data.name
+      });
     }
 
-    // 로그인 성공 후 메인 페이지로 이동
-    router.push("/");
+    const redirectTo = route.query.redirect || "/";
+    router.push(redirectTo);
   } catch (err) {
     console.error(err);
     errorMessage.value = "서버와 통신할 수 없습니다. 잠시 후 다시 시도해 주세요.";
@@ -789,6 +840,30 @@ const handleSubmit = async () => {
 
 .helper-link:hover {
   text-decoration: underline;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #111827;
+  color: #f9fafb;
+  padding: 10px 16px;
+  border-radius: 10px;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25);
+  font-size: 14px;
+  z-index: 60;
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition: opacity 0.18s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
 }
 
 @media (max-width: 768px) {

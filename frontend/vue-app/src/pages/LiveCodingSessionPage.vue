@@ -371,65 +371,48 @@ const fetchRandomProblem = async () => {
   isLoadingProblem.value = true;
   problemError.value = "";
 
-  const fetchRandomOnly = async () => {
-    const resp = await fetch(`${BACKEND_BASE}/api/coding-problems/random/?language=python`);
+  try {
+    const sessionId = route.query.session_id;
+    const token = localStorage.getItem("jobtory_access_token");
+
+    if (!sessionId) {
+      throw new Error("세션 ID가 없습니다. 라이브 코딩을 다시 시작해 주세요.");
+    }
+    if (!token) {
+      throw new Error("로그인이 필요합니다. 다시 로그인해 주세요.");
+    }
+
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/session/?session_id=${encodeURIComponent(
+        sessionId
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      }
+    );
+
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      throw new Error(data?.detail || "문제를 불러오지 못했습니다.");
+      throw new Error(data?.detail || "세션 정보를 불러오지 못했습니다.");
     }
     problemData.value = data;
+
+    // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
       selectedLanguage.value = "python3";
     }
     if (problemData.value?.starter_code) {
       code.value = problemData.value.starter_code;
-    } else {
+
+    } else if (selectedLanguage.value === "python3") {
       code.value = languageTemplates.python3;
     }
-  };
 
-  try {
-    const sessionId = route.query.session_id;
-    const token = localStorage.getItem("jobtory_access_token");
-
-    if (sessionId && token) {
-      const resp = await fetch(
-        `${BACKEND_BASE}/api/livecoding/session/?session_id=${encodeURIComponent(
-          sessionId
-        )}`,
-        {
-          method: "GET",
-          headers: {
-            Authorization: `Bearer ${token}`
-          }
-        }
-      );
-
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) {
-        throw new Error(data?.detail || "세션 정보를 불러오지 못했습니다.");
-      }
-
-      problemData.value = data;
-
-      if (selectedLanguage.value !== "python3") {
-        selectedLanguage.value = "python3";
-      }
-      if (problemData.value?.starter_code) {
-        code.value = problemData.value.starter_code;
-      } else {
-        code.value = languageTemplates.python3;
-      }
-
-      await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
-    } else {
-      await fetchRandomOnly();
-    }
-
-    // 문제 데이터를 기반으로 intro 음성 생성 시도
-    if (problemData.value) {
-      await fetchIntroAudio(problemData.value);
-    }
+    // 세션/언어별로 저장된 코드가 있다면 불러와서 이어서 작성할 수 있도록 합니다.
+    await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
   } catch (err) {
     console.error(err);
     try {

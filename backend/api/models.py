@@ -11,6 +11,10 @@ class User(models.Model):
   created_at = models.DateTimeField(null=True, blank=True)
   updated_at = models.DateTimeField(null=True, blank=True)
 
+  @property
+  def is_authenticated(self) -> bool:
+    return True
+
   class Meta:
     managed = False
     db_table = "users"
@@ -30,6 +34,9 @@ class AuthIdentity(models.Model):
     managed = False
     db_table = "auth_identities"
     unique_together = (("provider", "provider_user_id"), ("user", "provider"))
+    indexes = [
+      models.Index(fields=["provider", "provider_user_id"], name="auth_id_provider_user_idx"),
+    ]
 
 
 class EmailVerification(models.Model):

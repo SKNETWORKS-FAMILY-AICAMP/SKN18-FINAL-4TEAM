@@ -8,11 +8,11 @@
       <section class="card">
         <h1 class="title">Sign in</h1>
 
-        <div class="form-grid">
+        <form class="form-grid" @submit.prevent="handleSubmit" @keydown.enter.prevent="handleEnter">
           <div class="field-block">
             <label class="field-label">아이디</label>
             <div class="field-line">
-              <input class="field-input" type="text" />
+              <input ref="usernameInput" class="field-input" type="text" />
             </div>
           </div>
 
@@ -58,9 +58,10 @@
           <div class="field-block">
             <label class="field-label">회사 이메일</label>
             <div class="field-line email-line">
-              <input class="field-input email-local" type="text" />
+              <input ref="emailLocalInput" class="field-input email-local" type="text" />
               <span class="at">@</span>
               <input
+                ref="emailDomainInputRef"
                 v-model="emailDomainInput"
                 class="field-input email-domain-input"
                 type="text"
@@ -87,13 +88,12 @@
           <div class="field-block">
             <label class="field-label">인증번호</label>
             <div class="field-line">
-              <input class="field-input" type="text" />
+              <input ref="emailCodeInput" class="field-input" type="text" />
               <button type="button" class="pill-button">인증</button>
             </div>
           </div>
-        </div>
-
-        <button type="button" class="submit-button" @click="handleSubmit">회원가입</button>
+          <button type="submit" class="submit-button">회원가입</button>
+        </form>
       </section>
     </main>
   </div>
@@ -104,6 +104,10 @@ import { computed, ref, watch } from "vue";
 
 const password = ref("");
 const passwordConfirm = ref("");
+const usernameInput = ref(null);
+const emailLocalInput = ref(null);
+const emailDomainInputRef = ref(null);
+const emailCodeInput = ref(null);
 
 const emailDomainInput = ref("");
 const emailDomainSelect = ref("");
@@ -121,6 +125,23 @@ const showPasswordMatch = computed(
 const showPasswordError = computed(
   () => !!password.value && !!passwordConfirm.value && password.value !== passwordConfirm.value
 );
+
+const handleEnter = () => {
+  const active = document.activeElement;
+  if (active === usernameInput.value) {
+    window.alert("아이디 중복확인 기능이 아직 연결되지 않았습니다.");
+    return;
+  }
+  if (active === emailLocalInput.value || active === emailDomainInputRef.value) {
+    window.alert("이메일 인증번호 발송 기능이 아직 연결되지 않았습니다.");
+    return;
+  }
+  if (active === emailCodeInput.value) {
+    window.alert("인증 확인 기능이 아직 연결되지 않았습니다.");
+    return;
+  }
+  handleSubmit();
+};
 
 const handleSubmit = () => {
   if (!password.value || !passwordConfirm.value) {

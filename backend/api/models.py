@@ -11,6 +11,10 @@ class User(models.Model):
   created_at = models.DateTimeField(null=True, blank=True)
   updated_at = models.DateTimeField(null=True, blank=True)
 
+  @property
+  def is_authenticated(self) -> bool:
+    return True
+
   class Meta:
     managed = False
     db_table = "users"

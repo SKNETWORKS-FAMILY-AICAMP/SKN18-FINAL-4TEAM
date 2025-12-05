@@ -1,13 +1,21 @@
 import csv
+import os
+import sys
+
 import psycopg2
 
-# Docker Compose 기준 연결 정보
+# 파괴적인 동작을 방지하기 위해 명시적 플래그 필요
+if os.getenv("ALLOW_DESTRUCTIVE_IMPORT", "").lower() != "true":
+    print("❌ ALLOW_DESTRUCTIVE_IMPORT=true 환경변수가 설정되어 있어야 실행됩니다. 종료합니다.")
+    sys.exit(1)
+
+# Docker Compose 기준 연결 정보 (환경변수로 재정의 가능)
 conn = psycopg2.connect(
-    host="localhost",
-    port="5432",
-    database="jobtory",
-    user="gyulcross",
-    password="gyulcross0113"
+    host=os.getenv("DB_HOST", "localhost"),
+    port=os.getenv("DB_PORT", "5432"),
+    database=os.getenv("DB_NAME", "jobtory"),
+    user=os.getenv("DB_USER", "gyulcross"),
+    password=os.getenv("DB_PASSWORD", "gyulcross0113"),
 )
 cur = conn.cursor()
 

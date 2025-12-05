@@ -57,12 +57,18 @@
         </div>
       </div>
     </div>
+    <div class="tts-test-footer">
+      <RouterLink to="/tts-test" class="tts-test-button">
+        TTS 테스트 페이지 열기
+      </RouterLink>
+    </div>
   </div>
 </template>
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
+import { RouterLink } from "vue-router";
 
 const router = useRouter();
 const typingLogo = new URL("../assets/mainpage_image2.png", import.meta.url).href;
@@ -395,5 +401,29 @@ const startNewSession = async (token) => {
   .start-btn {
     width: fit-content;
   }
+}
+
+.tts-test-footer {
+  margin-top: 16px;
+  padding: 24px 0 40px;
+  border-top: 1px dashed rgba(248, 250, 252, 0.25); /* 연한 흰색 점선 */
+  display: flex;
+  justify-content: center;
+}
+
+.tts-test-button {
+  padding: 8px 18px;
+  border-radius: 999px;
+  border: 1px solid rgba(248, 250, 252, 0.6);
+  background: transparent;
+  color: #f8fafc;
+  font-size: 14px;
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.tts-test-button:hover {
+  background: #f8fafc;
+  color: #111827;
 }
 </style>

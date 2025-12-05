@@ -17,9 +17,10 @@ django-redis==6.0.0
 celery==5.6.0
 redis==7.1.0
 
-
 # langgraph
 langchain==1.1.0
 langchain-community==0.4.1
 langchain-openai==1.1.0
 langgraph==1.0.4
+openai==1.67.1
+

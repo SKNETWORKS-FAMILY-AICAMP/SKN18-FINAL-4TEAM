@@ -2,7 +2,11 @@ from datetime import timedelta
 import json
 import secrets
 import string
+import os
 import time
+from openai import OpenAI
+
+
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -13,6 +17,8 @@ from rest_framework import status, permissions
 import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import AllowAny
 
 from .email_utils import send_verification_code, verify_code
 from .throttling import (
@@ -35,6 +41,8 @@ from .models import (
     User,
 )
 from .serializers import SignupSerializer
+from .jwt_utils import jwt_required
+from .tts_module import generate_interview_audio_batch
 
 
 def health(request):
@@ -986,3 +994,186 @@ class LiveCodingEndSessionView(APIView):
             pass
 
         return Response(status=status.HTTP_204_NO_CONTENT)
+
+class ProfileView(APIView):
+    """
+    회원정보 조회 및 수정 API
+    """
+    
+    @jwt_required
+    def get(self, request):
+        """회원정보 조회"""
+        user = request.user
+        
+        return Response({
+            "user_id": user.user_id,
+            "email": user.email,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "birthdate": user.birthdate.isoformat() if user.birthdate else None,
+        }, status=status.HTTP_200_OK)
+    
+    @jwt_required
+    def patch(self, request):
+        """회원정보 수정"""
+        user = request.user
+        data = request.data
+        
+        # 수정할 필드들
+        name = data.get("name")
+        phone_number = data.get("phone_number")
+        birthdate = data.get("birthdate")
+        current_password = data.get("current_password")
+        new_password = data.get("new_password")
+        
+        # 필수 필드 검증
+        if not name:
+            return Response(
+                {"detail": "이름은 필수 항목입니다."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 전화번호 중복 체크 (자신의 번호가 아닌 경우만)
+        if phone_number:
+            existing = User.objects.filter(phone_number=phone_number).exclude(user_id=user.user_id).first()
+            if existing:
+                return Response(
+                    {"detail": "이미 사용 중인 전화번호입니다."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+        
+        # 비밀번호 변경 로직
+        if current_password and new_password:
+            if not user.password_hash:
+                return Response(
+                    {"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if not check_password(current_password, user.password_hash):
+                return Response(
+                    {"detail": "현재 비밀번호가 올바르지 않습니다."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            if len(new_password) < 8:
+                return Response(
+                    {"detail": "새 비밀번호는 8자 이상이어야 합니다."},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            
+            user.password_hash = make_password(new_password)
+        
+        elif current_password or new_password:
+            return Response(
+                {"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+        
+        # 정보 업데이트
+        user.name = name
+        user.phone_number = phone_number if phone_number else None
+        user.birthdate = birthdate if birthdate else None
+        user.updated_at = timezone.now()
+        
+        user.save()
+        
+        return Response({
+            "message": "회원정보가 성공적으로 수정되었습니다.",
+            "user_id": user.user_id,
+            "email": user.email,
+            "name": user.name,
+            "phone_number": user.phone_number,
+            "birthdate": user.birthdate.isoformat() if user.birthdate else None,
+        }, status=status.HTTP_200_OK)
+
+# -------------------------------------------------------------------
+# AI 면접관용 프롬프트
+# -------------------------------------------------------------------
+OPTIMIZED_PROMPT = """당신은 친절한 코딩 면접관입니다.
+
+[역할]
+- 지원자의 질문에 대해, 면접관처럼 짧고 명확하게 설명하고, 마지막에는 한 문장 정도의 격려를 덧붙입니다.
+
+[답변 스타일]
+1) 첫 문장은 5~10단어 정도의 짧은 공감/인사
+2) 핵심 개념/정답을 1~2문장으로 명확히 정리
+3) 필요하다면 예시나 추가 설명 1~3문장
+4) 마지막은 "이런 방향으로 코드를 개선해보면 좋겠습니다." 와 같은 짧은 격려 문장
+
+- 문장 끝에는 반드시 마침표(.)를 사용해 문장을 구분하세요.
+- 너무 길게 설명하지 말고, 총 4~8문장 정도로 유지하세요.
+"""
+
+client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+
+@api_view(["POST"])
+@permission_classes([AllowAny])
+def interview_ask(request):
+    """
+    POST /api/interview/ask/
+
+    body:
+      { "question": "해시맵의 시간복잡도 설명해주세요" }
+
+    response 예시:
+    {
+      "question": "...",
+      "answer": "...",             # LLM 전체 텍스트
+      "sentences": [
+        { "text": "...", "audio": "<base64 mp3>" },
+        ...
+      ],
+      "first_audio_time": 1.98,
+      "total_time": 3.45
+    }
+    """
+    start_time = time.time()
+    question = (request.data.get("question") or "").strip()
+
+    if not question:
+        return Response({"error": "question 필드가 비어 있습니다."}, status=400)
+
+    # 1) LLM으로 면접관 답변 생성 (스트리밍 말고 한 번에)
+    completion = client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": OPTIMIZED_PROMPT},
+            {"role": "user", "content": question},
+        ],
+        temperature=0.7,
+        max_tokens=400,
+    )
+    answer_text = completion.choices[0].message.content
+
+    # 2) 문장 단위 TTS 배치 생성
+    tts_result = generate_interview_audio_batch(answer_text)
+
+    # generate_interview_audio_batch 가 돌려주는 청크들에서
+    # 실제로 오디오가 생성된 문장만 골라서 프론트에 전달
+    sentences_payload = []
+    for chunk in tts_result.get("audio_chunks", []):
+        audio_b64 = chunk.get("audio_base64")
+        if not audio_b64:
+            # 에러난 문장은 스킵 (원하면 error도 같이 넘길 수 있음)
+            continue
+
+        sentences_payload.append(
+            {
+                "text": chunk.get("text", ""),
+                "audio": audio_b64,
+            }
+        )
+
+    total_time = time.time() - start_time
+
+    return Response(
+        {
+            "question": question,
+            "answer": answer_text,
+            "sentences": sentences_payload,
+            "first_audio_time": tts_result.get("first_audio_time", 0.0),
+            "total_time": total_time,
+        }
+    )

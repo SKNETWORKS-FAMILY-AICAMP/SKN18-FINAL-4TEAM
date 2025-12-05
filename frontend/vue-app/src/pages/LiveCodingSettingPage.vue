@@ -14,7 +14,9 @@
             <div class="step-label">{{ item.label }}</div>
             <span v-if="item.id === 2 && cameraPassed" class="pass-badge">통과</span>
             <!-- ✅ 마이크 + 스피커 둘 다 통과해야 3번에 뱃지 표시 -->
-            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge">통과</span>
+            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge"
+              >통과</span
+            >
           </li>
         </ol>
       </aside>
@@ -63,7 +65,13 @@
           <p class="help-text">
             상태:
             <strong>
-              {{ cameraPassed ? "웹캠 통과 ✅" : (cameraChecking ? "밝기 측정 중..." : "테스트 필요 ❗") }}
+              {{
+                cameraPassed
+                  ? "웹캠 통과 ✅"
+                  : cameraChecking
+                  ? "밝기 측정 중..."
+                  : "테스트 필요 ❗"
+              }}
             </strong>
           </p>
 
@@ -91,7 +99,7 @@
         <div v-else-if="currentStep === 3" class="step-panel">
           <h3 class="step-title">마이크 연결</h3>
           <p class="step-desc">
-            아래 버튼을 눌러 마이크/스피커 테스트를 진행해 주세요. 몇 초 동안 말하면 자동으로 통과 여부를 판단합니다.
+            아래 버튼을 눌러 마이크/스피커 테스트를 진행해 주세요. 말소리가 일정 기준 이상 감지되면 자동으로 통과합니다.
           </p>
 
           <!-- 🎤 마이크 테스트 -->
@@ -99,13 +107,24 @@
             <label class="audio-label">마이크 입력 레벨</label>
             <div class="audio-bar-wrapper">
               <div class="audio-bar-bg">
+                <!-- 실시간 레벨 -->
                 <div
                   class="audio-bar-fill"
                   :style="{ width: micLevel + '%' }"
                 ></div>
+                <!-- ✅ 통과 기준선 표시 -->
+                <div
+                  class="audio-bar-threshold"
+                  :style="{ left: MIC_THRESHOLD_LEVEL + '%' }"
+                ></div>
               </div>
-              <span class="audio-level-text">{{ micLevel }}%</span>
+              <span class="audio-level-text">
+                {{ micLevel }}%
+              </span>
             </div>
+            <p class="help-text small">
+              통과 기준: 바가 <strong>{{ MIC_THRESHOLD_LEVEL }}%</strong> 이상으로 올라가면 자동으로 통과합니다.
+            </p>
           </div>
 
           <!-- 🔊 스피커 테스트 -->
@@ -174,10 +193,10 @@
             <button class="secondary-btn" @click="goPrev">이전</button>
             <button
               class="primary-btn"
-              :disabled="!cameraPassed || !micPassed || !speakerPassed"
+              :disabled="!cameraPassed || !micPassed || !speakerPassed || isStarting"
               @click="startTest"
             >
-              시작
+              {{ isStarting ? "시작 중..." : "시작" }}
             </button>
           </div>
         </div>
@@ -187,11 +206,20 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from "vue";
+import { ref, onBeforeUnmount, nextTick } from "vue";
 import { useRouter } from "vue-router";
-import { nextTick } from "vue";
 
 const router = useRouter();
+
+/* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
+// rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
+const RMS_THRESHOLD = 3;
+
+// UI용 퍼센트 기준선 (micLevel 계산 방식과 동일 스케일)
+const MIC_THRESHOLD_LEVEL = Math.min(
+  100,
+  Math.round((RMS_THRESHOLD / 60) * 100)
+);
 
 /* ----- 단계 ----- */
 const currentStep = ref(1);
@@ -288,7 +316,7 @@ const stopCamera = () => {
   cameraActive.value = false;
 };
 
-/* ----- 마이크 체크 ----- */
+/* ----- 마이크 체크 (기준선 넘는 순간 통과) ----- */
 const micLevel = ref(0);
 const micPassed = ref(false);
 const micChecking = ref(false);
@@ -316,12 +344,7 @@ const startMicTest = async () => {
     source.connect(analyser);
 
     const dataArray = new Uint8Array(analyser.fftSize);
-
-    let sumRms = 0;
-    let frameCount = 0;
     let maxVolume = 0;
-
-    const AVG_RMS_THRESHOLD = 3; // 여유 있게 설정
 
     const updateLevel = () => {
       if (!analyser) return;
@@ -334,26 +357,32 @@ const startMicTest = async () => {
       }
       const rms = Math.sqrt(sum / dataArray.length);
 
-      sumRms += rms;
-      frameCount += 1;
       maxVolume = Math.max(maxVolume, rms);
 
+      // UI용 퍼센트 레벨
       micLevel.value = Math.min(100, Math.round((rms / 60) * 100));
+
+      // ✅ 기준선 넘는 순간 통과 처리
+      if (rms >= RMS_THRESHOLD) {
+        console.log("Mic passed with rms:", rms);
+        micPassed.value = true;
+        micChecking.value = false;
+        stopMic(false); // 스트림/타이머 정리 (레벨은 유지)
+        return;
+      }
 
       micAnimationId = requestAnimationFrame(updateLevel);
     };
 
     updateLevel();
 
+    // 최대 5초까지만 기다리고, 그 안에 통과 못 하면 실패
     micCheckTimeout = setTimeout(() => {
-      micChecking.value = false;
-
-      const avgRms = frameCount > 0 ? sumRms / frameCount : 0;
-      console.log("avgRms:", avgRms, "maxVolume:", maxVolume);
-
-      micPassed.value = avgRms > AVG_RMS_THRESHOLD;
-
-      stopMic(false);
+      if (!micPassed.value) {
+        micChecking.value = false;
+        console.log("Mic test failed, maxVolume:", maxVolume);
+        stopMic(false);
+      }
     }, 5000);
   } catch (e) {
     micChecking.value = false;
@@ -390,11 +419,10 @@ const speakerTestPlayed = ref(false);
 const playSpeakerTest = () => {
   speakerTestPlayed.value = true;
 
-  // Web Audio API로 1초짜리 비프음 재생
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = ctx.createOscillator();
   osc.type = "sine";
-  osc.frequency.value = 880; // 880Hz 비프음
+  osc.frequency.value = 880;
 
   osc.connect(ctx.destination);
   osc.start();
@@ -409,9 +437,60 @@ const confirmSpeakerHeard = () => {
   speakerPassed.value = true;
 };
 
-/* ----- 마지막: 테스트 시작 ----- */
-const startTest = () => {
-  router.push("/coding-test/session");
+/* ----- 마지막: 테스트 시작 (파일2의 API 연동 버전) ----- */
+const isStarting = ref(false);
+
+const startTest = async () => {
+  if (isStarting.value) return;
+
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
+    router.push({ name: "login" });
+    return;
+  }
+
+  isStarting.value = true;
+  try {
+    const resp = await fetch(
+      `${
+        import.meta.env.VITE_API_BASE || "http://localhost:8000"
+      }/api/livecoding/start/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      }
+    );
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const detail = data.detail || "라이브 코딩 세션을 시작하지 못했습니다.";
+      window.alert(detail);
+      return;
+    }
+
+    if (data.session_id) {
+      localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+      // 세션 화면으로 이동할 때 히스토리를 교체하여 뒤로가기를 누르면 설정 페이지 대신 이전 화면으로 이동합니다.
+      router.replace({
+        name: "coding-session",
+        query: { session_id: data.session_id },
+      });
+    } else {
+      window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
+    }
+  } catch (err) {
+    console.error(err);
+    window.alert(
+      "라이브 코딩 세션을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    );
+  } finally {
+    isStarting.value = false;
+  }
 };
 
 /* ----- 컴포넌트 언마운트 시 정리 ----- */
@@ -616,6 +695,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #e5e7eb;
   overflow: hidden;
+  position: relative; /* 기준선 absolute 포지셔닝용 */
 }
 
 .audio-bar-fill {
@@ -623,6 +703,17 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #10b981;
   transition: width 0.12s ease-out;
+}
+
+/* ✅ 통과 기준선 */
+.audio-bar-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444; /* 빨간 기준선 */
+  transform: translateX(-50%);
+  opacity: 0.9;
 }
 
 .audio-level-text {
@@ -651,6 +742,11 @@ onBeforeUnmount(() => {
   margin-top: 10px;
   font-size: 13px;
   color: #4b5563;
+}
+
+.help-text.small {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 /* 푸터 버튼 */

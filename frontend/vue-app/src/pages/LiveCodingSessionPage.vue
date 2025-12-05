@@ -129,6 +129,7 @@ const audioBlob = ref(null);
 const isRecording = ref(false);
 //STT 진행 중 여부
 const isSttRunning = ref(false);
+const isTtsPlaying = ref(false);
 
 /* -----------------------------
    🔥 버튼 클릭 로직
@@ -242,6 +243,61 @@ const runSttClient = async () => {
   }
 };
 
+/* -----------------------------
+  🔊 TTS: 문제 안내 자동 재생
+------------------------------ */
+const playTtsChunks = async (chunks = []) => {
+  for (const chunk of chunks) {
+    if (!chunk?.audio) continue;
+    const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
+    try {
+      await audio.play();
+    } catch (err) {
+      console.error("TTS 재생 실패:", err);
+      break;
+    }
+    await new Promise((resolve) => {
+      audio.onended = resolve;
+      audio.onerror = resolve;
+    });
+  }
+};
+
+const requestAndPlayTts = async (problemPayload) => {
+  if (!problemPayload || isTtsPlaying.value) return;
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    console.warn("TTS 요청을 위해 로그인 토큰이 필요합니다.");
+    return;
+  }
+  isTtsPlaying.value = true;
+  try {
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/coding-problems/random/session/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(problemPayload),
+      }
+    );
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.error("TTS 요청 실패:", data);
+      return;
+    }
+    const chunks = Array.isArray(data?.tts_text) ? data.tts_text : [];
+    if (chunks.length) {
+      await playTtsChunks(chunks);
+    }
+  } catch (err) {
+    console.error("TTS 요청/재생 오류:", err);
+  } finally {
+    isTtsPlaying.value = false;
+  }
+};
 
 /* -----------------------------
   ✂ 이하 기존 코드 유지
@@ -298,6 +354,11 @@ const loadSavedCodeIfExists = async (sessionId, token, language) => {
     );
 
     if (!resp.ok) {
+      // 404는 "저장된 스냅샷 없음" 상황이므로 조용히 반환
+      if (resp.status !== 404) {
+        const errBody = await resp.json().catch(() => ({}));
+        console.warn("failed to load code snapshot", resp.status, errBody);
+      }
       return;
     }
 
@@ -356,6 +417,8 @@ const fetchRandomProblem = async () => {
 
     // 세션/언어별로 저장된 코드가 있다면 불러와서 이어서 작성할 수 있도록 합니다.
     await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
+    // 문제 안내 음성 자동 재생 (TTS 응답이 느려도 UI 로딩을 막지 않도록 fire-and-forget)
+    void requestAndPlayTts(problemData.value);
   } catch (err) {
     console.error(err);
     problemError.value = err?.message || "문제를 불러오지 못했습니다.";
@@ -442,7 +505,7 @@ const KEY_WINDOW_MS = 2000;
 const KEY_THRESHOLD = 12;
 const ABNORMAL_COOLDOWN_MS = 8000;
 const COPY_COOLDOWN_MS = 4000;
-const OFFSCREEN_LIMIT = 5;
+const OFFSCREEN_LIMIT = 3000;
 const OFFSCREEN_COOLDOWN_MS = 1500; // blur/visibility/mouseleave가 연달아 올 때 중복 카운트 방지
 
 const clearAntiCheatTimer = () => {

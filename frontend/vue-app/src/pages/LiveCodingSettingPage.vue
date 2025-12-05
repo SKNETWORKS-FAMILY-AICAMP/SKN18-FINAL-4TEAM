@@ -421,7 +421,8 @@ const confirmSpeakerHeard = () => {
 
 /* ----- 마지막: 테스트 시작 ----- */
 const startTest = () => {
-  router.push("/coding-test/session");
+  // 세션 바로 진입 대신 설정 페이지로 이동
+  router.push("/coding-test/setting");
 };
 
 /* ----- 컴포넌트 언마운트 시 정리 ----- */

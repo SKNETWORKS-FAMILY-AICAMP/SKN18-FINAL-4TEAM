@@ -20,13 +20,11 @@ def problem_intro_agent(state: InterviewState) -> InterviewState:
         사용자의 질문에 답변. 필요 시 TTS로도 출력하기 좋은 문장 형태로 변환.
     """
 
-    problem_data = state.get("problem_data", {})
+    problem_data = state.get("problem_data", "")
     user_question = state.get("user_question", "")
 
-    # Align fields with RandomCodingProblemView response
-    problem_text = problem_data.get("problem", "문제 내용 없음")
     problem_context = (
-        f"문제: {problem_text}\n"
+        f"문제: {problem_data}\n"
     )
 
     # 모드 판단: 질문이 있으면 Q&A, 없으면 초기 소개

@@ -1,8 +1,8 @@
 from datetime import timedelta
+import json
 import secrets
 import string
-import json
-
+import time
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -124,32 +124,36 @@ class CodingProblemSessionInitView(APIView):
     """
 
     def post(self, request):
+        start_time = time.time()
         payload = request.data or {}
-        # request.data가 문자열이면 JSON 파싱 시도
+         # 1) 문자열로 들어온 경우 JSON 파싱 시도 (옵션)
         if isinstance(payload, str):
             try:
                 payload = json.loads(payload)
             except Exception:
                 payload = {}
 
-        # RandomCodingProblemView 응답 전체를 그대로 보내면 problem 키 없이도 동작하도록 처리
-        problem_data = payload.get("problem") if isinstance(payload, dict) else None
-        if not problem_data and isinstance(payload, dict):
-            problem_data = payload
-
-
+        # 2) dict 아니면 그냥 빈 dict
+        if not isinstance(payload, dict):
+            payload = {}
+        
+        # 3) 여기서부터 'problem'만 추출해서 LangGraph용 problem_data 구성
+        problem_text = ""
+        if isinstance(payload.get("problem"), str):
+            problem_text = payload["problem"]
+        
         # langgraph 실행
         init_state = {
             "event_type": "init",
-            "problem_data": problem_data,
+            "problem_data": problem_text,
             "await_human": False,
         }
 
         intro_text = None
-        intro_audio = None
         graph_state = None
-        graph_error = None
-        tts_error = None
+        sentences_payload = []
+        tts_result = {}
+        total_time = None
 
         try:
             graph = get_cached_graph()
@@ -157,26 +161,47 @@ class CodingProblemSessionInitView(APIView):
             if isinstance(graph_state, dict):
                 intro_text = graph_state.get("tts_text")
         except Exception as exc:  # noqa: BLE001
-            graph_error = str(exc)
+            return Response(
+                {
+                    "detail": "langgraph 호출을 할 수 없습니다.",
+                    "error": str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         # TTS 실행
         if intro_text:
             try:
                 tts_result = generate_interview_audio_batch(intro_text)
-                intro_audio = tts_result.get("audio_chunks")
+                for chunk in tts_result.get("audio_chunks", []):
+                    audio_b64 = chunk.get("audio_base64")
+                    if not audio_b64:
+                        # 에러난 문장은 스킵 (원하면 error도 같이 넘길 수 있음)
+                        continue
+
+                    sentences_payload.append(
+                        {
+                            "text": chunk.get("text", ""),
+                            "audio": audio_b64,
+                        }
+                    )
+                total_time = time.time() - start_time
+
             except Exception as exc:  # noqa: BLE001
-                tts_error = str(exc)
+                return Response(
+                    {
+                        "detail": "TTS 함수를 실행할 수 없습니다.",
+                        "error": str(exc),
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
 
         return Response(
             {
-                "problem": problem_data,
-                "intro_text": intro_text,
-                "intro_audio": intro_audio,
-                "graph_state": graph_state,
-                "graph_error": graph_error,
-                "tts_error": tts_error,
-            },
-            status=status.HTTP_200_OK,
+                "tts_text": sentences_payload,
+                "first_audio_time": tts_result.get("first_audio_time", 0.0),
+                "total_time": total_time,
+            }
         )
 
 

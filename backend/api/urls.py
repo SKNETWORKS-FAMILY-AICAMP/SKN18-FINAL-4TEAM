@@ -43,7 +43,6 @@ urlpatterns = [
         CodingProblemSessionInitView.as_view(),
         name="coding-problem-random-session",
     ),
-    path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
     path("livecoding/session/", LiveCodingSessionView.as_view(), name="livecoding-session"),
     path("livecoding/session/active/", LiveCodingActiveSessionView.as_view(), name="livecoding-session-active"),

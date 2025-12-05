@@ -90,18 +90,33 @@ def generate_interview_audio(text: str) -> Generator[Dict, None, None]:
     # 각 문장을 TTS로 변환하여 yield
     for index, sentence in enumerate(sentences, start=1):
         sentence_start_time = time.time()
-        
+
         try:
             # TTS 생성
             tts_response = client.audio.speech.create(
                 model=TTS_MODEL,
                 voice=TTS_VOICE,
                 input=sentence,
-                speed=TTS_SPEED
+                speed=TTS_SPEED,
+                response_format="mp3",
             )
+
+            # 최신 OpenAI SDK는 스트리밍 Response 객체를 반환하므로 안전하게 바이트로 변환
+            audio_bytes = b""
+            if hasattr(tts_response, "iter_bytes"):
+                audio_bytes = b"".join(tts_response.iter_bytes())
+            elif hasattr(tts_response, "read"):
+                audio_bytes = tts_response.read()
+            elif hasattr(tts_response, "content"):
+                audio_bytes = tts_response.content
+            elif isinstance(tts_response, (bytes, bytearray)):
+                audio_bytes = bytes(tts_response)
+
+            if not audio_bytes:
+                raise ValueError("TTS 응답에 오디오 데이터가 없습니다.")
             
             # Base64 인코딩
-            audio_base64 = base64.b64encode(tts_response.content).decode('utf-8')
+            audio_base64 = base64.b64encode(audio_bytes).decode('utf-8')
             
             generation_time = time.time() - sentence_start_time
             

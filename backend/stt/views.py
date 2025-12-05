@@ -40,7 +40,6 @@ def run_stt(request):
         webm_path = f.name
 
     pcm_path = webm_path + ".s16le"
-
     try:
         # 2) ffmpeg 로 16kHz mono s16le PCM 으로 변환
         cmd = [
@@ -82,36 +81,41 @@ def run_stt(request):
             loop.close()
 
         # 5) langgraph 연동: STT 텍스트를 latest_user_text로 전달
+        user_question = None
+        answer_class = None
         intro_text = None
-        graph_error = None
-        text = " ".join((ln.get("text") or "").strip() for ln in lines if isinstance(ln, dict)).strip()
+        text = " ".join((ln.get("text") or "").strip() for ln in (lines or []) if isinstance(ln, dict)).strip()
         if text:
             update_state = {
                 "event_type": "strategy_submit",  # answer_classify_agent 경로
-                "latest_user_text": text,
+                "stt_text": text,
                 "await_human": False,
             }
             try:
                 graph = get_cached_graph()
                 result_state = graph.invoke(update_state)
-                intro_text = result_state.get("tts_text") if isinstance(result_state, dict) else None
+                if isinstance(result_state, dict):
+                    intro_text = result_state.get("tts_text") 
+                    user_question = result_state.get("user_question")
+                    answer_class = result_state.get("answer_class")
+                    
+                    
             except Exception as exc:  # noqa: BLE001
-                graph_error = str(exc)
+                return JsonResponse({"error": f"{str(exc)} 오류 발생"}, status=500)
 
-        return Response(
+        return JsonResponse(
             {
-                "lines": lines,
-                "intro_text": intro_text,
-                "graph_error": graph_error,
+                "answer_class":answer_class,
+                "tts_text": intro_text,
+                "user_question":user_question
             },
             status=200,
         )
-
     finally:
-        # 6) 임시 파일 정리
-        for p in (webm_path, pcm_path):
+        # 임시 파일 정리
+        for path in (pcm_path, webm_path):
             try:
-                if os.path.exists(p):
-                    os.remove(p)
-            except Exception:
+                if path and os.path.exists(path):
+                    os.remove(path)
+            except OSError:
                 pass

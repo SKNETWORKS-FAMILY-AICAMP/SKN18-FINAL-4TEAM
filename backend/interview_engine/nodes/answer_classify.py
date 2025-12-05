@@ -73,7 +73,7 @@ def answer_classify_agent(state: InterviewState) -> InterviewState:
         state["tts_text"] = "다시 질문에 대해 대답해 주세요"
         state["await_human"] = True
         
-    elif answer_class == "RELATED_ANSWER":
+    elif answer_class == "PROBLEM_QUESTION":
         state["event_type"] = "init"
         state["user_question"] = user_text
     

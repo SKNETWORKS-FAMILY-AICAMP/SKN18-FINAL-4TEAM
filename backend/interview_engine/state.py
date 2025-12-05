@@ -17,6 +17,7 @@ class InterviewState(TypedDict, total=False):
     tts_text:str
     
     # 2번 agent (사용자 대답 분류)
+    stt_text:str
     answer_class: str                # "UNRELATED" | "RELATED_ANSWER" | "PROBLEM_QUESTION"
     user_question:str
     

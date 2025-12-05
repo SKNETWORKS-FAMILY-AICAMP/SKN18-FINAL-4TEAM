@@ -286,7 +286,7 @@ const handleFindId = () => {
         return;
       }
 
-      window.alert(`입력하신 이메일로 가입된 아이디는 "${data.user_id}" 입니다.`);
+      window.alert("입력하신 이메일로 아이디 안내 메일을 발송했습니다.");
       closeFindId();
     } catch (err) {
       console.error(err);

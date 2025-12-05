@@ -141,12 +141,7 @@ const handleStartClick = async () => {
     return;
   }
 
-  try {
-    await startNewSession(token);
-  } catch (err) {
-    console.error(err);
-    window.alert("라이브 코딩 세션 시작 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
-  }
+  await startNewSession(token);
 };
 
 const handleResumeSession = () => {
@@ -189,26 +184,8 @@ const handleStartNewSession = async () => {
 };
 
 const startNewSession = async (token) => {
-  const resp = await fetch(`${BACKEND_BASE}/api/livecoding/start/`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${token}`
-    },
-    body: JSON.stringify({})
-  });
-
-  const data = await resp.json().catch(() => ({}));
-
-  if (!resp.ok) {
-    const detail = data.detail || "라이브 코딩 세션을 시작하지 못했습니다.";
-    window.alert(detail);
-    return;
-  }
-
-  activeSessionId.value = data.session_id;
-  localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
-  router.push({ name: "coding-session", query: { session_id: data.session_id } });
+  // 준비 단계(세팅 페이지)로 이동하여 거기서 세션을 생성합니다.
+  router.push({ name: "coding-settings" });
 };
 </script>
 

@@ -52,7 +52,7 @@ def split_into_sentences(text: str) -> list[str]:
     return result
 
 
-def generate_interview_audio(text: str) -> Generator[Dict, None, None]:
+def generate_interview_audio(text: str, config=None) -> Generator[Dict, None, None]:
     """
     면접관 음성 생성 (문장별 스트리밍)
     
@@ -145,7 +145,7 @@ def generate_interview_audio(text: str) -> Generator[Dict, None, None]:
 # 편의 함수들
 # ============================================================================
 
-def generate_interview_audio_batch(text: str) -> Dict:
+def generate_interview_audio_batch(text: str, config=None) -> Dict:
     """
     모든 문장을 한 번에 생성 (배치 모드)
     

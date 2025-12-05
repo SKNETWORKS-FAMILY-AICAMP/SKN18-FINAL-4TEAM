@@ -1,5 +1,4 @@
 from django.urls import path
-from . import views
 
 from .views import (
     EmailSendView,
@@ -44,6 +43,7 @@ urlpatterns = [
         CodingProblemSessionInitView.as_view(),
         name="coding-problem-random-session",
     ),
+    path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
     path("livecoding/session/", LiveCodingSessionView.as_view(), name="livecoding-session"),
     path("livecoding/session/active/", LiveCodingActiveSessionView.as_view(), name="livecoding-session-active"),
@@ -54,6 +54,5 @@ urlpatterns = [
         name="livecoding-session-code",
     ),
     path("user/profile/", ProfileView.as_view(), name="profile"),
-    path("interview/ask/", views.interview_ask, name="interview-ask"),
 ]
 

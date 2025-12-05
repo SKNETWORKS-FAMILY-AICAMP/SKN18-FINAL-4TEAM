@@ -2,9 +2,8 @@ from datetime import timedelta
 import json
 import secrets
 import string
-import os
 import time
-from openai import OpenAI
+
 
 
 from django.conf import settings
@@ -42,7 +41,6 @@ from .models import (
 )
 from .serializers import SignupSerializer
 from .jwt_utils import jwt_required
-from .tts_module import generate_interview_audio_batch
 
 
 def health(request):
@@ -134,7 +132,7 @@ class CodingProblemSessionInitView(APIView):
     def post(self, request):
         start_time = time.time()
         payload = request.data or {}
-         # 1) 문자열로 들어온 경우 JSON 파싱 시도 (옵션)
+        # 1) 문자열로 들어온 경우 JSON 파싱 시도 (옵션)
         if isinstance(payload, str):
             try:
                 payload = json.loads(payload)
@@ -150,13 +148,23 @@ class CodingProblemSessionInitView(APIView):
         if isinstance(payload.get("problem"), str):
             problem_text = payload["problem"]
         
-        # langgraph 실행
+        #  langgraph 호출: 세션 상태를 thread_id로 이어서 사용
         init_state = {
             "event_type": "init",
             "problem_data": problem_text,
             "await_human": False,
         }
 
+        session_id = (
+            request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+            or (request.data.get("session_id") if hasattr(request, "data") else None)
+        )
+        if not session_id:
+            return Response(
+                {"detail": "session_id 쿼리 파라미터를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         intro_text = None
         graph_state = None
         sentences_payload = []
@@ -165,7 +173,14 @@ class CodingProblemSessionInitView(APIView):
 
         try:
             graph = get_cached_graph()
-            graph_state = graph.invoke(init_state)
+            graph_state = graph.invoke(
+                init_state,
+                config={
+                    "configurable": {
+                        "thread_id": session_id
+                    }
+                },
+            )
             if isinstance(graph_state, dict):
                 intro_text = graph_state.get("tts_text")
         except Exception as exc:  # noqa: BLE001
@@ -180,7 +195,13 @@ class CodingProblemSessionInitView(APIView):
         # TTS 실행
         if intro_text:
             try:
-                tts_result = generate_interview_audio_batch(intro_text)
+                tts_result = generate_interview_audio_batch(
+                    intro_text,
+                    config={
+                        "configurable": {
+                            "thread_id": session_id
+                        }
+                    })
                 for chunk in tts_result.get("audio_chunks", []):
                     audio_b64 = chunk.get("audio_base64")
                     if not audio_b64:
@@ -1086,94 +1107,3 @@ class ProfileView(APIView):
             "phone_number": user.phone_number,
             "birthdate": user.birthdate.isoformat() if user.birthdate else None,
         }, status=status.HTTP_200_OK)
-
-# -------------------------------------------------------------------
-# AI 면접관용 프롬프트
-# -------------------------------------------------------------------
-OPTIMIZED_PROMPT = """당신은 친절한 코딩 면접관입니다.
-
-[역할]
-- 지원자의 질문에 대해, 면접관처럼 짧고 명확하게 설명하고, 마지막에는 한 문장 정도의 격려를 덧붙입니다.
-
-[답변 스타일]
-1) 첫 문장은 5~10단어 정도의 짧은 공감/인사
-2) 핵심 개념/정답을 1~2문장으로 명확히 정리
-3) 필요하다면 예시나 추가 설명 1~3문장
-4) 마지막은 "이런 방향으로 코드를 개선해보면 좋겠습니다." 와 같은 짧은 격려 문장
-
-- 문장 끝에는 반드시 마침표(.)를 사용해 문장을 구분하세요.
-- 너무 길게 설명하지 말고, 총 4~8문장 정도로 유지하세요.
-"""
-
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def interview_ask(request):
-    """
-    POST /api/interview/ask/
-
-    body:
-      { "question": "해시맵의 시간복잡도 설명해주세요" }
-
-    response 예시:
-    {
-      "question": "...",
-      "answer": "...",             # LLM 전체 텍스트
-      "sentences": [
-        { "text": "...", "audio": "<base64 mp3>" },
-        ...
-      ],
-      "first_audio_time": 1.98,
-      "total_time": 3.45
-    }
-    """
-    start_time = time.time()
-    question = (request.data.get("question") or "").strip()
-
-    if not question:
-        return Response({"error": "question 필드가 비어 있습니다."}, status=400)
-
-    # 1) LLM으로 면접관 답변 생성 (스트리밍 말고 한 번에)
-    completion = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": OPTIMIZED_PROMPT},
-            {"role": "user", "content": question},
-        ],
-        temperature=0.7,
-        max_tokens=400,
-    )
-    answer_text = completion.choices[0].message.content
-
-    # 2) 문장 단위 TTS 배치 생성
-    tts_result = generate_interview_audio_batch(answer_text)
-
-    # generate_interview_audio_batch 가 돌려주는 청크들에서
-    # 실제로 오디오가 생성된 문장만 골라서 프론트에 전달
-    sentences_payload = []
-    for chunk in tts_result.get("audio_chunks", []):
-        audio_b64 = chunk.get("audio_base64")
-        if not audio_b64:
-            # 에러난 문장은 스킵 (원하면 error도 같이 넘길 수 있음)
-            continue
-
-        sentences_payload.append(
-            {
-                "text": chunk.get("text", ""),
-                "audio": audio_b64,
-            }
-        )
-
-    total_time = time.time() - start_time
-
-    return Response(
-        {
-            "question": question,
-            "answer": answer_text,
-            "sentences": sentences_payload,
-            "first_audio_time": tts_result.get("first_audio_time", 0.0),
-            "total_time": total_time,
-        }
-    )

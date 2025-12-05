@@ -13,7 +13,7 @@ def session_manager(state: InterviewState) -> InterviewState:
     # 그냥 state 그대로 리턴, 라우팅은 route_main_loop가 결정
     return state
 
-def create_graph_flow():
+def create_graph_flow(checkpointer=None):
     graph = StateGraph(InterviewState)
 
     # chapter 1: Intro
@@ -49,6 +49,7 @@ def create_graph_flow():
     )
 
     # 워커 노드들은 일을 끝내고 항상 main_loop로 돌아온다
+    graph.add_edge("answer_classify_agent", "session_manager")
     graph.add_edge("problem_intro_agent", "session_manager")
     graph.add_edge("code_quality_agent","session_manager")
     graph.add_edge("hint_agent","session_manager")
@@ -56,4 +57,4 @@ def create_graph_flow():
     graph.add_edge("code_quality_agent","question_generation_agent")
     graph.add_edge("collaboration_eval_agent", "session_manager")
     graph.add_edge("problem_solving_eval_agent", "session_manager")
-    return  graph.compile()
+    return graph.compile(checkpointer=checkpointer) if checkpointer else graph.compile()

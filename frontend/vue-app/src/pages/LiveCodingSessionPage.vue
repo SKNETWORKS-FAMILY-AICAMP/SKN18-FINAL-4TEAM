@@ -94,10 +94,44 @@
           >
             {{ isSttRunning ? "분석 중..." : (isRecording ? "제출" : "질문하기") }}
           </button>
-          <button type="button" class="run-button">답변하기</button>
+          <button
+            type="button"
+            class="run-button"
+            @click="onAnswerButtonClick"
+            :disabled="isSttRunning || isRecording"
+          >
+            {{ isSttRunning ? "분석 중..." : "답변하기" }}
+          </button>
+          <span v-if="answerCountdown !== null" class="hint">
+            {{ answerCountdown }}초 후 자동 답변 시작
+          </span>
         </footer>
       </section>
     </main>
+
+    <!-- 30초 카운트다운 오버레이 -->
+    <div v-if="answerCountdown !== null" class="countdown-overlay">
+      <div class="countdown-ring">
+        <svg :width="ringSize" :height="ringSize">
+          <circle
+            class="ring-bg"
+            :r="ringRadius"
+            :cx="ringSize / 2"
+            :cy="ringSize / 2"
+          />
+          <circle
+            class="ring-progress"
+            :r="ringRadius"
+            :cx="ringSize / 2"
+            :cy="ringSize / 2"
+            :stroke-dasharray="ringCircumference"
+            :stroke-dashoffset="ringStrokeOffset"
+          />
+        </svg>
+        <div class="countdown-text">{{ answerCountdown }}</div>
+      </div>
+      <p class="countdown-helper">곧 답변 녹음이 자동으로 시작됩니다</p>
+    </div>
   </div>
 </template>
 
@@ -130,6 +164,13 @@ const isRecording = ref(false);
 //STT 진행 중 여부
 const isSttRunning = ref(false);
 const isTtsPlaying = ref(false);
+const answerCountdown = ref(null);
+let answerCountdownTimer = null;
+const ANSWER_COUNTDOWN_SECONDS = 30;
+const ringRadius = 46;
+const ringSize = 140;
+const ringCircumference = 2 * Math.PI * ringRadius;
+const hasPlayedIntroTts = ref(false);
 
 /* -----------------------------
    🔥 버튼 클릭 로직
@@ -137,29 +178,67 @@ const isTtsPlaying = ref(false);
    - isRecording = true → 녹음 종료 + STT 실행
 ----------------------------- */
 const onAskButtonClick = async () => {
-  // STT 처리 중일 땐 아예 무시
+  // STT 처리 중이면 무시
   if (isSttRunning.value) return;
 
   if (!isRecording.value) {
-    // 질문하기 → 녹음 시작
+    // 수동으로 질문하기 버튼을 눌렀을 때 녹음 시작
     await startRecording();
     isRecording.value = true;
-  } else {
-    // 제출 → 녹음 종료 + STT 실행
-    await stopRecording();
-    isRecording.value = false;
+    return;
+  }
 
-    isSttRunning.value = true;      // 🔥 STT 시작
-    try {
-      await runSttClient();         // STT 끝날 때까지 버튼 비활성화
-    } finally {
-      isSttRunning.value = false;   // 🔥 STT 종료 후 다시 활성화
-    }
+  // 녹음 중일 때만 제출 → 녹음 종료 + STT 실행
+  await stopRecording();
+  isRecording.value = false;
+
+  isSttRunning.value = true;
+  try {
+    await runSttClient();
+  } finally {
+    isSttRunning.value = false;
   }
 };
 
+const onAnswerButtonClick = async () => {
+  clearAnswerCountdown();
+  if (isSttRunning.value || isRecording.value) return;
+  await startRecording();
+  isRecording.value = true;
+};
+
+const startAnswerCountdown = (seconds = 30) => {
+  clearAnswerCountdown();
+  answerCountdown.value = seconds;
+  answerCountdownTimer = setInterval(() => {
+    if (answerCountdown.value === null) return;
+    answerCountdown.value -= 1;
+    if (answerCountdown.value <= 0) {
+      clearAnswerCountdown();
+      void onAnswerButtonClick(); // 자동으로 녹음 시작 (제출은 수동)
+    }
+  }, 1000);
+};
+
+const clearAnswerCountdown = () => {
+  if (answerCountdownTimer) {
+    clearInterval(answerCountdownTimer);
+    answerCountdownTimer = null;
+  }
+  answerCountdown.value = null;
+};
+
+const ringStrokeOffset = computed(() => {
+  if (answerCountdown.value === null) return ringCircumference;
+  const progress = Math.max(
+    0,
+    Math.min(1, answerCountdown.value / ANSWER_COUNTDOWN_SECONDS)
+  );
+  return ringCircumference * (1 - progress);
+});
+
 /* -----------------------------
-   🎙️ 녹음 시작
+  🎙️ 녹음 시작
 ----------------------------- */
 const startRecording = async () => {
   try {
@@ -220,20 +299,50 @@ const runSttClient = async () => {
     return;
   }
 
+  const sessionId = route.query.session_id;
+  if (!sessionId) {
+    showAntiCheat("sttError", "session_id가 없습니다. 세션을 다시 시작해 주세요.");
+    return;
+  }
+
   try {
-    const res = await fetch("http://localhost:8000/api/stt/run/", {
-      method: "POST",
-      // raw PCM/웹엠 바이트 그대로 보낼 거라 헤더 안 넣는 게 안전
-      // headers: { "Content-Type": "application/octet-stream" },
-      body: audioBlob.value,
-    });
+    const res = await fetch(
+      `${BACKEND_BASE}/api/stt/run/?session_id=${encodeURIComponent(sessionId)}`,
+      {
+        method: "POST",
+        // raw PCM/웹엠 바이트 그대로 보낼 거라 헤더는 비워둔다 (CORS preflight 회피)
+        body: audioBlob.value,
+      }
+    );
 
     const data = await res.json();
     console.log("STT 결과:", data);
 
+    // 분류/재질문 등에서 내려온 TTS 오디오가 있으면 바로 재생
+    const playSttTtsAudio = async (chunks = []) => {
+      for (const chunk of chunks) {
+        const base64 = chunk?.audio_base64 || chunk?.audio;
+        if (!base64) continue;
+        const audio = new Audio(`data:audio/mp3;base64,${base64}`);
+        try {
+          await audio.play();
+        } catch (err) {
+          console.error("STT 응답 TTS 재생 실패:", err);
+          break;
+        }
+        await new Promise((resolve) => {
+          audio.onended = resolve;
+          audio.onerror = resolve;
+        });
+      }
+    };
+
+    if (Array.isArray(data.tts_audio) && data.tts_audio.length) {
+      await playSttTtsAudio(data.tts_audio);
+    }
+
     if (data.lines) {
       const text = data.lines.map(l => l.text || "").join(" ");
-      console.log("최종 텍스트:", text);
     } else {
       showAntiCheat("sttError", "STT 결과가 올바르지 않습니다.");
     }
@@ -264,7 +373,7 @@ const playTtsChunks = async (chunks = []) => {
 };
 
 const requestAndPlayTts = async (problemPayload) => {
-  if (!problemPayload || isTtsPlaying.value) return;
+  if (!problemPayload || isTtsPlaying.value || hasPlayedIntroTts.value) return;
   const token = localStorage.getItem("jobtory_access_token");
   if (!token) {
     console.warn("TTS 요청을 위해 로그인 토큰이 필요합니다.");
@@ -286,11 +395,20 @@ const requestAndPlayTts = async (problemPayload) => {
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
       console.error("TTS 요청 실패:", data);
+      // TTS 재생이 실패해도 카운트다운은 진행
+      hasPlayedIntroTts.value = true;
+      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
     const chunks = Array.isArray(data?.tts_text) ? data.tts_text : [];
     if (chunks.length) {
       await playTtsChunks(chunks);
+      hasPlayedIntroTts.value = true;
+      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
+    } else {
+      // 오디오 청크가 없어도 타이머는 시작
+      hasPlayedIntroTts.value = true;
+      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
     }
   } catch (err) {
     console.error("TTS 요청/재생 오류:", err);
@@ -336,7 +454,6 @@ const displayedTestCases = computed(() => {
   if (!problemData.value?.test_cases?.length) return [];
   return problemData.value.test_cases.slice(0, 3);
 });
-
 const loadSavedCodeIfExists = async (sessionId, token, language) => {
   try {
     const params = new URLSearchParams({
@@ -404,6 +521,9 @@ const fetchRandomProblem = async () => {
     }
 
     problemData.value = data;
+    hasPlayedIntroTts.value = false;
+    clearAnswerCountdown();
+    isRecording.value = false;
 
     // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
@@ -762,6 +882,7 @@ onBeforeUnmount(() => {
     clearTimeout(saveCodeTimer);
     saveCodeTimer = null;
   }
+  clearAnswerCountdown();
 });
 </script>
 
@@ -1042,6 +1163,56 @@ onBeforeUnmount(() => {
 .hint {
   font-size: 12px;
   color: #9ca3af;
+}
+
+.countdown-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.65);
+  z-index: 999;
+}
+
+.countdown-ring {
+  position: relative;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-bg {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.2);
+  stroke-width: 10;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+}
+
+.ring-progress {
+  fill: none;
+  stroke: #ec4899;
+  stroke-width: 10;
+  transform: rotate(-90deg);
+  transform-origin: 50% 50%;
+  transition: stroke-dashoffset 0.2s ease;
+}
+
+.countdown-text {
+  position: absolute;
+  color: #fff;
+  font-size: 48px;
+  font-weight: 800;
+}
+
+.countdown-helper {
+  margin-top: 10px;
+  color: #f3f4f6;
+  font-size: 14px;
 }
 
 @media (max-width: 900px) {

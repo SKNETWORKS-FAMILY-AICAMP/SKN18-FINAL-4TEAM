@@ -9,9 +9,21 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env_path = BASE_DIR.parent / ".env"
 load_dotenv(env_path)
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-secret-key")
-DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if os.getenv("DJANGO_ALLOWED_HOSTS") else []
+
+def _env_bool(key: str, default: bool = False) -> bool:
+    return os.getenv(key, str(default)).lower() == "true"
+
+
+SECRET_KEY = os.getenv("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    raise RuntimeError("DJANGO_SECRET_KEY 환경변수가 설정되어 있어야 합니다.")
+
+DEBUG = _env_bool("DJANGO_DEBUG", False)
+ALLOWED_HOSTS = (
+    os.getenv("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if os.getenv("DJANGO_ALLOWED_HOSTS") or not DEBUG
+    else []
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -93,7 +105,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGINS = os.getenv(
+    "DJANGO_CORS_ALLOWED_ORIGINS",
+    "http://localhost:5173,http://localhost:5174",
+).split(",")
+CSRF_TRUSTED_ORIGINS = os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS", "").split(",") if os.getenv("DJANGO_CSRF_TRUSTED_ORIGINS") else []
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -148,3 +165,13 @@ CACHES = {
         },
     }
 }
+
+# 프로덕션용 보안 설정 (기본은 로컬 친화적 값)
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https") if _env_bool("DJANGO_SECURE_PROXY_SSL_HEADER", False) else None
+SECURE_SSL_REDIRECT = _env_bool("DJANGO_SECURE_SSL_REDIRECT", False)
+SESSION_COOKIE_SECURE = _env_bool("DJANGO_SESSION_COOKIE_SECURE", False)
+CSRF_COOKIE_SECURE = _env_bool("DJANGO_CSRF_COOKIE_SECURE", False)
+SECURE_REFERRER_POLICY = os.getenv("DJANGO_SECURE_REFERRER_POLICY", "same-origin")
+SECURE_HSTS_SECONDS = int(os.getenv("DJANGO_SECURE_HSTS_SECONDS", "0"))
+SECURE_HSTS_INCLUDE_SUBDOMAINS = _env_bool("DJANGO_SECURE_HSTS_INCLUDE_SUBDOMAINS", False)
+SECURE_HSTS_PRELOAD = _env_bool("DJANGO_SECURE_HSTS_PRELOAD", False)

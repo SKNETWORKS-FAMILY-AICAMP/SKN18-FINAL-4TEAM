@@ -9,7 +9,6 @@ from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from rest_framework import status, permissions
-import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
@@ -198,26 +197,12 @@ class UserMeView(APIView):
     단순 JWT 검증 후 사용자 프로필 반환.
     """
 
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request):
-        auth_header = request.headers.get("Authorization")
-        if not auth_header or not auth_header.lower().startswith("bearer "):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
             return Response({"detail": "인증 정보가 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        token = auth_header.split(" ", 1)[1].strip()
-        try:
-            payload = jwt.decode(token, settings.SECRET_KEY, algorithms=["HS256"])
-        except jwt.ExpiredSignatureError:
-            return Response({"detail": "토큰이 만료되었습니다."}, status=status.HTTP_401_UNAUTHORIZED)
-        except jwt.InvalidTokenError:
-            return Response({"detail": "유효하지 않은 토큰입니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        user_id = payload.get("sub")
-        if not user_id:
-            return Response({"detail": "유효하지 않은 토큰입니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-        user = User.objects.filter(user_id=user_id).first()
-        if not user:
-            return Response({"detail": "사용자를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(
             {
@@ -254,6 +239,7 @@ class EmailSendView(APIView):
 
 class EmailVerifyView(APIView):
     permission_classes = [permissions.AllowAny]
+    throttle_classes = [EmailActionRateThrottle]
 
     def post(self, request):
         email = request.data.get("email")
@@ -281,20 +267,27 @@ class FindIdView(APIView):
             return Response({"detail": "이메일을 입력해 주세요."}, status=status.HTTP_400_BAD_REQUEST)
 
         user = User.objects.filter(email=email).first()
-        if not user:
-            return Response({"detail": "해당 이메일로 가입된 아이디가 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        # 존재 여부와 관계 없이 동일한 응답을 주어 계정 열거를 줄입니다.
+        if user:
+            try:
+                send_mail(
+                    subject="[JobTory] 아이디 찾기 안내",
+                    message=(
+                        "요청하신 이메일에 연결된 아이디 정보를 안내드립니다.\n\n"
+                        f"아이디: {user.user_id}\n"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[email],
+                    fail_silently=True,
+                )
+            except Exception:
+                # 메일 전송 실패 여부는 응답에 드러내지 않습니다.
+                pass
 
-        # 구글 소셜 로그인 계정은 아이디 찾기 대상에서 제외
-        if AuthIdentity.objects.filter(user=user, provider="google").exists():
-            return Response(
-                {
-                    "detail": "구글 소셜 로그인으로 가입한 계정은 아이디 찾기 기능을 사용할 수 없습니다. "
-                    "구글 로그인을 이용해 주세요."
-                },
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        return Response({"email": email, "user_id": user.user_id})
+        return Response(
+            {"detail": "요청을 접수했습니다. 이메일을 확인해 주세요."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class FindPasswordView(APIView):

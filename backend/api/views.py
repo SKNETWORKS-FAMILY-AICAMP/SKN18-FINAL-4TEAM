@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, datetime
 import secrets
 import string
 
@@ -29,6 +29,57 @@ from .models import (
     User,
 )
 from .serializers import SignupSerializer
+
+LIVE_CODING_DURATION_SECONDS = 40 * 60  # 40분 고정 타이머
+
+
+def _parse_iso_datetime(value: str | None):
+    if not value:
+        return None
+    try:
+        dt = datetime.fromisoformat(value)
+        # timezone aware가 아니면 기본 타임존을 붙여준다.
+        if timezone.is_naive(dt):
+            dt = timezone.make_aware(dt, timezone.get_default_timezone())
+        return dt
+    except Exception:
+        return None
+
+
+def _cleanup_livecoding_session(session_id: str, user_id: str | None = None) -> None:
+    meta_key = f"livecoding:{session_id}:meta"
+    code_key = f"livecoding:{session_id}:code"
+    mapping_key = f"livecoding:user:{user_id}:current_session" if user_id else None
+
+    cache.delete(meta_key)
+    cache.delete(code_key)
+    if mapping_key:
+        cache.delete(mapping_key)
+
+    try:
+        clear_utterances(str(session_id))
+    except Exception:
+        # 정리 실패는 치명적이지 않으므로 무시
+        pass
+
+
+def _compute_remaining_seconds(meta: dict) -> int | None:
+    expires_at = _parse_iso_datetime(meta.get("expires_at"))
+    if not expires_at:
+        return None
+    return max(0, int((expires_at - timezone.now()).total_seconds()))
+
+
+def _ensure_session_not_expired(meta: dict, session_id: str, user_id: str | None = None):
+    remaining = _compute_remaining_seconds(meta)
+    if remaining is None or remaining > 0:
+        return None
+
+    _cleanup_livecoding_session(session_id, user_id)
+    return Response(
+        {"detail": "세션이 만료되었습니다."},
+        status=status.HTTP_410_GONE,
+    )
 
 
 def health(request):
@@ -487,6 +538,9 @@ class LiveCodingStartView(APIView):
             for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
         ]
 
+        started_at = timezone.now()
+        expires_at = started_at + timedelta(seconds=LIVE_CODING_DURATION_SECONDS)
+
         # Redis(캐시)에 저장할 세션 메타 정보
         meta = {
             "state": "ready",
@@ -494,15 +548,17 @@ class LiveCodingStartView(APIView):
             "user_id": user.user_id,
             "session_id": session_id,
             "language": problem_lang.language,
+            "started_at": started_at.isoformat(),
+            "expires_at": expires_at.isoformat(),
         }
 
-        # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
-        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60 * 60)
+        # 기본 TTL: 시험 시간(40분)과 동일하게 유지
+        cache.set(f"livecoding:{session_id}:meta", meta, timeout=LIVE_CODING_DURATION_SECONDS)
         # 유저별 현재 진행 중인 세션 매핑
         cache.set(
             f"livecoding:user:{user.user_id}:current_session",
             session_id,
-            timeout=60 * 60,
+            timeout=LIVE_CODING_DURATION_SECONDS,
         )
 
         return Response(
@@ -518,6 +574,8 @@ class LiveCodingStartView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "expires_at": meta["expires_at"],
+                "remaining_seconds": LIVE_CODING_DURATION_SECONDS,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -546,6 +604,10 @@ class LiveCodingCodeSnapshotView(APIView):
                 {"detail": "해당 세션 정보를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        expired_resp = _ensure_session_not_expired(meta, session_id, getattr(user, "user_id", None))
+        if expired_resp is not None:
+            return None, expired_resp
 
         if str(meta.get("user_id")) != str(getattr(user, "user_id", None)):
             return None, Response(
@@ -600,10 +662,15 @@ class LiveCodingCodeSnapshotView(APIView):
         data["history"] = history
 
         # 세션 메타 TTL(기본 1시간)과 동일하게 유지
-        cache.set(key, data, timeout=60 * 60)
+        cache.set(key, data, timeout=LIVE_CODING_DURATION_SECONDS)
 
         return Response(
-            {"saved": True, "snapshot": snapshot},
+            {
+                "saved": True,
+                "snapshot": snapshot,
+                "remaining_seconds": _compute_remaining_seconds(meta),
+                "expires_at": meta.get("expires_at"),
+            },
             status=status.HTTP_201_CREATED,
         )
 
@@ -656,6 +723,8 @@ class LiveCodingCodeSnapshotView(APIView):
                 "language": snapshot.get("language") or meta.get("language"),
                 "code": snapshot.get("code") or "",
                 "saved_at": snapshot.get("saved_at"),
+                "expires_at": meta.get("expires_at"),
+                "remaining_seconds": _compute_remaining_seconds(meta),
             },
             status=status.HTTP_200_OK,
         )
@@ -692,6 +761,10 @@ class LiveCodingSessionView(APIView):
                 {"detail": "해당 세션 정보를 찾을 수 없습니다."},
                 status=status.HTTP_404_NOT_FOUND,
             )
+
+        expired_resp = _ensure_session_not_expired(meta, session_id, getattr(user, "user_id", None))
+        if expired_resp is not None:
+            return expired_resp
 
         # 다른 사용자의 세션에 접근하지 못하도록 검증
         if meta.get("user_id") != str(user.user_id):
@@ -737,6 +810,8 @@ class LiveCodingSessionView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "expires_at": meta.get("expires_at"),
+                "remaining_seconds": _compute_remaining_seconds(meta),
             },
             status=status.HTTP_200_OK,
         )
@@ -775,6 +850,10 @@ class LiveCodingActiveSessionView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        expired_resp = _ensure_session_not_expired(meta, session_id, getattr(user, "user_id", None))
+        if expired_resp is not None:
+            return expired_resp
+
         # 다른 사용자의 세션에 접근하지 못하도록 검증
         if meta.get("user_id") != str(user.user_id):
             return Response(
@@ -819,6 +898,8 @@ class LiveCodingActiveSessionView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "expires_at": meta.get("expires_at"),
+                "remaining_seconds": _compute_remaining_seconds(meta),
             },
             status=status.HTTP_200_OK,
         )

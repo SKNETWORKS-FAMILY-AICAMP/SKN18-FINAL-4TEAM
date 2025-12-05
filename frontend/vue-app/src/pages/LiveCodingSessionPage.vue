@@ -12,6 +12,10 @@
     <header class="session-header">
       <h1>JobTory Live Coding</h1>
       <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
+      <div v-if="remainingSeconds !== null" class="timer-pill">
+        <span class="timer-label">남은 시간</span>
+        <span class="timer-value">{{ formattedRemaining }}</span>
+      </div>
     </header>
 
     <main class="session-main">
@@ -257,6 +261,8 @@ const code = ref(languageTemplates[selectedLanguage.value]);
 const problemData = ref(null);
 const isLoadingProblem = ref(false);
 const problemError = ref("");
+const expiresAtIso = ref(null);
+const remainingSeconds = ref(null);
 
 
 watch(selectedLanguage, (lang) => {
@@ -305,9 +311,47 @@ const loadSavedCodeIfExists = async (sessionId, token, language) => {
     if (data && typeof data.code === "string") {
       code.value = data.code;
     }
+    if (typeof data.remaining_seconds === "number") {
+      remainingSeconds.value = Math.max(0, Math.floor(data.remaining_seconds));
+    }
+    if (data.expires_at) {
+      expiresAtIso.value = data.expires_at;
+    }
   } catch (err) {
     console.error("failed to load saved code snapshot", err);
   }
+};
+
+const stopCountdown = () => {
+  if (countdownInterval) {
+    clearInterval(countdownInterval);
+    countdownInterval = null;
+  }
+};
+
+const handleTimeout = async () => {
+  if (isForceEnding.value) return;
+  remainingSeconds.value = 0;
+  await forceEndSession("timeout");
+};
+
+const startCountdown = () => {
+  stopCountdown();
+
+  // expires_at 기준으로 remaining 계산 보정
+  if (expiresAtIso.value && (remainingSeconds.value === null || Number.isNaN(remainingSeconds.value))) {
+    const diff = Math.floor((new Date(expiresAtIso.value).getTime() - Date.now()) / 1000);
+    remainingSeconds.value = Math.max(0, diff);
+  }
+
+  countdownInterval = setInterval(() => {
+    if (remainingSeconds.value === null) return;
+    remainingSeconds.value = Math.max(0, remainingSeconds.value - 1);
+    if (remainingSeconds.value <= 0) {
+      stopCountdown();
+      void handleTimeout();
+    }
+  }, 1000);
 };
 
 const fetchRandomProblem = async () => {
@@ -343,6 +387,15 @@ const fetchRandomProblem = async () => {
     }
 
     problemData.value = data;
+    expiresAtIso.value = data?.expires_at || null;
+    if (typeof data?.remaining_seconds === "number") {
+      remainingSeconds.value = Math.max(0, Math.floor(data.remaining_seconds));
+    } else if (expiresAtIso.value) {
+      const diff = Math.floor((new Date(expiresAtIso.value).getTime() - Date.now()) / 1000);
+      remainingSeconds.value = Math.max(0, diff);
+    } else {
+      remainingSeconds.value = 40 * 60;
+    }
 
     // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
@@ -356,6 +409,7 @@ const fetchRandomProblem = async () => {
 
     // 세션/언어별로 저장된 코드가 있다면 불러와서 이어서 작성할 수 있도록 합니다.
     await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
+    startCountdown();
   } catch (err) {
     console.error(err);
     problemError.value = err?.message || "문제를 불러오지 못했습니다.";
@@ -375,6 +429,7 @@ const currentFilename = computed(() => {
 });
 
 let saveCodeTimer = null;
+let countdownInterval = null;
 
 const saveCodeSnapshot = async (content) => {
   const sessionId = route.query.session_id;
@@ -421,6 +476,16 @@ const cmMode = computed(() => {
     case "cpp": return "text/x-c++src";
     default: return "text/plain";
   }
+});
+
+const formattedRemaining = computed(() => {
+  if (remainingSeconds.value === null || Number.isNaN(remainingSeconds.value)) {
+    return "--:--";
+  }
+  const total = Math.max(0, Math.floor(remainingSeconds.value));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 });
 
 
@@ -695,6 +760,7 @@ onBeforeUnmount(() => {
   document.removeEventListener("copy", copyListener, { capture: true });
   document.removeEventListener("mouseleave", handleMouseLeave);
   clearAntiCheatTimer();
+  stopCountdown();
   if (saveCodeTimer) {
     clearTimeout(saveCodeTimer);
     saveCodeTimer = null;
@@ -732,6 +798,24 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 13px;
   color: #9ca3af;
+}
+
+.timer-pill {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: #0f172a;
+  border: 1px solid #1f2937;
+  border-radius: 999px;
+  font-size: 12px;
+  color: #e5e7eb;
+}
+
+.timer-value {
+  font-weight: 700;
+  letter-spacing: 0.04em;
 }
 
 .session-main {

@@ -3,6 +3,7 @@ import string
 from datetime import timedelta
 
 from django.conf import settings
+from django.core.cache import cache
 from django.core.mail import send_mail
 from django.utils import timezone
 
@@ -14,6 +15,9 @@ def generate_code(length=6):
 
 
 def send_verification_code(email: str):
+    # 실패/시도 카운터 초기화
+    cache.delete(f"email_verify_attempts:{email}")
+
     code = generate_code()
     now = timezone.now()
     expires_at = now + timedelta(minutes=10)
@@ -30,6 +34,22 @@ def send_verification_code(email: str):
 
 
 def verify_code(email: str, code: str):
+    # 간단한 시도 제한 (기본 5회)
+    attempt_key = f"email_verify_attempts:{email}"
+    try:
+        attempts = cache.incr(attempt_key)
+    except Exception:
+        attempts = (cache.get(attempt_key) or 0) + 1
+        cache.set(attempt_key, attempts, 600)
+    else:
+        try:
+            cache.touch(attempt_key, 600)
+        except Exception:
+            cache.set(attempt_key, attempts, 600)
+
+    if attempts > 5:
+        return False, "인증 시도 제한을 초과했습니다. 새로운 코드를 요청해 주세요."
+
     try:
         record = EmailVerification.objects.get(email=email, code=code)
     except EmailVerification.DoesNotExist:
@@ -40,4 +60,5 @@ def verify_code(email: str, code: str):
 
     record.verified_at = timezone.now()
     record.save(update_fields=["verified_at"])
+    cache.delete(attempt_key)
     return True, "인증 완료"

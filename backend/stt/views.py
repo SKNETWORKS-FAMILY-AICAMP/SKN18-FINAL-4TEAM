@@ -15,6 +15,10 @@ logger = logging.getLogger(__name__)
 # 한 번만 만들어서 재사용 (매 요청마다 로딩하지 않도록)
 stt_client = STTClient(model_size="base")
 
+STT_API_TOKEN = os.getenv("STT_API_TOKEN")
+MAX_UPLOAD_BYTES = int(os.getenv("STT_MAX_UPLOAD_BYTES", str(5 * 1024 * 1024)))  # 기본 5MB
+FFMPEG_TIMEOUT_SECONDS = int(os.getenv("STT_FFMPEG_TIMEOUT_SECONDS", "20"))
+
 
 @csrf_exempt
 def run_stt(request):
@@ -27,9 +31,17 @@ def run_stt(request):
     if request.method != "POST":
         return JsonResponse({"error": "POST only"}, status=405)
 
+    if STT_API_TOKEN:
+        auth_header = request.headers.get("Authorization", "")
+        if auth_header != f"Bearer {STT_API_TOKEN}":
+            return JsonResponse({"error": "Unauthorized"}, status=401)
+
     webm_bytes = request.body
     if not webm_bytes:
         return JsonResponse({"error": "No audio data"}, status=400)
+
+    if len(webm_bytes) > MAX_UPLOAD_BYTES:
+        return JsonResponse({"error": "Payload too large"}, status=413)
 
     # 1) webm 임시 파일로 저장
     with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
@@ -55,6 +67,7 @@ def run_stt(request):
                 check=True,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
+                timeout=FFMPEG_TIMEOUT_SECONDS,
             )
         except subprocess.CalledProcessError as e:
             logger.error("ffmpeg 변환 실패: %s", e.stderr.decode("utf-8", "ignore"))
@@ -62,6 +75,9 @@ def run_stt(request):
                 {"error": "ffmpeg convert failed", "detail": "see server log"},
                 status=500,
             )
+        except subprocess.TimeoutExpired:
+            logger.warning("ffmpeg 변환이 제한 시간(%s초)을 초과했습니다.", FFMPEG_TIMEOUT_SECONDS)
+            return JsonResponse({"error": "ffmpeg timeout"}, status=504)
 
         # 3) 변환된 PCM 바이트 읽기
         with open(pcm_path, "rb") as f:

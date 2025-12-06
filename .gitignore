@@ -10,4 +10,5 @@ backend/*/migrations
 redis-data/
 docker/redis-data/
 docker/redis-data/**
-
+backend\__pycache__
+backend/**/__pycache__/

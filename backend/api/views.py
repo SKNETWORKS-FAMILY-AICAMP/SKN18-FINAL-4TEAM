@@ -239,6 +239,9 @@ class WarmupLanggraphView(APIView):
     Langgraph/LLM 모듈을 미리 로드하기 위한 워밍업 엔드포인트.
     """
 
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
     def get(self, request):
         try:
             # LLM 모듈 import 및 그래프 컴파일 시도

@@ -207,7 +207,7 @@
 
 <script setup>
 
-import { ref, onBeforeUnmount, nextTick } from "vue";
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();

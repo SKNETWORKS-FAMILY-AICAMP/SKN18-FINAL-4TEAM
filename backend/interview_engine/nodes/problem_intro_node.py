@@ -20,13 +20,10 @@ def _get_answer_class(state: InterviewState) -> str:
     return str(intro.get("user_answer_class") or "").lower()
 
 
-def _mark_meta(meta: dict, stage: str = "intro"
-                , intro_flow_done:bool = False ) -> None:
+def _mark_meta(meta: dict, stage: str = "intro") -> None:
     meta.setdefault("created_at", now_iso())
     meta["updated_at"] = now_iso()
     meta["stage"] = stage
-    # intro_flow_done은 후속 단계에서 True로 갱신될 수 있으므로 덮어쓴다
-    meta["intro_flow_done"] = intro_flow_done
 
 
 def problem_intro_agent(state: InterviewState) -> InterviewState:
@@ -140,6 +137,7 @@ def problem_intro_agent(state: InterviewState) -> InterviewState:
             state["await_human"] = True
 
             # meta 업데이트
+            intro["intro_flow_done"] = False
             _mark_meta(meta, stage="intro")
 
         except Exception:
@@ -187,7 +185,8 @@ def problem_intro_agent(state: InterviewState) -> InterviewState:
         # TTS로 읽을 텍스트
         state["tts_text"] = content + "\n" + "문제 이해는 되셨나요?  그렇다면 이 문제를 어떻게 접근하실지, 풀이 전략을 설명해주시겠어요?"
         # meta 갱신 (단계는 아직 intro / 전략 수집 단계일 수 있음)
-        _mark_meta(meta, stage="intro", intro_flow_done = True)
+        intro["intro_flow_done"] = True
+        _mark_meta(meta, stage="intro")
         state["await_human"] = True
 
     except Exception:
@@ -196,7 +195,8 @@ def problem_intro_agent(state: InterviewState) -> InterviewState:
         intro["problem_answer"] = intro.get("problem_answer") or ""
         state["tts_text"] = fallback
         state["await_human"] = True
-        _mark_meta(meta, stage="intro", intro_flow_done = True)
+        intro["intro_flow_done"] = True
+        _mark_meta(meta, stage="intro")
         return state
 
     return state

@@ -1,7 +1,6 @@
 from interview_engine.state import InterviewState
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain.chat_models import init_chat_model
-
+from interview_engine.llm import LLM
 
 def hint_agent(state: InterviewState) -> InterviewState:
     """
@@ -20,11 +19,29 @@ def hint_agent(state: InterviewState) -> InterviewState:
         → "문제에 어려움이 있으신 것 같아 힌트를 드릴게요" 같은 한두 줄 공감 + 구체적인 개선 포인트 제안.
     """
 
-    problem_algorithm_category = state.get("problem_algorithm_category", "")
-    current_user_code = state.get("current_user_code", "")
-    hint_trigger = state.get("hint_trigger", "manual")
-    problem_description = state.get("problem_description", "")
-    hint_count = int(state.get("hint_count", 0))
+    hint_state = state.get("hint") or {}
+
+    problem_algorithm_category = (
+        state.get("problem_algorithm_category")
+        or hint_state.get("problem_algorithm_category")
+        or ""
+    )
+    current_user_code = (
+        state.get("current_user_code")
+        or hint_state.get("current_user_code")
+        or ""
+    )
+    hint_trigger = (
+        state.get("hint_trigger")
+        or hint_state.get("hint_trigger")
+        or "manual"
+    )
+    problem_description = state.get("problem_data", "")
+    hint_count = int(
+        state.get("hint_count")
+        or hint_state.get("hint_count")
+        or 0
+    )
 
     if hint_trigger == "manual":
         trigger_description = (
@@ -67,18 +84,23 @@ def hint_agent(state: InterviewState) -> InterviewState:
         "위 코드를 기준으로, 지금 상황에 가장 도움이 될 만한 힌트를 작성해 주세요."
     )
 
-    model = init_chat_model("gpt-5-nano")
     messages = [
         SystemMessage(content=system_prompt),
         HumanMessage(content=human_prompt),
     ]
 
     try:
-        response = model.invoke(messages)
+        response = LLM.invoke(messages)
         hint_text = (getattr(response, "content", "") or "").strip()
         if hint_text:
-            state["hint_text"] = hint_text
-            state["hint_count"] = hint_count + 1
+            state["hint"] = {
+                **hint_state,
+                "current_user_code": current_user_code,
+                "problem_algorithm_category": problem_algorithm_category,
+                "hint_trigger": hint_trigger,
+                "hint_text": hint_text,
+                "hint_count": hint_count + 1,
+            }
     except Exception:
         # 실패 시 state는 그대로 둔다.
         return state

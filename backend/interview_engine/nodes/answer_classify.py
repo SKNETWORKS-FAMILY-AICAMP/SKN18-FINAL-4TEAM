@@ -18,9 +18,9 @@ def answer_classify_agent(state: InterviewState) -> InterviewState:
     meta = state.setdefault("meta", {})
 
     # intro_flow_done=True이면 추가 분류 없이 바로 전략 답변으로 수집하고 한 번만 루프
-    if meta.get("intro_flow_done"):
+    if intro.get("intro_flow_done"):
         intro["user_answer_class"] = "unknown"
-        state["user_strategy_answer"] = user_text
+        intro["user_strategy_answer"] = user_text
         state["event_type"] = "idle"
         _mark_meta(meta, stage="coding")
         return state
@@ -88,8 +88,9 @@ def answer_classify_agent(state: InterviewState) -> InterviewState:
         state["event_type"] = "init"  # 문제 관련 Q&A로 라우팅
     else:
         # strategy / unknown → 일단 진행
-        state["user_strategy_answer"] = user_text
+        intro["user_strategy_answer"] = user_text
         state["event_type"] = "idle"
+        intro["intro_flow_done"] = True
         _mark_meta(meta, stage="coding")
 
     return state

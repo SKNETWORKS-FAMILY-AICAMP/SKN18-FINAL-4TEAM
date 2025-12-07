@@ -815,6 +815,121 @@ class LiveCodingCodeSnapshotView(APIView):
         )
 
 
+class LiveCodingHintOfferView(APIView):
+    """
+    힌트 버튼 클릭 시 langgraph hint agent를 호출하는 엔드포인트.
+    POST: {"session_id": "...", "prompt": "<optional>", "code": "<optional>", "language": "<optional>"}
+    """
+
+    def _get_meta(self, user, session_id: str):
+        if not session_id:
+            return None, Response(
+                {"detail": "session_id가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return None, Response(
+                {"detail": "해당 세션 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if str(meta.get("user_id")) != str(getattr(user, "user_id", None)):
+            return None, Response(
+                {"detail": "이 세션에 접근할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return meta, None
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "힌트를 요청하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        
+    
+        session_id = request.data.get("session_id") or request.query_params.get("session_id")
+        
+        meta, error_response = self._get_meta(user, session_id)
+        if error_response is not None:
+            return error_response
+
+        if not language:
+            language = (meta.get("language") or "").lower() or None
+
+        # 코드가 비어 있으면 최근 스냅샷 가져오기
+        if not code:
+            code_data = cache.get(f"livecoding:{session_id}:code") or {}
+            latest = code_data.get("latest") or {}
+            code = latest.get("code") or ""
+
+        # 문제 정보: 클라이언트가 보냈다면 우선 사용, 없으면 DB에서 조회
+        problem_description = (request.data.get("problem") or "").strip()
+        problem_algorithm_category = (request.data.get("category") or "").strip()
+        if not problem_description or not problem_algorithm_category:
+            problem_id = meta.get("problem_id")
+            if problem_id:
+                qs = (
+                    CodingProblemLanguage.objects.select_related("problem")
+                    .filter(problem__problem_id=problem_id)
+                )
+                if language:
+                    qs = qs.filter(language__iexact=language)
+                problem_lang = qs.first()
+                if problem_lang and problem_lang.problem:
+                    if not problem_description:
+                        problem_description = problem_lang.problem.problem or ""
+                    if not problem_algorithm_category:
+                        problem_algorithm_category = problem_lang.problem.category or ""
+
+        # 이전 힌트 카운트 추출(있으면)
+        hint_count = 0
+        try:
+            graph = get_cached_graph()
+            state_snapshot = graph.get_state(
+                config={"configurable": {"thread_id": session_id}}
+            )
+            values = state_snapshot
+            if hasattr(state_snapshot, "values"):
+                values = getattr(state_snapshot, "values", {})
+            if isinstance(values, dict):
+                hint_count = int(values.get("hint_count") or 0)
+        except Exception:
+            graph = get_cached_graph()
+
+        try:
+            graph_state = graph.invoke(
+                {
+                "event_type": "hint_request",
+                "await_human": False,
+                "problem_data": problem_description,
+                "hint": {
+                    "current_user_code": code,
+                    "problem_algorithm_category": problem_algorithm_category,
+                    "hint_trigger": "manual",
+                    "hint_count": hint_count,   
+                    }
+                },
+                config={"configurable": {"thread_id": session_id}},
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"detail": "langgraph 호출을 할 수 없습니다.", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        hint_text = ""
+        if isinstance(graph_state, dict):
+            hint_text = graph_state.get("hint_text") or graph_state.get("hint") or ""
+
+        return Response(
+            {"hint": hint_text, "state": graph_state},
+            status=status.HTTP_200_OK,
+        )
+
+
 class LiveCodingSessionView(APIView):
     """
     Redis에 저장된 라이브 코딩 세션 정보를 가져오는 엔드포인트.

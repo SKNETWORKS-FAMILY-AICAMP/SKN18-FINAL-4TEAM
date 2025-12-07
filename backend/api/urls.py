@@ -14,6 +14,7 @@ from .views import (
     LiveCodingStartView,
     LiveCodingCodeSnapshotView,
     LiveCodingSessionView,
+    LiveCodingHintOfferView,
     RandomCodingProblemView,
     SignupView,
     UserIdCheckView,
@@ -52,6 +53,11 @@ urlpatterns = [
         "livecoding/session/code/",
         LiveCodingCodeSnapshotView.as_view(),
         name="livecoding-session-code",
+    ),
+    path(
+        "livecoding/session/hint/",
+        LiveCodingHintOfferView.as_view(),
+        name="livecoding-session-hint",
     ),
     path("user/profile/", ProfileView.as_view(), name="profile"),
 ]

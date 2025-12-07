@@ -84,27 +84,28 @@
           />
         </div>
         <footer class="editor-footer">
-          <button type="button" class="run-button">실행하기</button>
-          <span class="hint">실행 결과는 추후 연동 예정</span>
-          <button
-            type="button"
-            class="run-button"
-            @click="onAskButtonClick"
+          <div class="footer-left">
+            <button
+              type="button"
+              class="mic-button"
+              @click="onAskButtonClick"
             :disabled="isSttRunning"
+            :class="{ 'is-active': isRecording }"
           >
-            {{ isSttRunning ? "분석 중..." : (isRecording ? "제출" : "질문하기") }}
+            <span class="mic-label">
+              {{ isSttRunning ? "분석 중..." : (isRecording ? "제출하기" : "음성입력") }}
+            </span>
           </button>
-          <button
-            type="button"
-            class="run-button"
-            @click="onAnswerButtonClick"
-            :disabled="isSttRunning || isRecording"
-          >
-            {{ isSttRunning ? "분석 중..." : "답변하기" }}
-          </button>
-          <span v-if="answerCountdown !== null" class="hint">
-            {{ answerCountdown }}초 후 자동 답변 시작
-          </span>
+            <button type="button" class="hint-button" @click="requestHint">힌트요청</button>
+            <span class="hint-counter">힌트 3/3</span>
+            <span v-if="answerCountdown !== null" class="hint countdown-inline">
+              {{ answerCountdown }}초 후 자동 답변 시작
+            </span>
+          </div>
+          <div class="footer-right">
+            <button type="button" class="run-button">실행하기</button>
+            <span class="hint">실행 결과는 추후 연동 예정</span>
+          </div>
         </footer>
       </section>
     </main>
@@ -544,6 +545,46 @@ const fetchRandomProblem = async () => {
     problemError.value = err?.message || "문제를 불러오지 못했습니다.";
   } finally {
     isLoadingProblem.value = false;
+  }
+};
+
+// 힌트 요청: session_id, code, language, 문제 정보 함께 전달
+const requestHint = async () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  const sessionId = route.query.session_id;
+  if (!token || !sessionId) {
+    showAntiCheat("sttError", "세션이나 로그인 정보가 없습니다.");
+    return;
+  }
+
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/session/hint/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        session_id: sessionId,
+        language: selectedLanguage.value,
+        code: code.value,
+        problem_description: problemData.value?.problem || "",
+        problem_algorithm_category: problemData.value?.category || "",
+      }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("hint request failed", data);
+      showAntiCheat("sttError", data.detail || "힌트를 가져오지 못했습니다.");
+      return;
+    }
+
+    // TODO: 받은 힌트를 UI에 표시하도록 연결
+    console.log("hint result", data);
+  } catch (err) {
+    console.error("hint request error", err);
+    showAntiCheat("sttError", "힌트 요청 중 오류가 발생했습니다.");
   }
 };
 
@@ -1146,9 +1187,19 @@ onBeforeUnmount(() => {
   border-top: 1px solid #1f2937;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 12px;
 }
 
+.footer-left,
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.mic-button,
+.hint-button,
 .run-button {
   padding: 6px 14px;
   border-radius: 999px;
@@ -1158,6 +1209,49 @@ onBeforeUnmount(() => {
   font-size: 13px;
   font-weight: 700;
   cursor: pointer;
+}
+
+.mic-button:disabled,
+.hint-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.mic-button:hover:not(:disabled),
+.hint-button:hover:not(:disabled) {
+  background: #1fb154;
+  transform: translateY(-1px);
+}
+
+.mic-button.is-active {
+  background: linear-gradient(135deg, #16a34a, #22c55e);
+  color: #0b1a13;
+}
+
+.mic-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: inherit;
+  white-space: nowrap;
+}
+
+.hint-counter {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
+.countdown-inline {
+  color: #9ca3af;
+}
+
+.run-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.disabled-answer {
+  background: #4b5563;
+  color: #e5e7eb;
 }
 
 .hint {

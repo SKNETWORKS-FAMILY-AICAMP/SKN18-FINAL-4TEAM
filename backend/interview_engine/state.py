@@ -12,7 +12,6 @@ class MetaState(TypedDict, total=False):
     ]
     created_at: str           # ISO 문자열
     updated_at: str           # 매 노드 통과 시 갱신
-    intro_flow_done: bool     # 한번 loop(질문/분류 플로우)
 
 # 2) 인트로 단계 상태
 class IntroState(TypedDict, total=False):
@@ -28,34 +27,9 @@ class IntroState(TypedDict, total=False):
     ]
     user_question: Optional[str]   # 문제에 대해 되묻는 질문 텍스트
     problem_answer: Optional[str]   # 문제 관련 질문에 대한 답
+    intro_flow_done: bool     # 한번 loop(질문/분류 플로우)
     
-    
-    
-class InterviewState(TypedDict, total=False):
-    meta: MetaState
-    problem_data: str
-    intro: IntroState
-    
-    
-    
-    # HITL 용
-    await_human: bool
-    event_type: str
-    
-
-    tts_text:str
-    stt_text:str
-    
-
-    user_question:str
-
-    # 협업능력 평가(코드기준)
-    collaboration_feedback: List[str]
-
-    # Ruff 분석 결과 캐시
-    ruff_issues: List[Dict[str, Any]]
-
-
+class HintState(TypedDict, total=False):
     # 힌트 agent
     # - current_user_code: 현재 사용자의 전체 코드 (문자열)
     # - problem_algorithm_category: 예) "two_pointer", "dfs_bfs", "dp" 등
@@ -69,4 +43,25 @@ class InterviewState(TypedDict, total=False):
     hint_trigger: Literal["manual", "auto_quality"]
     hint_text: str
     hint_count: int
+    
+class InterviewState(TypedDict, total=False):
+    meta: MetaState
+    intro: IntroState
+    hint:HintState
+    problem_data: str
+    
+    # HITL 용
+    await_human: bool
+    event_type: str
+    tts_text:str
+    stt_text:str
+    
+
+    # 협업능력 평가(코드기준)
+    collaboration_feedback: List[str]
+
+    # Ruff 분석 결과 캐시
+    ruff_issues: List[Dict[str, Any]]
+
+
     

@@ -12,7 +12,6 @@ import SignUpCompanyPage from "../pages/SignUpCompanyPage.vue";
 import MyPage from "../pages/MyPage.vue";
 import LiveCodingSettingPage from "../pages/LiveCodingSettingPage.vue";
 import ProfileEditPage from "../pages/ProfileEditPage.vue";
-import TtsTestPage from "../pages/TtsTestPage.vue";
 
 const routes = [
   { path: "/", name: "home", component: MainPage },

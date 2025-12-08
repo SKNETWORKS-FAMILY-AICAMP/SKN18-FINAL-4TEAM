@@ -9,6 +9,7 @@ WhisperLiveKit를 직접 Python 코드에서 호출해서
 
 import asyncio
 import os
+import logging
 from typing import Any, Dict, List, Optional
 
 from whisperlivekit import AudioProcessor, TranscriptionEngine  # basic_server와 동일한 import
@@ -64,6 +65,7 @@ class STTClient:
         self._lock = asyncio.Lock()
 
         # NLP 보정을 쓸 경우에만 OpenAI 클라이언트 준비
+        self._logger = logging.getLogger(__name__)
         
 
     async def _get_engine(self) -> TranscriptionEngine:
@@ -119,8 +121,38 @@ class STTClient:
             nonlocal last_lines
             async for front_data in results_generator:
                 data = front_data.to_dict()
+                # 1) lines 우선 사용
                 if "lines" in data:
-                    last_lines = data["lines"]
+                    lines = data["lines"]
+                    has_text = any(
+                        (ln.get("text") or "").strip()
+                        for ln in lines
+                        if isinstance(ln, dict)
+                    )
+                    if has_text or not last_lines:
+                        last_lines = lines
+                        self._logger.debug("stt_client: updated lines=%s", lines)
+                    continue
+
+                # 2) lines가 없고 segments만 있을 경우, segments를 lines 형태로 변환
+                segments = data.get("segments") or []
+                if segments:
+                    converted = []
+                    for seg in segments:
+                        if not isinstance(seg, dict):
+                            continue
+                        converted.append(
+                            {
+                                "text": seg.get("text") or "",
+                                "start": seg.get("start", 0.0),
+                                "end": seg.get("end", 0.0),
+                                "speaker": seg.get("speaker", -1),
+                            }
+                        )
+                    has_text = any((c.get("text") or "").strip() for c in converted)
+                    if has_text or not last_lines:
+                        last_lines = converted
+                        self._logger.debug("stt_client: converted segments=%s", converted)
 
         try:
             await asyncio.gather(_feed_audio(), _consume_results())
@@ -128,8 +160,13 @@ class STTClient:
             await audio_processor.cleanup()
 
         # 🔧 여기에서 NLP 보정 한 번 태운다
-        
-        return last_lines
+
+        # 비어 있지 않은 텍스트가 있는 lines만 반환, 없으면 원본 유지
+        non_empty_lines = [
+            ln for ln in last_lines
+            if isinstance(ln, dict) and (ln.get("text") or "").strip()
+        ]
+        return non_empty_lines or last_lines
 
     async def transcribe_pcm(self, pcm_bytes: bytes) -> List[Dict[str, Any]]:
         """

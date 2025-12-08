@@ -206,10 +206,12 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount, nextTick } from "vue";
+
+import { ref, onMounted, onBeforeUnmount, nextTick } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 /* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
 // rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
@@ -242,6 +244,15 @@ const goNext = () => {
 
 const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
+};
+
+// Langgraph/LLM 워밍업 호출
+const warmupLanggraph = async () => {
+  try {
+    await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, { method: "GET" });
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
 };
 
 /* ----- 웹캠 체크 ----- */
@@ -497,6 +508,10 @@ const startTest = async () => {
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();
+});
+
+onMounted(() => {
+  void warmupLanggraph();
 });
 </script>
 

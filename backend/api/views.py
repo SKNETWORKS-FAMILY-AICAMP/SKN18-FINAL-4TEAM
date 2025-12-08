@@ -41,6 +41,8 @@ from .models import (
 )
 from .serializers import SignupSerializer
 from .jwt_utils import jwt_required
+from .tts_module import generate_interview_audio_batch
+from .authentication import JWTAuthentication
 
 
 def health(request):
@@ -1134,94 +1136,125 @@ class LiveCodingEndSessionView(APIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+from datetime import datetime
+
+from datetime import datetime
+from django.utils.decorators import method_decorator
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth.hashers import check_password, make_password
+
+from .jwt_utils import jwt_required
+from .models import User
+
+
+from datetime import datetime, date
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from django.contrib.auth.hashers import check_password, make_password
+
+from .authentication import JWTAuthentication
+from .models import User
+
+
+def _format_birthdate(value):
+    """birthdate가 문자열이든 date 객체든 안전하게 변환"""
+    if not value:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, date):
+        return value.isoformat()
+    return None
+
+
 class ProfileView(APIView):
-    """
-    회원정보 조회 및 수정 API
-    """
-    
-    @jwt_required
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request):
-        """회원정보 조회"""
         user = request.user
-        
-        return Response({
-            "user_id": user.user_id,
-            "email": user.email,
-            "name": user.name,
-            "phone_number": user.phone_number,
-            "birthdate": user.birthdate.isoformat() if user.birthdate else None,
-        }, status=status.HTTP_200_OK)
-    
-    @jwt_required
+
+        return Response(
+            {
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.phone_number,
+                "birthdate": _format_birthdate(user.birthdate),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def patch(self, request):
-        """회원정보 수정"""
         user = request.user
         data = request.data
-        
-        # 수정할 필드들
+
         name = data.get("name")
         phone_number = data.get("phone_number")
         birthdate = data.get("birthdate")
         current_password = data.get("current_password")
         new_password = data.get("new_password")
-        
-        # 필수 필드 검증
+
+        # 1. 필수 검증
         if not name:
-            return Response(
-                {"detail": "이름은 필수 항목입니다."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # 전화번호 중복 체크 (자신의 번호가 아닌 경우만)
+            return Response({"detail": "이름은 필수 항목입니다."}, status=400)
+
+        # 2. 전화번호 중복 체크
         if phone_number:
             existing = User.objects.filter(phone_number=phone_number).exclude(user_id=user.user_id).first()
             if existing:
-                return Response(
-                    {"detail": "이미 사용 중인 전화번호입니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        # 비밀번호 변경 로직
+                return Response({"detail": "이미 사용 중인 전화번호입니다."}, status=400)
+
+        # 3. 비밀번호 변경
         if current_password and new_password:
             if not user.password_hash:
-                return Response(
-                    {"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."}, status=400)
+
             if not check_password(current_password, user.password_hash):
-                return Response(
-                    {"detail": "현재 비밀번호가 올바르지 않습니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"detail": "현재 비밀번호가 올바르지 않습니다."}, status=400)
+
             if len(new_password) < 8:
-                return Response(
-                    {"detail": "새 비밀번호는 8자 이상이어야 합니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"detail": "새 비밀번호는 8자 이상이어야 합니다."}, status=400)
+
             user.password_hash = make_password(new_password)
-        
+
         elif current_password or new_password:
-            return Response(
-                {"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # 정보 업데이트
+            return Response({"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."}, status=400)
+
+        # 4. birthdate 변환
+        if birthdate:
+            # 이미 날짜 형식 문자열일 경우 그대로 저장
+            try:
+                # 먼저 date 객체로 바꾸기 시도
+                parsed = datetime.strptime(birthdate, "%Y-%m-%d").date()
+                user.birthdate = parsed
+            except Exception:
+                # 문자열 그대로 저장해야 하는 경우도 있을 수 있음
+                user.birthdate = birthdate
+        else:
+            user.birthdate = None
+
+        # 5. 나머지 필드 저장
         user.name = name
         user.phone_number = phone_number if phone_number else None
-        user.birthdate = birthdate if birthdate else None
         user.updated_at = timezone.now()
-        
+
         user.save()
-        
-        return Response({
-            "message": "회원정보가 성공적으로 수정되었습니다.",
-            "user_id": user.user_id,
-            "email": user.email,
-            "name": user.name,
-            "phone_number": user.phone_number,
-            "birthdate": user.birthdate.isoformat() if user.birthdate else None,
-        }, status=status.HTTP_200_OK)
+
+        return Response(
+            {
+                "message": "회원정보가 성공적으로 수정되었습니다.",
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.phone_number,
+                "birthdate": _format_birthdate(user.birthdate),
+            },
+            status=status.HTTP_200_OK,
+        )
+

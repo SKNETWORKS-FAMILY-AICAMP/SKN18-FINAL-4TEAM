@@ -18,6 +18,9 @@
         남은 시간
         <span class="timer-value">{{ formattedRemainingTime }}</span>
       </div>
+      <div class="realtime-chip" :class="{ error: socketError }">
+        {{ socketConnected ? "Realtime 연결됨" : "Realtime 연결 대기" }}
+      </div>
     </header>
 
     <main class="session-main">
@@ -148,6 +151,7 @@ import { useRoute, useRouter } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
+import { useSocket } from "../hooks/useSocket";
 
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const route = useRoute();
@@ -158,6 +162,14 @@ const {
   setState: setAntiCheatState,
   resetState: resetAntiCheatState,
 } = useAntiCheatStatus();
+
+const {
+  isConnected: socketConnected,
+  lastError: socketError,
+  connect: connectSocket,
+  disconnect: disconnectSocket,
+  emitCodeUpdate,
+} = useSocket();
 
 
 /* -----------------------------
@@ -667,6 +679,10 @@ watch(
     }
     saveCodeTimer = setTimeout(() => {
       void saveCodeSnapshot(newCode);
+      const sessionId = route.query.session_id;
+      if (sessionId) {
+        emitCodeUpdate(sessionId, newCode, selectedLanguage.value);
+      }
     }, 1500);
   }
 );
@@ -953,6 +969,14 @@ const stopWebcamMonitor = () => {
 };
 
 onMounted(async () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  const sessionId = route.query.session_id;
+  if (token && sessionId) {
+    connectSocket(token, sessionId);
+  } else {
+    console.warn("Socket connect skipped: missing token or session_id");
+  }
+
   void fetchRandomProblem();
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
@@ -982,6 +1006,7 @@ onBeforeUnmount(() => {
   // 페이지를 떠날 때 마지막 코드 스냅샷을 한 번 더 저장해 이어하기 진입 시 최대한 최근 코드가 복원되도록 합니다.
   void saveCodeSnapshot(code.value);
   clearCountdown();
+  disconnectSocket();
 
   if (mediaStream) {
     mediaStream.getTracks().forEach((t) => t.stop());
@@ -1055,6 +1080,23 @@ onBeforeUnmount(() => {
   font-size: 13px;
   border: 1px solid #1f2937;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+}
+
+.realtime-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: #0b1220;
+  color: #10b981;
+  font-size: 12px;
+  border: 1px solid #1f2937;
+}
+
+.realtime-chip.error {
+  color: #f87171;
+  border-color: #4b2835;
 }
 
 .timer-value {

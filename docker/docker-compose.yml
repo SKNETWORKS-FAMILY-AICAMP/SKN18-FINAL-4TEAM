@@ -25,3 +25,22 @@ services:
       - "6379:6379"
     volumes:
       - ./redis-data:/data
+
+  socket-gateway:
+    image: node:20
+    working_dir: /app
+    command: ["node", "server.js"]
+    env_file:
+      - ../.env
+    environment:
+      PORT: ${SOCKET_PORT:-4000}
+      SOCKET_PORT: ${SOCKET_PORT:-4000}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      JWT_SECRET: ${JWT_SECRET}
+      SOCKET_CORS_ORIGINS: ${SOCKET_CORS_ORIGINS:-http://localhost:5174}
+    volumes:
+      - ../realtime-server:/app
+    depends_on:
+      - redis
+    ports:
+      - "${SOCKET_PORT:-4000}:${SOCKET_PORT:-4000}"

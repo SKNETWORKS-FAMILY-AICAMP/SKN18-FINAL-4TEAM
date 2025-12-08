@@ -90,13 +90,23 @@ class RandomCodingProblemView(APIView):
 
     def get(self, request):
         language = (request.query_params.get("language") or "python").lower()
-        problem_lang = (
+        qs = (
             CodingProblemLanguage.objects.select_related("problem")
             .prefetch_related("problem__test_cases")
             .filter(language__iexact=language)
-            .order_by("?")
-            .first()
+            .order_by("id")
         )
+
+        problem_count = qs.count()
+        if problem_count == 0:
+            return Response(
+                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+
+        # order_by("?")는 데이터가 많아지면 매우 느려지므로 랜덤 오프셋으로 선택
+        random_index = secrets.randbelow(problem_count)
+        problem_lang = qs[random_index]
 
         if not problem_lang:
             return Response(
@@ -105,10 +115,11 @@ class RandomCodingProblemView(APIView):
             )
 
         problem = problem_lang.problem
-        test_cases = [
-            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
-        ]
+        # 응답 페이로드와 DB 부하를 줄이기 위해 테스트케이스는 상위 3개만 반환
+        test_cases = []
+        if hasattr(problem, "test_cases"):
+            for tc in problem.test_cases.all()[:3]:
+                test_cases.append({"id": tc.id, "input": tc.input_data, "output": tc.output_data})
 
         return Response(
             {
@@ -637,10 +648,10 @@ class LiveCodingStartView(APIView):
         problem = problem_lang.problem
         session_id = secrets.token_hex(16)
 
-        test_cases = [
-            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
-        ]
+        test_cases = []
+        if hasattr(problem, "test_cases"):
+            for tc in problem.test_cases.all()[:3]:
+                test_cases.append({"id": tc.id, "input": tc.input_data, "output": tc.output_data})
 
         # Redis(캐시)에 저장할 세션 메타 정보
         start_at = timezone.now()

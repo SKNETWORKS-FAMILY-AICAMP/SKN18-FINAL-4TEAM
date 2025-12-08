@@ -10,9 +10,10 @@
     "lint": "echo \"Add lint command\""
   },
   "dependencies": {
+    "codemirror": "^5.65.16",
+    "socket.io-client": "^4.8.1",
     "vue": "^3.4.21",
-    "vue-router": "^4.3.0",
-    "codemirror": "^5.65.16"
+    "vue-router": "^4.3.0"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^5.0.3",

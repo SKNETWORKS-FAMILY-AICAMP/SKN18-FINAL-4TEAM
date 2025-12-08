@@ -10,8 +10,14 @@
       @dismiss="resetAntiCheatState"
     />
     <header class="session-header">
-      <h1>JobTory Live Coding</h1>
-      <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
+      <div class="session-title-block">
+        <h1>JobTory Live Coding</h1>
+        <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
+      </div>
+      <div class="timer-chip">
+        남은 시간
+        <span class="timer-value">{{ formattedRemainingTime }}</span>
+      </div>
     </header>
 
     <main class="session-main">
@@ -432,6 +438,20 @@ const code = ref(languageTemplates[selectedLanguage.value]);
 const problemData = ref(null);
 const isLoadingProblem = ref(false);
 const problemError = ref("");
+const timeLimitSeconds = ref(40 * 60);
+const remainingSeconds = ref(null);
+let countdownTimer = null;
+let hasAutoEnded = false;
+
+const formattedRemainingTime = computed(() => {
+  if (remainingSeconds.value === null || remainingSeconds.value === undefined) {
+    return "--:--";
+  }
+  const sec = Math.max(0, remainingSeconds.value);
+  const mm = String(Math.floor(sec / 60)).padStart(2, "0");
+  const ss = String(sec % 60).padStart(2, "0");
+  return `${mm}:${ss}`;
+});
 
 
 watch(selectedLanguage, (lang) => {
@@ -492,6 +512,8 @@ const loadSavedCodeIfExists = async (sessionId, token, language) => {
 const fetchRandomProblem = async () => {
   isLoadingProblem.value = true;
   problemError.value = "";
+  hasAutoEnded = false;
+  clearCountdown();
 
   try {
     const sessionId = route.query.session_id;
@@ -525,6 +547,18 @@ const fetchRandomProblem = async () => {
     hasPlayedIntroTts.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
+    timeLimitSeconds.value = Number(data?.time_limit_seconds || 40 * 60);
+    remainingSeconds.value =
+      data?.remaining_seconds !== undefined && data?.remaining_seconds !== null
+        ? Number(data.remaining_seconds)
+        : timeLimitSeconds.value;
+
+    if (remainingSeconds.value <= 0) {
+      await endSessionDueToTimeout();
+      return;
+    }
+
+    startCountdown();
 
     // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
@@ -637,6 +671,48 @@ watch(
   }
 );
 
+const clearCountdown = () => {
+  if (countdownTimer) {
+    clearInterval(countdownTimer);
+    countdownTimer = null;
+  }
+};
+
+const endSessionDueToTimeout = async () => {
+  if (hasAutoEnded) return;
+  hasAutoEnded = true;
+  clearCountdown();
+
+  try {
+    const token = localStorage.getItem("jobtory_access_token");
+    if (token) {
+      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ reason: "timeout" })
+      }).catch(() => {});
+    }
+  } finally {
+    localStorage.removeItem("jobtory_livecoding_session_id");
+    router.replace({ name: "home", query: { alert: "session_timeout" } });
+  }
+};
+
+const startCountdown = () => {
+  clearCountdown();
+  countdownTimer = setInterval(() => {
+    if (remainingSeconds.value === null || remainingSeconds.value === undefined) return;
+    const next = Math.max(0, Number(remainingSeconds.value) - 1);
+    remainingSeconds.value = next;
+    if (next <= 0) {
+      void endSessionDueToTimeout();
+    }
+  }, 1000);
+};
+
 const cmMode = computed(() => {
   switch (selectedLanguage.value) {
     case "python3": return "python";
@@ -705,6 +781,7 @@ const registerOffscreenInfraction = (stateKey, baseDetail) => {
 const forceEndSession = async (reason = "") => {
   if (isForceEnding.value) return;
   isForceEnding.value = true;
+  clearCountdown();
 
   try {
     const token = localStorage.getItem("jobtory_access_token");
@@ -904,6 +981,7 @@ onMounted(async () => {
 onBeforeUnmount(() => {
   // 페이지를 떠날 때 마지막 코드 스냅샷을 한 번 더 저장해 이어하기 진입 시 최대한 최근 코드가 복원되도록 합니다.
   void saveCodeSnapshot(code.value);
+  clearCountdown();
 
   if (mediaStream) {
     mediaStream.getTracks().forEach((t) => t.stop());
@@ -943,8 +1021,15 @@ onBeforeUnmount(() => {
   padding: 14px 28px;
   border-bottom: 1px solid #1f2937;
   display: flex;
-  align-items: baseline;
+  align-items: center;
+  justify-content: space-between;
   gap: 12px;
+}
+
+.session-title-block {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
 }
 
 .session-header h1 {
@@ -957,6 +1042,25 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 13px;
   color: #9ca3af;
+}
+
+.timer-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #0f172a;
+  color: #e5e7eb;
+  font-size: 13px;
+  border: 1px solid #1f2937;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+}
+
+.timer-value {
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: #38bdf8;
 }
 
 .session-main {

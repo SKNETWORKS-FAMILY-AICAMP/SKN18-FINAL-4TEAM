@@ -12,7 +12,6 @@ import SignUpCompanyPage from "../pages/SignUpCompanyPage.vue";
 import MyPage from "../pages/MyPage.vue";
 import LiveCodingSettingPage from "../pages/LiveCodingSettingPage.vue";
 import ProfileEditPage from "../pages/ProfileEditPage.vue";
-import TtsTestPage from "../pages/TtsTestPage.vue";
 
 const routes = [
   { path: "/", name: "home", component: MainPage },
@@ -27,7 +26,6 @@ const routes = [
   { path: "/interview", name: "interview", component: InterviewPage },
   { path: "/mypage", name: "mypage", component: MyPage, meta: { requiresAuth: true } },
   { path: "/profile/edit", name: "profile-edit", component: ProfileEditPage, meta: { requiresAuth: true } },
-  { path: "/tts-test", name: "tts-test", component: TtsTestPage },
 ];
 
 const router = createRouter({

@@ -14,7 +14,9 @@
             <div class="step-label">{{ item.label }}</div>
             <span v-if="item.id === 2 && cameraPassed" class="pass-badge">통과</span>
             <!-- ✅ 마이크 + 스피커 둘 다 통과해야 3번에 뱃지 표시 -->
-            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge">통과</span>
+            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge"
+              >통과</span
+            >
           </li>
         </ol>
       </aside>
@@ -43,10 +45,11 @@
         <div v-else-if="currentStep === 2" class="step-panel">
           <h3 class="step-title">웹캠 연결</h3>
           <p class="step-desc">
-            아래 영역에 본인 얼굴이 잘 보이는지 확인해 주세요. 일정 밝기 이상이 감지되면 자동으로 통과 처리됩니다.
+            공정한 평가를 위해 카메라를 활성화해 주세요.<br />
+            얼굴이 화면 중앙의 테두리 안에 모두 보이도록 위치를 맞춰 주세요.
           </p>
 
-          <div class="preview-box">
+          <div class="preview-box" :class="[previewBorderClass, cameraActive ? 'preview-active' : '']">
             <video
               ref="videoRef"
               autoplay
@@ -54,28 +57,31 @@
               class="video-preview"
               v-show="cameraActive"
             ></video>
+            <div
+              v-if="cameraActive"
+              class="face-target-box"
+              :class="{
+                'target-success': detectionStatus === 'success',
+                'target-fail': detectionStatus === 'fail'
+              }"
+            ></div>
             <div v-show="!cameraActive" class="preview-placeholder">
-              <span class="placeholder-icon">📷</span>
-              <span class="placeholder-text">웹캠이 아직 활성화되지 않았습니다.</span>
+              <div class="placeholder-illustration-wrap">
+                <img :src="faceDetectImage" alt="카메라 안내" class="placeholder-illustration" />
+              </div>
             </div>
           </div>
-
           <p class="help-text">
             상태:
-            <strong>
-              {{ cameraPassed ? "웹캠 통과 ✅" : (cameraChecking ? "밝기 측정 중..." : "테스트 필요 ❗") }}
-            </strong>
+            <strong>{{ cameraStatusText }}</strong>
           </p>
 
           <canvas ref="canvasRef" class="hidden-canvas"></canvas>
 
           <div class="panel-footer">
             <button class="secondary-btn" @click="goPrev">이전</button>
-            <button class="secondary-btn" @click="stopCamera" v-if="cameraActive">
-              웹캠 종료
-            </button>
-            <button class="primary-btn" @click="startCameraTest">
-              {{ cameraActive ? "다시 테스트" : "웹캠 테스트 시작" }}
+            <button class="primary-btn" @click="startCameraTest" v-if="!cameraActive">
+              {{ cameraPassedOnce ? "웹캠 테스트 재시작" : "웹캠 테스트 시작" }}
             </button>
             <button
               class="primary-btn"
@@ -91,7 +97,7 @@
         <div v-else-if="currentStep === 3" class="step-panel">
           <h3 class="step-title">마이크 연결</h3>
           <p class="step-desc">
-            아래 버튼을 눌러 마이크/스피커 테스트를 진행해 주세요. 몇 초 동안 말하면 자동으로 통과 여부를 판단합니다.
+            아래 버튼을 눌러 마이크/스피커 테스트를 진행해 주세요. 말소리가 일정 기준 이상 감지되면 자동으로 통과합니다.
           </p>
 
           <!-- 🎤 마이크 테스트 -->
@@ -99,13 +105,24 @@
             <label class="audio-label">마이크 입력 레벨</label>
             <div class="audio-bar-wrapper">
               <div class="audio-bar-bg">
+                <!-- 실시간 레벨 -->
                 <div
                   class="audio-bar-fill"
                   :style="{ width: micLevel + '%' }"
                 ></div>
+                <!-- ✅ 통과 기준선 표시 -->
+                <div
+                  class="audio-bar-threshold"
+                  :style="{ left: MIC_THRESHOLD_LEVEL + '%' }"
+                ></div>
               </div>
-              <span class="audio-level-text">{{ micLevel }}%</span>
+              <span class="audio-level-text">
+                {{ micLevel }}%
+              </span>
             </div>
+            <p class="help-text small">
+              통과 기준: 바가 <strong>{{ MIC_THRESHOLD_LEVEL }}%</strong> 이상으로 올라가면 자동으로 통과합니다.
+            </p>
           </div>
 
           <!-- 🔊 스피커 테스트 -->
@@ -174,10 +191,10 @@
             <button class="secondary-btn" @click="goPrev">이전</button>
             <button
               class="primary-btn"
-              :disabled="!cameraPassed || !micPassed || !speakerPassed"
+              :disabled="!cameraPassed || !micPassed || !speakerPassed || isStarting"
               @click="startTest"
             >
-              시작
+              {{ isStarting ? "시작 중..." : "시작" }}
             </button>
           </div>
         </div>
@@ -187,11 +204,23 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount } from "vue";
+import { ref, onBeforeUnmount, nextTick, computed } from "vue";
 import { useRouter } from "vue-router";
-import { nextTick } from "vue";
+import { onMounted } from "vue"
 
 const router = useRouter();
+const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+
+/* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
+// rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
+const RMS_THRESHOLD = 3;
+
+// UI용 퍼센트 기준선 (micLevel 계산 방식과 동일 스케일)
+const MIC_THRESHOLD_LEVEL = Math.min(
+  100,
+  Math.round((RMS_THRESHOLD / 60) * 100)
+);
 
 /* ----- 단계 ----- */
 const currentStep = ref(1);
@@ -209,11 +238,34 @@ const stepClass = (id) => {
 };
 
 const goNext = () => {
+  const prevStep = currentStep.value;
+  if (prevStep === 2) {
+    stopCamera();
+    if (cameraPassed.value) {
+      cameraPassedOnce.value = true;
+    }
+  }
   if (currentStep.value < 4) currentStep.value += 1;
 };
 
 const goPrev = () => {
+  const prevStep = currentStep.value;
+  if (prevStep === 2) {
+    stopCamera();
+    cameraPassed.value = false;
+    detectionStatus.value = "idle";
+    cameraPassedOnce.value = false;
+  }
   if (currentStep.value > 1) currentStep.value -= 1;
+};
+
+// Langgraph/LLM 워밍업 호출
+const warmupLanggraph = async () => {
+  try {
+    await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, { method: "GET" });
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
 };
 
 /* ----- 웹캠 체크 ----- */
@@ -221,12 +273,93 @@ const videoRef = ref(null);
 const canvasRef = ref(null);
 const cameraActive = ref(false);
 const cameraPassed = ref(false);
+const cameraPassedOnce = ref(false);
 const cameraChecking = ref(false);
 let cameraStream = null;
+let mediapipeInterval = null;
+const detectionStatus = ref("idle"); // idle | success | fail
+
+const previewBorderClass = computed(() => {
+  if (!cameraActive.value) return "border-idle";
+  if (detectionStatus.value === "success") return "border-success";
+  if (detectionStatus.value === "fail") return "border-fail";
+  return "border-idle";
+});
+
+const cameraStatusText = computed(() => {
+  if (cameraActive.value) {
+    if (detectionStatus.value === "success") return "얼굴 인식 성공! ✅";
+    if (cameraChecking.value) return "얼굴 감지 중...";
+    if (detectionStatus.value === "fail") return "얼굴이 인식되지 않았습니다.";
+    return "얼굴 감지 중...";
+  }
+  return cameraPassed.value ? "얼굴 인식 성공! ✅" : "테스트 필요 ❗";
+});
+
+const stopFaceDetection = () => {
+  if (mediapipeInterval) {
+    clearInterval(mediapipeInterval);
+    mediapipeInterval = null;
+  }
+};
+
+const sendFrameForMediapipe = async () => {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 180;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 360;
+  const scale = Math.min(canvas.width / vw, canvas.height / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  const dx = (canvas.width - dw) / 2;
+  const dy = (canvas.height - dh) / 2;
+
+  ctx.drawImage(video, dx, dy, dw, dh);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append("image", blob, "frame.jpg");
+
+    try {
+      const resp = await fetch(
+        `${BACKEND_BASE}/mediapipe/analyze/?session_id=livecoding-setting`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        detectionStatus.value = "fail";
+        cameraPassed.value = false;
+        return;
+      }
+
+      const faceCount = Number(data.face_count ?? 0);
+      const hasFace = faceCount >= 1;
+      detectionStatus.value = hasFace ? "success" : "fail";
+      cameraPassed.value = hasFace;
+    } catch (err) {
+      detectionStatus.value = "fail";
+      cameraPassed.value = false;
+    }
+  }, "image/jpeg", 0.6);
+};
 
 const startCameraTest = async () => {
   cameraPassed.value = false;
   cameraChecking.value = true;
+  detectionStatus.value = "idle";
 
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -240,7 +373,11 @@ const startCameraTest = async () => {
 
     setTimeout(() => {
       checkCameraBrightness();
-    }, 1000);
+      stopFaceDetection();
+      mediapipeInterval = setInterval(() => {
+        void sendFrameForMediapipe();
+      }, 1500);
+    }, 800);
   } catch (e) {
     cameraChecking.value = false;
     alert("웹캠 접근이 거부되었습니다. 브라우저 권한 설정을 확인해 주세요.");
@@ -270,9 +407,7 @@ const checkCameraBrightness = () => {
     for (let i = 0; i < data.length; i += 4) {
       total += (data[i] + data[i + 1] + data[i + 2]) / 3;
     }
-    const avgBrightness = total / (width * height);
-
-    cameraPassed.value = avgBrightness > 30;
+    // 밝기 값은 참고용으로만 사용 (통과/실패 판정은 서버 Mediapipe 결과에 따름)
   } catch (e) {
     cameraPassed.value = false;
   } finally {
@@ -281,6 +416,7 @@ const checkCameraBrightness = () => {
 };
 
 const stopCamera = () => {
+  stopFaceDetection();
   if (cameraStream) {
     cameraStream.getTracks().forEach((t) => t.stop());
     cameraStream = null;
@@ -288,7 +424,7 @@ const stopCamera = () => {
   cameraActive.value = false;
 };
 
-/* ----- 마이크 체크 ----- */
+/* ----- 마이크 체크 (기준선 넘는 순간 통과) ----- */
 const micLevel = ref(0);
 const micPassed = ref(false);
 const micChecking = ref(false);
@@ -316,12 +452,7 @@ const startMicTest = async () => {
     source.connect(analyser);
 
     const dataArray = new Uint8Array(analyser.fftSize);
-
-    let sumRms = 0;
-    let frameCount = 0;
     let maxVolume = 0;
-
-    const AVG_RMS_THRESHOLD = 3; // 여유 있게 설정
 
     const updateLevel = () => {
       if (!analyser) return;
@@ -334,26 +465,32 @@ const startMicTest = async () => {
       }
       const rms = Math.sqrt(sum / dataArray.length);
 
-      sumRms += rms;
-      frameCount += 1;
       maxVolume = Math.max(maxVolume, rms);
 
+      // UI용 퍼센트 레벨
       micLevel.value = Math.min(100, Math.round((rms / 60) * 100));
+
+      // ✅ 기준선 넘는 순간 통과 처리
+      if (rms >= RMS_THRESHOLD) {
+        console.log("Mic passed with rms:", rms);
+        micPassed.value = true;
+        micChecking.value = false;
+        stopMic(false); // 스트림/타이머 정리 (레벨은 유지)
+        return;
+      }
 
       micAnimationId = requestAnimationFrame(updateLevel);
     };
 
     updateLevel();
 
+    // 최대 5초까지만 기다리고, 그 안에 통과 못 하면 실패
     micCheckTimeout = setTimeout(() => {
-      micChecking.value = false;
-
-      const avgRms = frameCount > 0 ? sumRms / frameCount : 0;
-      console.log("avgRms:", avgRms, "maxVolume:", maxVolume);
-
-      micPassed.value = avgRms > AVG_RMS_THRESHOLD;
-
-      stopMic(false);
+      if (!micPassed.value) {
+        micChecking.value = false;
+        console.log("Mic test failed, maxVolume:", maxVolume);
+        stopMic(false);
+      }
     }, 5000);
   } catch (e) {
     micChecking.value = false;
@@ -390,11 +527,10 @@ const speakerTestPlayed = ref(false);
 const playSpeakerTest = () => {
   speakerTestPlayed.value = true;
 
-  // Web Audio API로 1초짜리 비프음 재생
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = ctx.createOscillator();
   osc.type = "sine";
-  osc.frequency.value = 880; // 880Hz 비프음
+  osc.frequency.value = 880;
 
   osc.connect(ctx.destination);
   osc.start();
@@ -409,15 +545,70 @@ const confirmSpeakerHeard = () => {
   speakerPassed.value = true;
 };
 
-/* ----- 마지막: 테스트 시작 ----- */
-const startTest = () => {
-  router.push("/coding-test/session");
+/* ----- 마지막: 테스트 시작 (파일2의 API 연동 버전) ----- */
+const isStarting = ref(false);
+
+const startTest = async () => {
+  if (isStarting.value) return;
+
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
+    router.push({ name: "login" });
+    return;
+  }
+
+  isStarting.value = true;
+  try {
+    const resp = await fetch(
+      `${
+        import.meta.env.VITE_API_BASE || "http://localhost:8000"
+      }/api/livecoding/start/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({}),
+      }
+    );
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      const detail = data.detail || "라이브 코딩 세션을 시작하지 못했습니다.";
+      window.alert(detail);
+      return;
+    }
+
+    if (data.session_id) {
+      localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+      // 세션 화면으로 이동할 때 히스토리를 교체하여 뒤로가기를 누르면 설정 페이지 대신 이전 화면으로 이동합니다.
+      router.replace({
+        name: "coding-session",
+        query: { session_id: data.session_id },
+      });
+    } else {
+      window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
+    }
+  } catch (err) {
+    console.error(err);
+    window.alert(
+      "라이브 코딩 세션을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요."
+    );
+  } finally {
+    isStarting.value = false;
+  }
 };
 
 /* ----- 컴포넌트 언마운트 시 정리 ----- */
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();
+});
+
+onMounted(() => {
+  void warmupLanggraph();
 });
 </script>
 
@@ -560,13 +751,39 @@ onBeforeUnmount(() => {
 /* 웹캠 프리뷰 */
 .preview-box {
   margin-top: 18px;
-  flex: 1;
+  flex: 0 0 auto;
   border-radius: 10px;
-  border: 1px dashed #9ca3af;
-  background: #e5e7eb;
+  border: 3px dashed #9ca3af;
+  background: #f1f3f5;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 320px;
+  overflow: hidden;
+}
+
+.preview-active {
+  width: 60%;
+  margin-left: auto;
+  margin-right: auto;
+  transition: width 0.2s ease;
+}
+
+.border-idle {
+  border-style: dashed;
+  border-color: #9ca3af;
+}
+
+.border-success {
+  border-style: dashed;
+  border-color: #9ca3af;
+}
+
+.border-fail {
+  border-style: dashed;
+  border-color: #9ca3af;
 }
 
 .video-preview {
@@ -576,20 +793,60 @@ onBeforeUnmount(() => {
   border-radius: 9px;
 }
 
+.face-target-box {
+  position: absolute;
+  inset: 10%;
+  border: 4px solid #4b5563;
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  transition: border-color 0.2s ease;
+}
+
+.target-success {
+  border-color: #10b981;
+}
+
+.target-fail {
+  border-color: #ef4444;
+}
+
 .preview-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  color: #6b7280;
+  gap: 12px;
+  color: #1f2937;
+  text-align: center;
+  padding: 16px;
 }
 
-.placeholder-icon {
-  font-size: 32px;
+.placeholder-illustration {
+  width: 176px;
+  height: auto;
+  border-radius: 12px;
+  opacity: 0.3;
 }
 
-.placeholder-text {
-  font-size: 13px;
+.placeholder-illustration-wrap {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.camera-guidance {
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1f2937;
+  text-align: center;
+}
+
+.test-running-text {
+  font-size: 14px;
+  color: #4b5563;
+  font-weight: 600;
 }
 
 /* 마이크 테스트 */
@@ -616,6 +873,7 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #e5e7eb;
   overflow: hidden;
+  position: relative; /* 기준선 absolute 포지셔닝용 */
 }
 
 .audio-bar-fill {
@@ -623,6 +881,17 @@ onBeforeUnmount(() => {
   border-radius: 999px;
   background: #10b981;
   transition: width 0.12s ease-out;
+}
+
+/* ✅ 통과 기준선 */
+.audio-bar-threshold {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: #ef4444; /* 빨간 기준선 */
+  transform: translateX(-50%);
+  opacity: 0.9;
 }
 
 .audio-level-text {
@@ -651,6 +920,11 @@ onBeforeUnmount(() => {
   margin-top: 10px;
   font-size: 13px;
   color: #4b5563;
+}
+
+.help-text.small {
+  font-size: 12px;
+  color: #6b7280;
 }
 
 /* 푸터 버튼 */

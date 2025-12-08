@@ -26,7 +26,7 @@ const routes = [
   { path: "/coding-test/session", name: "coding-session", component: LiveCodingSessionPage },
   { path: "/interview", name: "interview", component: InterviewPage },
   { path: "/mypage", name: "mypage", component: MyPage, meta: { requiresAuth: true } },
-  { path: "/profile/edit", name: "profile-edit", component: ProfileEditPage },
+  { path: "/profile/edit", name: "profile-edit", component: ProfileEditPage, meta: { requiresAuth: true } },
   { path: "/tts-test", name: "tts-test", component: TtsTestPage },
 ];
 

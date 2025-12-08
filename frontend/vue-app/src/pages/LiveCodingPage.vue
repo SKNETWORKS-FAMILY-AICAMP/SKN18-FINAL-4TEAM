@@ -57,11 +57,6 @@
         </div>
       </div>
     </div>
-    <div class="tts-test-footer">
-      <RouterLink to="/tts-test" class="tts-test-button">
-        TTS 테스트 페이지 열기
-      </RouterLink>
-    </div>
   </div>
 </template>
 

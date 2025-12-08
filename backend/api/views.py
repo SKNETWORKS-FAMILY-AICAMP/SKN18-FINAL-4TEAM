@@ -1,9 +1,10 @@
 from datetime import timedelta
+import json
 import secrets
 import string
-import os
 import time
-from openai import OpenAI
+
+
 
 from django.conf import settings
 from django.core.mail import send_mail
@@ -27,6 +28,10 @@ from .throttling import (
 from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
+
+from .interview_utils import get_cached_graph, get_cached_llm
+from tts_client import generate_interview_audio_batch
+
 from .models import (
     AuthIdentity,
     CodingProblem,
@@ -37,6 +42,7 @@ from .models import (
 from .serializers import SignupSerializer
 from .jwt_utils import jwt_required
 from .tts_module import generate_interview_audio_batch
+from .authentication import JWTAuthentication
 
 
 def health(request):
@@ -72,6 +78,7 @@ def roadmap(request):
         ]
     }
     return JsonResponse(data)
+
 
 
 class RandomCodingProblemView(APIView):
@@ -116,6 +123,141 @@ class RandomCodingProblemView(APIView):
                 "test_cases": test_cases,
             }
         )
+
+
+class CodingProblemSessionInitView(APIView):
+    """
+    RandomCodingProblemView 결과를 langgraph 초기 state에 넣어 실행한 뒤 상태를 반환합니다.
+    - 프론트에서 RandomCodingProblemView 응답 전체를 POST 바디로 전달하면 DB 조회 없이 그대로 사용합니다.
+    """
+
+    def post(self, request):
+        start_time = time.time()
+        payload = request.data or {}
+        # 1) 문자열로 들어온 경우 JSON 파싱 시도 (옵션)
+        if isinstance(payload, str):
+            try:
+                payload = json.loads(payload)
+            except Exception:
+                payload = {}
+
+        # 2) dict 아니면 그냥 빈 dict
+        if not isinstance(payload, dict):
+            payload = {}
+        
+        # 3) 여기서부터 'problem'만 추출해서 LangGraph용 problem_data 구성
+        problem_text = ""
+        if isinstance(payload.get("problem"), str):
+            problem_text = payload["problem"]
+        
+        #  langgraph 호출: 세션 상태를 thread_id로 이어서 사용
+        init_state = {
+            "event_type": "init",
+            "problem_data": problem_text,
+            "await_human": False,
+        }
+
+        session_id = (
+            request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+            or (request.data.get("session_id") if hasattr(request, "data") else None)
+        )
+        if not session_id:
+            return Response(
+                {"detail": "session_id 쿼리 파라미터를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        intro_text = None
+        graph_state = None
+        sentences_payload = []
+        tts_result = {}
+        total_time = None
+
+        try:
+            graph = get_cached_graph()
+            graph_state = graph.invoke(
+                init_state,
+                config={
+                    "configurable": {
+                        "thread_id": session_id
+                    }
+                },
+            )
+            if isinstance(graph_state, dict):
+                intro_text = graph_state.get("tts_text")
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {
+                    "detail": "langgraph 호출을 할 수 없습니다.",
+                    "error": str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # TTS 실행
+        if intro_text:
+            try:
+                tts_result = generate_interview_audio_batch(
+                    intro_text,
+                    config={
+                        "configurable": {
+                            "thread_id": session_id
+                        }
+                    })
+                for chunk in tts_result.get("audio_chunks", []):
+                    audio_b64 = chunk.get("audio_base64")
+                    if not audio_b64:
+                        # 에러난 문장은 스킵 (원하면 error도 같이 넘길 수 있음)
+                        continue
+
+                    sentences_payload.append(
+                        {
+                            "text": chunk.get("text", ""),
+                            "audio": audio_b64,
+                        }
+                    )
+                total_time = time.time() - start_time
+
+            except Exception as exc:  # noqa: BLE001
+                return Response(
+                    {
+                        "detail": "TTS 함수를 실행할 수 없습니다.",
+                        "error": str(exc),
+                    },
+                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                )
+
+        return Response(
+            {
+                "tts_text": sentences_payload,
+                "first_audio_time": tts_result.get("first_audio_time", 0.0),
+                "total_time": total_time,
+            }
+        )
+
+
+class WarmupLanggraphView(APIView):
+    """
+    Langgraph/LLM 모듈을 미리 로드하기 위한 워밍업 엔드포인트.
+    """
+
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        try:
+            # LLM 모듈 import 및 그래프 컴파일 시도
+            llm_instance = get_cached_llm()
+            graph = get_cached_graph()
+            # LLM은 import 시점에 초기화되므로 존재만 확인
+            _ = llm_instance
+            graph.get_graph()  # 실제 실행은 하지 않고 DAG만 준비
+            return Response({"status": "warmed"}, status=status.HTTP_200_OK)
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"status": "error", "detail": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
 
 class SignupView(APIView):
@@ -675,6 +817,121 @@ class LiveCodingCodeSnapshotView(APIView):
         )
 
 
+class LiveCodingHintOfferView(APIView):
+    """
+    힌트 버튼 클릭 시 langgraph hint agent를 호출하는 엔드포인트.
+    POST: {"session_id": "...", "prompt": "<optional>", "code": "<optional>", "language": "<optional>"}
+    """
+
+    def _get_meta(self, user, session_id: str):
+        if not session_id:
+            return None, Response(
+                {"detail": "session_id가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return None, Response(
+                {"detail": "해당 세션 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if str(meta.get("user_id")) != str(getattr(user, "user_id", None)):
+            return None, Response(
+                {"detail": "이 세션에 접근할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+        return meta, None
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "힌트를 요청하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+        
+    
+        session_id = request.data.get("session_id") or request.query_params.get("session_id")
+        
+        meta, error_response = self._get_meta(user, session_id)
+        if error_response is not None:
+            return error_response
+
+        if not language:
+            language = (meta.get("language") or "").lower() or None
+
+        # 코드가 비어 있으면 최근 스냅샷 가져오기
+        if not code:
+            code_data = cache.get(f"livecoding:{session_id}:code") or {}
+            latest = code_data.get("latest") or {}
+            code = latest.get("code") or ""
+
+        # 문제 정보: 클라이언트가 보냈다면 우선 사용, 없으면 DB에서 조회
+        problem_description = (request.data.get("problem") or "").strip()
+        problem_algorithm_category = (request.data.get("category") or "").strip()
+        if not problem_description or not problem_algorithm_category:
+            problem_id = meta.get("problem_id")
+            if problem_id:
+                qs = (
+                    CodingProblemLanguage.objects.select_related("problem")
+                    .filter(problem__problem_id=problem_id)
+                )
+                if language:
+                    qs = qs.filter(language__iexact=language)
+                problem_lang = qs.first()
+                if problem_lang and problem_lang.problem:
+                    if not problem_description:
+                        problem_description = problem_lang.problem.problem or ""
+                    if not problem_algorithm_category:
+                        problem_algorithm_category = problem_lang.problem.category or ""
+
+        # 이전 힌트 카운트 추출(있으면)
+        hint_count = 0
+        try:
+            graph = get_cached_graph()
+            state_snapshot = graph.get_state(
+                config={"configurable": {"thread_id": session_id}}
+            )
+            values = state_snapshot
+            if hasattr(state_snapshot, "values"):
+                values = getattr(state_snapshot, "values", {})
+            if isinstance(values, dict):
+                hint_count = int(values.get("hint_count") or 0)
+        except Exception:
+            graph = get_cached_graph()
+
+        try:
+            graph_state = graph.invoke(
+                {
+                "event_type": "hint_request",
+                "await_human": False,
+                "problem_data": problem_description,
+                "hint": {
+                    "current_user_code": code,
+                    "problem_algorithm_category": problem_algorithm_category,
+                    "hint_trigger": "manual",
+                    "hint_count": hint_count,   
+                    }
+                },
+                config={"configurable": {"thread_id": session_id}},
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"detail": "langgraph 호출을 할 수 없습니다.", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        hint_text = ""
+        if isinstance(graph_state, dict):
+            hint_text = graph_state.get("hint_text") or graph_state.get("hint") or ""
+
+        return Response(
+            {"hint": hint_text, "state": graph_state},
+            status=status.HTTP_200_OK,
+        )
+
+
 class LiveCodingSessionView(APIView):
     """
     Redis에 저장된 라이브 코딩 세션 정보를 가져오는 엔드포인트.
@@ -879,185 +1136,125 @@ class LiveCodingEndSessionView(APIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
+from datetime import datetime
+
+from datetime import datetime
+from django.utils.decorators import method_decorator
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status
+from django.contrib.auth.hashers import check_password, make_password
+
+from .jwt_utils import jwt_required
+from .models import User
+
+
+from datetime import datetime, date
+from django.utils import timezone
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework import status, permissions
+from django.contrib.auth.hashers import check_password, make_password
+
+from .authentication import JWTAuthentication
+from .models import User
+
+
+def _format_birthdate(value):
+    """birthdate가 문자열이든 date 객체든 안전하게 변환"""
+    if not value:
+        return None
+    if isinstance(value, str):
+        return value
+    if isinstance(value, date):
+        return value.isoformat()
+    return None
+
+
 class ProfileView(APIView):
-    """
-    회원정보 조회 및 수정 API
-    """
-    
-    @jwt_required
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
     def get(self, request):
-        """회원정보 조회"""
         user = request.user
-        
-        return Response({
-            "user_id": user.user_id,
-            "email": user.email,
-            "name": user.name,
-            "phone_number": user.phone_number,
-            "birthdate": user.birthdate.isoformat() if user.birthdate else None,
-        }, status=status.HTTP_200_OK)
-    
-    @jwt_required
+
+        return Response(
+            {
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.phone_number,
+                "birthdate": _format_birthdate(user.birthdate),
+            },
+            status=status.HTTP_200_OK,
+        )
+
     def patch(self, request):
-        """회원정보 수정"""
         user = request.user
         data = request.data
-        
-        # 수정할 필드들
+
         name = data.get("name")
         phone_number = data.get("phone_number")
         birthdate = data.get("birthdate")
         current_password = data.get("current_password")
         new_password = data.get("new_password")
-        
-        # 필수 필드 검증
+
+        # 1. 필수 검증
         if not name:
-            return Response(
-                {"detail": "이름은 필수 항목입니다."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # 전화번호 중복 체크 (자신의 번호가 아닌 경우만)
+            return Response({"detail": "이름은 필수 항목입니다."}, status=400)
+
+        # 2. 전화번호 중복 체크
         if phone_number:
             existing = User.objects.filter(phone_number=phone_number).exclude(user_id=user.user_id).first()
             if existing:
-                return Response(
-                    {"detail": "이미 사용 중인 전화번호입니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-        
-        # 비밀번호 변경 로직
+                return Response({"detail": "이미 사용 중인 전화번호입니다."}, status=400)
+
+        # 3. 비밀번호 변경
         if current_password and new_password:
             if not user.password_hash:
-                return Response(
-                    {"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."}, status=400)
+
             if not check_password(current_password, user.password_hash):
-                return Response(
-                    {"detail": "현재 비밀번호가 올바르지 않습니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"detail": "현재 비밀번호가 올바르지 않습니다."}, status=400)
+
             if len(new_password) < 8:
-                return Response(
-                    {"detail": "새 비밀번호는 8자 이상이어야 합니다."},
-                    status=status.HTTP_400_BAD_REQUEST
-                )
-            
+                return Response({"detail": "새 비밀번호는 8자 이상이어야 합니다."}, status=400)
+
             user.password_hash = make_password(new_password)
-        
+
         elif current_password or new_password:
-            return Response(
-                {"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."},
-                status=status.HTTP_400_BAD_REQUEST
-            )
-        
-        # 정보 업데이트
+            return Response({"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."}, status=400)
+
+        # 4. birthdate 변환
+        if birthdate:
+            # 이미 날짜 형식 문자열일 경우 그대로 저장
+            try:
+                # 먼저 date 객체로 바꾸기 시도
+                parsed = datetime.strptime(birthdate, "%Y-%m-%d").date()
+                user.birthdate = parsed
+            except Exception:
+                # 문자열 그대로 저장해야 하는 경우도 있을 수 있음
+                user.birthdate = birthdate
+        else:
+            user.birthdate = None
+
+        # 5. 나머지 필드 저장
         user.name = name
         user.phone_number = phone_number if phone_number else None
-        user.birthdate = birthdate if birthdate else None
         user.updated_at = timezone.now()
-        
+
         user.save()
-        
-        return Response({
-            "message": "회원정보가 성공적으로 수정되었습니다.",
-            "user_id": user.user_id,
-            "email": user.email,
-            "name": user.name,
-            "phone_number": user.phone_number,
-            "birthdate": user.birthdate.isoformat() if user.birthdate else None,
-        }, status=status.HTTP_200_OK)
 
-# -------------------------------------------------------------------
-# AI 면접관용 프롬프트
-# -------------------------------------------------------------------
-OPTIMIZED_PROMPT = """당신은 친절한 코딩 면접관입니다.
-
-[역할]
-- 지원자의 질문에 대해, 면접관처럼 짧고 명확하게 설명하고, 마지막에는 한 문장 정도의 격려를 덧붙입니다.
-
-[답변 스타일]
-1) 첫 문장은 5~10단어 정도의 짧은 공감/인사
-2) 핵심 개념/정답을 1~2문장으로 명확히 정리
-3) 필요하다면 예시나 추가 설명 1~3문장
-4) 마지막은 "이런 방향으로 코드를 개선해보면 좋겠습니다." 와 같은 짧은 격려 문장
-
-- 문장 끝에는 반드시 마침표(.)를 사용해 문장을 구분하세요.
-- 너무 길게 설명하지 말고, 총 4~8문장 정도로 유지하세요.
-"""
-
-client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
-
-
-@api_view(["POST"])
-@permission_classes([AllowAny])
-def interview_ask(request):
-    """
-    POST /api/interview/ask/
-
-    body:
-      { "question": "해시맵의 시간복잡도 설명해주세요" }
-
-    response 예시:
-    {
-      "question": "...",
-      "answer": "...",             # LLM 전체 텍스트
-      "sentences": [
-        { "text": "...", "audio": "<base64 mp3>" },
-        ...
-      ],
-      "first_audio_time": 1.98,
-      "total_time": 3.45
-    }
-    """
-    start_time = time.time()
-    question = (request.data.get("question") or "").strip()
-
-    if not question:
-        return Response({"error": "question 필드가 비어 있습니다."}, status=400)
-
-    # 1) LLM으로 면접관 답변 생성 (스트리밍 말고 한 번에)
-    completion = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {"role": "system", "content": OPTIMIZED_PROMPT},
-            {"role": "user", "content": question},
-        ],
-        temperature=0.7,
-        max_tokens=400,
-    )
-    answer_text = completion.choices[0].message.content
-
-    # 2) 문장 단위 TTS 배치 생성
-    tts_result = generate_interview_audio_batch(answer_text)
-
-    # generate_interview_audio_batch 가 돌려주는 청크들에서
-    # 실제로 오디오가 생성된 문장만 골라서 프론트에 전달
-    sentences_payload = []
-    for chunk in tts_result.get("audio_chunks", []):
-        audio_b64 = chunk.get("audio_base64")
-        if not audio_b64:
-            # 에러난 문장은 스킵 (원하면 error도 같이 넘길 수 있음)
-            continue
-
-        sentences_payload.append(
+        return Response(
             {
-                "text": chunk.get("text", ""),
-                "audio": audio_b64,
-            }
+                "message": "회원정보가 성공적으로 수정되었습니다.",
+                "user_id": user.user_id,
+                "email": user.email,
+                "name": user.name,
+                "phone_number": user.phone_number,
+                "birthdate": _format_birthdate(user.birthdate),
+            },
+            status=status.HTTP_200_OK,
         )
 
-    total_time = time.time() - start_time
-
-    return Response(
-        {
-            "question": question,
-            "answer": answer_text,
-            "sentences": sentences_payload,
-            "first_audio_time": tts_result.get("first_audio_time", 0.0),
-            "total_time": total_time,
-        }
-    )

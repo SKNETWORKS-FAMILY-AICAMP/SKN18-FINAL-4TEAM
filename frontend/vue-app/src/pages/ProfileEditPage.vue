@@ -183,9 +183,11 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRouter, RouterLink } from "vue-router";
+import { useAuth } from "../hooks/useAuth";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const router = useRouter();
+const auth = useAuth();
 
 // 날짜 옵션
 const currentYear = new Date().getFullYear();
@@ -265,78 +267,72 @@ const loadProfile = async () => {
   loading.value = true;
   loadError.value = "";
 
-  // ⚠️ 임시: 토큰 검증 비활성화 (테스트용)
-  // 더미 데이터로 폼 채우기
-  setTimeout(() => {
-    username.value = "testuser";
-    name.value = "홍길동";
-    email.value = "test@example.com";
-    phone1.value = "010";
-    phone2.value = "1234";
-    phone3.value = "5678";
-    birthYear.value = "1990";
-    birthMonth.value = 1;
-    birthDay.value = 1;
-    loading.value = false;
-  }, 500);
-  
-  return;
-
-  /* 원래 코드 (나중에 사용)
-  const token = localStorage.getItem("access_token");
-  if (!token) {
-    loadError.value = "로그인이 필요합니다.";
-    loading.value = false;
-    setTimeout(() => router.push("/login"), 2000);
-    return;
-  }
-
   try {
+    // ✅ 먼저 세션을 한 번 검증 (만료되었으면 여기서 정리)
+    const valid = await auth.ensureValidSession();
+    if (!valid) {
+      loadError.value = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
+      setTimeout(() => {
+        router.push({ name: "login", query: { redirect: "/profile/edit" } });
+      }, 1500);
+      return;
+    }
+
+    // 🔑 더 이상 localStorage 직접 보지 말고, useAuth의 token을 사용
+    const token = auth.token?.value;
+    if (!token) {
+      loadError.value = "로그인 정보가 없습니다. 다시 로그인해주세요.";
+      setTimeout(() => {
+        router.push({ name: "login", query: { redirect: "/profile/edit" } });
+      }, 1500);
+      return;
+    }
+
     const res = await fetch(`${API_BASE}/api/user/profile/`, {
       method: "GET",
       headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
-      }
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
     });
 
     if (!res.ok) {
       if (res.status === 401) {
-        throw new Error("로그인 세션이 만료되었습니다. 다시 로그인해주세요.");
+        // ✅ 여기서도 진짜 401이면 세션 만료로 보고 로그인 페이지로 이동
+        loadError.value = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
+        setTimeout(() => {
+          router.push({ name: "login", query: { redirect: "/profile/edit" } });
+        }, 1500);
+        return;
       }
       throw new Error("회원정보를 불러오는데 실패했습니다.");
     }
 
     const data = await res.json();
-    
-    // 데이터 채우기
+
     username.value = data.user_id || "";
     name.value = data.name || "";
     email.value = data.email || "";
-    
+
     if (data.phone_number) {
       parsePhone(data.phone_number);
     }
-    
     if (data.birthdate) {
       parseBirthdate(data.birthdate);
     }
-
   } catch (err) {
-    loadError.value = err.message || "회원정보를 불러오는 중 오류가 발생했습니다.";
-    if (err.message.includes("로그인")) {
-      setTimeout(() => router.push("/login"), 2000);
-    }
+    loadError.value =
+      err?.message || "회원정보를 불러오는 중 오류가 발생했습니다.";
   } finally {
     loading.value = false;
   }
-  */
 };
+
 
 // 취소 버튼
 const handleCancel = () => {
   if (confirm("수정을 취소하시겠습니까? 변경사항이 저장되지 않습니다.")) {
-    router.push("/");
+    router.push("/mypage");
   }
 };
 
@@ -371,28 +367,6 @@ const handleSubmit = async () => {
     }
   }
 
-  // ⚠️ 임시: API 호출 비활성화 (테스트용)
-  pending.value = true;
-  setTimeout(() => {
-    pending.value = false;
-    message.value = "회원정보가 성공적으로 수정되었습니다. (테스트 모드)";
-    messageType.value = "success";
-    
-    // 비밀번호 필드 초기화
-    currentPassword.value = "";
-    newPassword.value = "";
-    newPasswordConfirm.value = "";
-    showPasswordChange.value = false;
-
-    // 2초 후 메인 페이지로 이동
-    setTimeout(() => {
-      router.push("/");
-    }, 2000);
-  }, 1000);
-  
-  return;
-
-  /* 원래 코드 (나중에 사용)
   const phone_number = buildPhone();
   const birthdate = buildBirthdate();
 
@@ -400,7 +374,7 @@ const handleSubmit = async () => {
   const updateData = {
     name: name.value,
     phone_number: phone_number || null,
-    birthdate: birthdate || null
+    birthdate: birthdate || null,
   };
 
   // 비밀번호 변경이 있으면 추가
@@ -409,10 +383,18 @@ const handleSubmit = async () => {
     updateData.new_password = newPassword.value;
   }
 
-  const token = localStorage.getItem("access_token");
+  // ✅ 저장 전에 한 번 더 세션 갱신/검증
+  const valid = await auth.ensureValidSession();
+  if (!valid) {
+    window.alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+    router.push({ name: "login", query: { redirect: "/profile/edit" } });
+    return;
+  }
+
+  const token = auth.token?.value;
   if (!token) {
-    window.alert("로그인이 필요합니다.");
-    router.push("/login");
+    window.alert("로그인 정보가 없습니다. 다시 로그인해 주세요.");
+    router.push({ name: "login", query: { redirect: "/profile/edit" } });
     return;
   }
 
@@ -421,40 +403,43 @@ const handleSubmit = async () => {
     const res = await fetch(`${API_BASE}/api/user/profile/`, {
       method: "PATCH",
       headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json"
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
       },
-      body: JSON.stringify(updateData)
+      body: JSON.stringify(updateData),
     });
 
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
+      if (res.status === 401) {
+        window.alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
+        router.push({ name: "login", query: { redirect: "/profile/edit" } });
+        return;
+      }
       const detail = data.detail || "회원정보 수정에 실패했습니다.";
       throw new Error(detail);
     }
 
     message.value = "회원정보가 성공적으로 수정되었습니다.";
     messageType.value = "success";
-    
+
     // 비밀번호 필드 초기화
     currentPassword.value = "";
     newPassword.value = "";
     newPasswordConfirm.value = "";
     showPasswordChange.value = false;
 
-    // 2초 후 메인 페이지로 이동
+    // 2초 후 마이페이지로 이동
     setTimeout(() => {
-      router.push("/");
+      router.push("/mypage");
     }, 2000);
-
   } catch (err) {
-    message.value = err.message || "회원정보 수정 중 오류가 발생했습니다.";
+    message.value = err?.message || "회원정보 수정 중 오류가 발생했습니다.";
     messageType.value = "error";
   } finally {
     pending.value = false;
   }
-  */
 };
 
 // 컴포넌트 마운트 시 회원정보 로드

@@ -24,11 +24,11 @@
           <div class="field-block">
             <label class="field-label">아이디</label>
             <div class="field-line readonly">
-              <input 
-                v-model="username" 
-                class="field-input" 
-                type="text" 
-                readonly 
+              <input
+                v-model="username"
+                class="field-input"
+                type="text"
+                readonly
                 disabled
               />
             </div>
@@ -39,7 +39,12 @@
           <div class="field-block">
             <label class="field-label">이름</label>
             <div class="field-line">
-              <input v-model="name" class="field-input" type="text" placeholder="홍길동" />
+              <input
+                v-model="name"
+                class="field-input"
+                type="text"
+                placeholder="홍길동"
+              />
             </div>
           </div>
 
@@ -47,11 +52,11 @@
           <div class="field-block">
             <label class="field-label">이메일</label>
             <div class="field-line readonly">
-              <input 
-                v-model="email" 
-                class="field-input" 
-                type="email" 
-                readonly 
+              <input
+                v-model="email"
+                class="field-input"
+                type="email"
+                readonly
                 disabled
               />
             </div>
@@ -62,11 +67,26 @@
           <div class="field-block">
             <label class="field-label">전화번호</label>
             <div class="field-line phone-line">
-              <input v-model="phone1" class="field-input phone-input" type="tel" maxlength="3" />
+              <input
+                v-model="phone1"
+                class="field-input phone-input"
+                type="tel"
+                maxlength="3"
+              />
               <span class="hyphen">-</span>
-              <input v-model="phone2" class="field-input phone-input" type="tel" maxlength="4" />
+              <input
+                v-model="phone2"
+                class="field-input phone-input"
+                type="tel"
+                maxlength="4"
+              />
               <span class="hyphen">-</span>
-              <input v-model="phone3" class="field-input phone-input" type="tel" maxlength="4" />
+              <input
+                v-model="phone3"
+                class="field-input phone-input"
+                type="tel"
+                maxlength="4"
+              />
             </div>
           </div>
 
@@ -95,30 +115,47 @@
             </div>
           </div>
 
-          <!-- 비밀번호 변경 섹션 -->
-          <div class="field-block full-width password-section">
+          <!-- 비밀번호 변경 섹션 (이메일 회원만 노출) -->
+          <div
+            v-if="canChangePassword"
+            class="field-block full-width password-section"
+          >
             <div class="section-header">
               <label class="field-label">비밀번호 변경</label>
-              <button 
-                type="button" 
-                class="toggle-button" 
+              <button
+                type="button"
+                class="toggle-button"
                 @click="showPasswordChange = !showPasswordChange"
               >
-                {{ showPasswordChange ? '숨기기' : '변경하기' }}
+                {{ showPasswordChange ? "숨기기" : "변경하기" }}
               </button>
             </div>
-            <p class="hint-text">비밀번호를 변경하지 않으려면 이 섹션을 비워두세요.</p>
+            <p class="hint-text">
+              비밀번호를 변경하지 않으려면 이 섹션을 비워두세요.
+            </p>
           </div>
 
-          <template v-if="showPasswordChange">
+          <!-- 소셜 로그인 안내 -->
+          <div
+            v-else
+            class="field-block full-width password-section"
+          >
+            <label class="field-label">비밀번호 변경</label>
+            <p class="hint-text">
+              소셜 로그인으로 가입한 계정은 비밀번호를 변경할 수 없습니다.
+            </p>
+          </div>
+
+          <!-- 비밀번호 변경 입력 필드들 -->
+          <template v-if="canChangePassword && showPasswordChange">
             <!-- 현재 비밀번호 -->
             <div class="field-block">
               <label class="field-label">현재 비밀번호</label>
               <div class="field-line">
-                <input 
-                  v-model="currentPassword" 
-                  class="field-input" 
-                  type="password" 
+                <input
+                  v-model="currentPassword"
+                  class="field-input"
+                  type="password"
                   placeholder="현재 비밀번호 입력"
                 />
               </div>
@@ -128,10 +165,10 @@
             <div class="field-block">
               <label class="field-label">새 비밀번호</label>
               <div class="field-line">
-                <input 
-                  v-model="newPassword" 
-                  class="field-input" 
-                  type="password" 
+                <input
+                  v-model="newPassword"
+                  class="field-input"
+                  type="password"
                   placeholder="새 비밀번호 입력"
                 />
               </div>
@@ -140,32 +177,42 @@
             <!-- 새 비밀번호 확인 -->
             <div class="field-block full-width">
               <label class="field-label">새 비밀번호 확인</label>
-              <div class="field-line" :class="{ 'error-line': showPasswordError, 'success-line': showPasswordMatch }">
-                <input 
-                  v-model="newPasswordConfirm" 
-                  class="field-input" 
-                  type="password" 
+              <div
+                class="field-line"
+                :class="{
+                  'error-line': showPasswordError,
+                  'success-line': showPasswordMatch
+                }"
+              >
+                <input
+                  v-model="newPasswordConfirm"
+                  class="field-input"
+                  type="password"
                   placeholder="새 비밀번호 재입력"
                 />
               </div>
-              <p v-if="showPasswordMatch" class="password-hint success">비밀번호가 일치합니다.</p>
-              <p v-else-if="showPasswordError" class="password-hint error">비밀번호가 일치하지 않습니다.</p>
+              <p v-if="showPasswordMatch" class="password-hint success">
+                비밀번호가 일치합니다.
+              </p>
+              <p v-else-if="showPasswordError" class="password-hint error">
+                비밀번호가 일치하지 않습니다.
+              </p>
             </div>
           </template>
         </div>
 
         <div class="button-group" v-if="!loading && !loadError">
-          <button 
-            type="button" 
-            class="cancel-button" 
+          <button
+            type="button"
+            class="cancel-button"
             @click="handleCancel"
           >
             취소
           </button>
-          <button 
-            type="button" 
-            class="submit-button" 
-            :disabled="pending" 
+          <button
+            type="button"
+            class="submit-button"
+            :disabled="pending"
             @click="handleSubmit"
           >
             {{ pending ? "저장 중..." : "저장하기" }}
@@ -202,6 +249,7 @@ const pending = ref(false);
 const message = ref("");
 const messageType = ref("info");
 const showPasswordChange = ref(false);
+const canChangePassword = ref(true);
 
 // 폼 데이터
 const username = ref("");
@@ -219,12 +267,24 @@ const newPasswordConfirm = ref("");
 
 // 비밀번호 검증
 const showPasswordMatch = computed(
-  () => !!newPassword.value && !!newPasswordConfirm.value && newPassword.value === newPasswordConfirm.value
+  () =>
+    !!newPassword.value &&
+    !!newPasswordConfirm.value &&
+    newPassword.value === newPasswordConfirm.value
 );
 
 const showPasswordError = computed(
-  () => !!newPassword.value && !!newPasswordConfirm.value && newPassword.value !== newPasswordConfirm.value
+  () =>
+    !!newPassword.value &&
+    !!newPasswordConfirm.value &&
+    newPassword.value !== newPasswordConfirm.value
 );
+
+// 공통 토큰 getter (새/옛 키 다 지원)
+const getToken = () =>
+  auth.token.value ||
+  localStorage.getItem("jobtory_access_token") ||
+  localStorage.getItem("access_token");
 
 // 전화번호 조합
 const buildPhone = () => {
@@ -234,7 +294,7 @@ const buildPhone = () => {
 
 // 생년월일 조합
 const buildBirthdate = () => {
-  if (!birthYear.value || !birthMonth.value || !birthDay.value) return null;
+  if (!birthYear.value || !birthMonth.value || !birthDay.value) return "";
   const month = String(birthMonth.value).padStart(2, "0");
   const day = String(birthDay.value).padStart(2, "0");
   return `${birthYear.value}-${month}-${day}`;
@@ -268,23 +328,13 @@ const loadProfile = async () => {
   loadError.value = "";
 
   try {
-    // ✅ 먼저 세션을 한 번 검증 (만료되었으면 여기서 정리)
-    const valid = await auth.ensureValidSession();
-    if (!valid) {
-      loadError.value = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
-      setTimeout(() => {
-        router.push({ name: "login", query: { redirect: "/profile/edit" } });
-      }, 1500);
-      return;
-    }
+    const token = getToken();
 
-    // 🔑 더 이상 localStorage 직접 보지 말고, useAuth의 token을 사용
-    const token = auth.token?.value;
     if (!token) {
-      loadError.value = "로그인 정보가 없습니다. 다시 로그인해주세요.";
+      loadError.value = "로그인이 필요합니다.";
       setTimeout(() => {
         router.push({ name: "login", query: { redirect: "/profile/edit" } });
-      }, 1500);
+      }, 1000);
       return;
     }
 
@@ -296,20 +346,26 @@ const loadProfile = async () => {
       },
     });
 
+    const data = await res.json().catch(() => ({}));
+
     if (!res.ok) {
+      // 401이면 로그인 페이지로
       if (res.status === 401) {
-        // ✅ 여기서도 진짜 401이면 세션 만료로 보고 로그인 페이지로 이동
-        loadError.value = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
+        loadError.value =
+          data.detail || "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
         setTimeout(() => {
           router.push({ name: "login", query: { redirect: "/profile/edit" } });
         }, 1500);
         return;
       }
-      throw new Error("회원정보를 불러오는데 실패했습니다.");
+
+      // 그 외에는 서버에서 내려준 detail을 우선적으로 보여줌
+      loadError.value =
+        data.detail || "회원정보를 불러오는데 실패했습니다.";
+      return;
     }
 
-    const data = await res.json();
-
+    // 정상 응답인 경우 폼 채우기
     username.value = data.user_id || "";
     name.value = data.name || "";
     email.value = data.email || "";
@@ -320,6 +376,12 @@ const loadProfile = async () => {
     if (data.birthdate) {
       parseBirthdate(data.birthdate);
     }
+
+    // 백엔드에서 내려줄 수 있는 플래그 (없으면 기본 true)
+    canChangePassword.value =
+      data.can_change_password === undefined
+        ? true
+        : !!data.can_change_password;
   } catch (err) {
     loadError.value =
       err?.message || "회원정보를 불러오는 중 오류가 발생했습니다.";
@@ -328,10 +390,11 @@ const loadProfile = async () => {
   }
 };
 
-
 // 취소 버튼
 const handleCancel = () => {
-  if (confirm("수정을 취소하시겠습니까? 변경사항이 저장되지 않습니다.")) {
+  if (
+    confirm("수정을 취소하시겠습니까? 변경사항이 저장되지 않습니다.")
+  ) {
     router.push("/mypage");
   }
 };
@@ -347,8 +410,8 @@ const handleSubmit = async () => {
     return;
   }
 
-  // 비밀번호 변경 시 검증
-  if (showPasswordChange.value) {
+  // 비밀번호 변경 시 검증 (이메일 회원 + 섹션 열려 있을 때만)
+  if (canChangePassword.value && showPasswordChange.value) {
     if (!currentPassword.value) {
       window.alert("현재 비밀번호를 입력해 주세요.");
       return;
@@ -370,35 +433,40 @@ const handleSubmit = async () => {
   const phone_number = buildPhone();
   const birthdate = buildBirthdate();
 
-  // 수정할 데이터 준비
   const updateData = {
     name: name.value,
-    phone_number: phone_number || null,
-    birthdate: birthdate || null,
   };
 
-  // 비밀번호 변경이 있으면 추가
-  if (showPasswordChange.value && currentPassword.value && newPassword.value) {
+  if (phone_number) {
+    updateData.phone_number = phone_number;
+  } else {
+    updateData.phone_number = null;
+  }
+
+  // 생일 입력 안 했으면 아예 안 보냄 (기존 값 유지)
+  if (birthdate) {
+    updateData.birthdate = birthdate;
+  }
+
+  if (
+    canChangePassword.value &&
+    showPasswordChange.value &&
+    currentPassword.value &&
+    newPassword.value
+  ) {
     updateData.current_password = currentPassword.value;
     updateData.new_password = newPassword.value;
   }
 
-  // ✅ 저장 전에 한 번 더 세션 갱신/검증
-  const valid = await auth.ensureValidSession();
-  if (!valid) {
-    window.alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
-    router.push({ name: "login", query: { redirect: "/profile/edit" } });
-    return;
-  }
-
-  const token = auth.token?.value;
+  const token = localStorage.getItem("access_token");
   if (!token) {
-    window.alert("로그인 정보가 없습니다. 다시 로그인해 주세요.");
+    window.alert("로그인이 필요합니다.");
     router.push({ name: "login", query: { redirect: "/profile/edit" } });
     return;
   }
 
   pending.value = true;
+
   try {
     const res = await fetch(`${API_BASE}/api/user/profile/`, {
       method: "PATCH",
@@ -412,11 +480,6 @@ const handleSubmit = async () => {
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {
-      if (res.status === 401) {
-        window.alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
-        router.push({ name: "login", query: { redirect: "/profile/edit" } });
-        return;
-      }
       const detail = data.detail || "회원정보 수정에 실패했습니다.";
       throw new Error(detail);
     }
@@ -430,19 +493,24 @@ const handleSubmit = async () => {
     newPasswordConfirm.value = "";
     showPasswordChange.value = false;
 
-    // 2초 후 마이페이지로 이동
+    // 프로필 재조회 (마이페이지 등에서 최신 값 쓰게)
+    try {
+      await auth.fetchProfile();
+    } catch (e) {
+      // 실패해도 치명적이지 않으니 무시
+    }
+
     setTimeout(() => {
       router.push("/mypage");
-    }, 2000);
+    }, 1500);
   } catch (err) {
-    message.value = err?.message || "회원정보 수정 중 오류가 발생했습니다.";
+    message.value = err.message || "회원정보 수정 중 오류가 발생했습니다.";
     messageType.value = "error";
   } finally {
     pending.value = false;
   }
 };
 
-// 컴포넌트 마운트 시 회원정보 로드
 onMounted(() => {
   loadProfile();
 });
@@ -454,7 +522,8 @@ onMounted(() => {
 .profile-edit-page {
   min-height: 100vh;
   background: #f6f5ef;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
   color: #111827;
   display: flex;
   flex-direction: column;

@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import timedelta, date
 import secrets
 import string
 import os
@@ -880,31 +880,6 @@ class LiveCodingEndSessionView(APIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-from datetime import datetime
-
-from datetime import datetime
-from django.utils.decorators import method_decorator
-from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth.hashers import check_password, make_password
-
-from .jwt_utils import jwt_required
-from .models import User
-
-
-from datetime import datetime, date
-from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status, permissions
-from django.contrib.auth.hashers import check_password, make_password
-
-from .authentication import JWTAuthentication
-from .models import User
-
-
 def _format_birthdate(value):
     """birthdate가 문자열이든 date 객체든 안전하게 변환"""
     if not value:
@@ -923,6 +898,8 @@ class ProfileView(APIView):
     def get(self, request):
         user = request.user
 
+        can_change_password = bool(user.password_hash)
+
         return Response(
             {
                 "user_id": user.user_id,
@@ -930,6 +907,7 @@ class ProfileView(APIView):
                 "name": user.name,
                 "phone_number": user.phone_number,
                 "birthdate": _format_birthdate(user.birthdate),
+                "can_change_password": can_change_password,
             },
             status=status.HTTP_200_OK,
         )
@@ -956,32 +934,47 @@ class ProfileView(APIView):
 
         # 3. 비밀번호 변경
         if current_password and new_password:
+            # 소셜 로그인 계정은 password_hash 가 없음 → 비밀번호 변경 불가
             if not user.password_hash:
-                return Response({"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."}, status=400)
+                return Response(
+                    {"detail": "소셜 로그인 계정은 비밀번호를 변경할 수 없습니다."},
+                    status=400,
+                )
 
             if not check_password(current_password, user.password_hash):
-                return Response({"detail": "현재 비밀번호가 올바르지 않습니다."}, status=400)
+                return Response(
+                    {"detail": "현재 비밀번호가 올바르지 않습니다."},
+                    status=400,
+                )
 
             if len(new_password) < 8:
-                return Response({"detail": "새 비밀번호는 8자 이상이어야 합니다."}, status=400)
+                return Response(
+                    {"detail": "새 비밀번호는 8자 이상이어야 합니다."},
+                    status=400,
+                )
 
             user.password_hash = make_password(new_password)
 
         elif current_password or new_password:
-            return Response({"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."}, status=400)
+            # 둘 중 하나만 들어온 경우
+            return Response(
+                {"detail": "현재 비밀번호와 새 비밀번호를 모두 입력해주세요."},
+                status=400,
+            )
 
         # 4. birthdate 변환
-        if birthdate:
-            # 이미 날짜 형식 문자열일 경우 그대로 저장
-            try:
-                # 먼저 date 객체로 바꾸기 시도
-                parsed = datetime.strptime(birthdate, "%Y-%m-%d").date()
-                user.birthdate = parsed
-            except Exception:
-                # 문자열 그대로 저장해야 하는 경우도 있을 수 있음
-                user.birthdate = birthdate
-        else:
-            user.birthdate = None
+        if birthdate is not None:
+            # 빈 문자열이면 None 처리
+            if birthdate == "":
+                user.birthdate = None
+            else:
+                try:
+                    parsed = datetime.strptime(birthdate, "%Y-%m-%d").date()
+                    user.birthdate = parsed
+                except Exception:
+                    # 혹시 이상한 값이 와도 서버 죽지 않게 방어
+                    user.birthdate = None
+        # 프론트에서 birthdate를 안 보냈으면 기존 값 유지
 
         # 5. 나머지 필드 저장
         user.name = name

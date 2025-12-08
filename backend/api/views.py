@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta
 import secrets
 import string
 import os
@@ -502,12 +502,15 @@ class LiveCodingStartView(APIView):
         ]
 
         # Redis(캐시)에 저장할 세션 메타 정보
+        start_at = timezone.now()
         meta = {
-            "state": "ready",
+            "state": "in_progress",
             "problem_id": problem.problem_id,
             "user_id": user.user_id,
             "session_id": session_id,
             "language": problem_lang.language,
+            "time_limit_seconds": 40 * 60,
+            "start_at": start_at.isoformat(),
         }
 
         # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
@@ -532,6 +535,9 @@ class LiveCodingStartView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "time_limit_seconds": meta["time_limit_seconds"],
+                "start_at": meta["start_at"],
+                "remaining_seconds": meta["time_limit_seconds"],
             },
             status=status.HTTP_201_CREATED,
         )
@@ -738,6 +744,20 @@ class LiveCodingSessionView(APIView):
             for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
         ]
 
+        start_at_str = meta.get("start_at")
+        time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
+        remaining_seconds = time_limit_seconds
+
+        if start_at_str:
+            try:
+                start_at_dt = datetime.fromisoformat(start_at_str)
+                if timezone.is_naive(start_at_dt):
+                    start_at_dt = timezone.make_aware(start_at_dt, timezone=timezone.utc)
+                elapsed = max(0, int((timezone.now() - start_at_dt).total_seconds()))
+                remaining_seconds = max(0, time_limit_seconds - elapsed)
+            except Exception:
+                remaining_seconds = time_limit_seconds
+
         return Response(
             {
                 "session_id": session_id,
@@ -751,6 +771,9 @@ class LiveCodingSessionView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "time_limit_seconds": time_limit_seconds,
+                "start_at": start_at_str,
+                "remaining_seconds": remaining_seconds,
             },
             status=status.HTTP_200_OK,
         )
@@ -820,6 +843,20 @@ class LiveCodingActiveSessionView(APIView):
             for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
         ]
 
+        start_at_str = meta.get("start_at")
+        time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
+        remaining_seconds = time_limit_seconds
+
+        if start_at_str:
+            try:
+                start_at_dt = datetime.fromisoformat(start_at_str)
+                if timezone.is_naive(start_at_dt):
+                    start_at_dt = timezone.make_aware(start_at_dt, timezone=timezone.utc)
+                elapsed = max(0, int((timezone.now() - start_at_dt).total_seconds()))
+                remaining_seconds = max(0, time_limit_seconds - elapsed)
+            except Exception:
+                remaining_seconds = time_limit_seconds
+
         return Response(
             {
                 "session_id": session_id,
@@ -833,6 +870,9 @@ class LiveCodingActiveSessionView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "time_limit_seconds": time_limit_seconds,
+                "start_at": start_at_str,
+                "remaining_seconds": remaining_seconds,
             },
             status=status.HTTP_200_OK,
         )

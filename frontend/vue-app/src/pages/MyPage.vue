@@ -31,6 +31,11 @@
           </div>
         </div>
         <p class="hint" v-else>계정 정보를 불러오는 중입니다...</p>
+        <div class="actions" v-if="user">
+          <RouterLink to="/profile/edit" class="edit-button">
+            회원정보 수정
+          </RouterLink>
+        </div>
       </div>
     </main>
   </div>
@@ -131,5 +136,40 @@ onMounted(() => {
 
 .value {
   color: #111827;
+}
+
+.actions {
+  margin-top: 24px;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.edit-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 18px;
+  border-radius: 9999px;
+  background: #111827;
+  color: #f9fafb;
+  font-size: 14px;
+  font-weight: 600;
+  text-decoration: none;
+  border: none;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
+  transition: background 0.15s ease, transform 0.15s ease,
+    box-shadow 0.15s ease;
+}
+
+.edit-button:hover {
+  background: #020617;
+  transform: translateY(-1px);
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.22);
+}
+
+.edit-button:active {
+  transform: translateY(0);
+  box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2);
 }
 </style>

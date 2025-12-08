@@ -1,4 +1,4 @@
-from datetime import timedelta
+from datetime import datetime, timedelta, date
 import json
 import secrets
 import string
@@ -855,10 +855,11 @@ class LiveCodingHintOfferView(APIView):
                 {"detail": "힌트를 요청하려면 로그인이 필요합니다."},
                 status=status.HTTP_401_UNAUTHORIZED,
             )
-        
-    
+
         session_id = request.data.get("session_id") or request.query_params.get("session_id")
-        
+        language = (request.data.get("language") or request.query_params.get("language") or "").lower()
+        code = request.data.get("code")
+
         meta, error_response = self._get_meta(user, session_id)
         if error_response is not None:
             return error_response
@@ -1175,31 +1176,6 @@ class LiveCodingEndSessionView(APIView):
 
         return Response(status=status.HTTP_204_NO_CONTENT)
 
-from datetime import datetime
-
-from datetime import datetime
-from django.utils.decorators import method_decorator
-from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status
-from django.contrib.auth.hashers import check_password, make_password
-
-from .jwt_utils import jwt_required
-from .models import User
-
-
-from datetime import datetime, date
-from django.utils import timezone
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework import status, permissions
-from django.contrib.auth.hashers import check_password, make_password
-
-from .authentication import JWTAuthentication
-from .models import User
-
-
 def _format_birthdate(value):
     """birthdate가 문자열이든 date 객체든 안전하게 변환"""
     if not value:
@@ -1296,15 +1272,3 @@ class ProfileView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-    total_time = time.time() - start_time
-
-    return Response(
-        {
-            "question": question,
-            "answer": answer_text,
-            "sentences": sentences_payload,
-            "first_audio_time": tts_result.get("first_audio_time", 0.0),
-            "total_time": total_time,
-        }
-    )

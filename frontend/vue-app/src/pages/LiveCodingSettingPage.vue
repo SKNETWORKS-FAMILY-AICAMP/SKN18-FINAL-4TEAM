@@ -258,6 +258,15 @@ const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
 };
 
+// Langgraph/LLM 워밍업 호출
+const warmupLanggraph = async () => {
+  try {
+    await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, { method: "GET" });
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
+};
+
 /* ----- 웹캠 체크 ----- */
 const videoRef = ref(null);
 const canvasRef = ref(null);
@@ -595,6 +604,10 @@ const startTest = async () => {
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();
+});
+
+onMounted(() => {
+  void warmupLanggraph();
 });
 </script>
 

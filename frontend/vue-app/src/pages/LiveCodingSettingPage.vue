@@ -45,10 +45,11 @@
         <div v-else-if="currentStep === 2" class="step-panel">
           <h3 class="step-title">웹캠 연결</h3>
           <p class="step-desc">
-            아래 영역에 본인 얼굴이 잘 보이는지 확인해 주세요. 일정 밝기 이상이 감지되면 자동으로 통과 처리됩니다.
+            공정한 평가를 위해 카메라를 활성화해 주세요.<br />
+            얼굴이 화면 중앙의 테두리 안에 모두 보이도록 위치를 맞춰 주세요.
           </p>
 
-          <div class="preview-box">
+          <div class="preview-box" :class="[previewBorderClass, cameraActive ? 'preview-active' : '']">
             <video
               ref="videoRef"
               autoplay
@@ -56,34 +57,31 @@
               class="video-preview"
               v-show="cameraActive"
             ></video>
+            <div
+              v-if="cameraActive"
+              class="face-target-box"
+              :class="{
+                'target-success': detectionStatus === 'success',
+                'target-fail': detectionStatus === 'fail'
+              }"
+            ></div>
             <div v-show="!cameraActive" class="preview-placeholder">
-              <span class="placeholder-icon">📷</span>
-              <span class="placeholder-text">웹캠이 아직 활성화되지 않았습니다.</span>
+              <div class="placeholder-illustration-wrap">
+                <img :src="faceDetectImage" alt="카메라 안내" class="placeholder-illustration" />
+              </div>
             </div>
           </div>
-
           <p class="help-text">
             상태:
-            <strong>
-              {{
-                cameraPassed
-                  ? "웹캠 통과 ✅"
-                  : cameraChecking
-                  ? "밝기 측정 중..."
-                  : "테스트 필요 ❗"
-              }}
-            </strong>
+            <strong>{{ cameraStatusText }}</strong>
           </p>
 
           <canvas ref="canvasRef" class="hidden-canvas"></canvas>
 
           <div class="panel-footer">
             <button class="secondary-btn" @click="goPrev">이전</button>
-            <button class="secondary-btn" @click="stopCamera" v-if="cameraActive">
-              웹캠 종료
-            </button>
-            <button class="primary-btn" @click="startCameraTest">
-              {{ cameraActive ? "다시 테스트" : "웹캠 테스트 시작" }}
+            <button class="primary-btn" @click="startCameraTest" v-if="!cameraActive">
+              {{ cameraPassedOnce ? "웹캠 테스트 재시작" : "웹캠 테스트 시작" }}
             </button>
             <button
               class="primary-btn"
@@ -206,10 +204,13 @@
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount, nextTick } from "vue";
+import { ref, onBeforeUnmount, nextTick, computed } from "vue";
 import { useRouter } from "vue-router";
+import { onMounted } from "vue"
 
 const router = useRouter();
+const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;
+const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 /* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
 // rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
@@ -237,11 +238,34 @@ const stepClass = (id) => {
 };
 
 const goNext = () => {
+  const prevStep = currentStep.value;
+  if (prevStep === 2) {
+    stopCamera();
+    if (cameraPassed.value) {
+      cameraPassedOnce.value = true;
+    }
+  }
   if (currentStep.value < 4) currentStep.value += 1;
 };
 
 const goPrev = () => {
+  const prevStep = currentStep.value;
+  if (prevStep === 2) {
+    stopCamera();
+    cameraPassed.value = false;
+    detectionStatus.value = "idle";
+    cameraPassedOnce.value = false;
+  }
   if (currentStep.value > 1) currentStep.value -= 1;
+};
+
+// Langgraph/LLM 워밍업 호출
+const warmupLanggraph = async () => {
+  try {
+    await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, { method: "GET" });
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
 };
 
 /* ----- 웹캠 체크 ----- */
@@ -249,12 +273,93 @@ const videoRef = ref(null);
 const canvasRef = ref(null);
 const cameraActive = ref(false);
 const cameraPassed = ref(false);
+const cameraPassedOnce = ref(false);
 const cameraChecking = ref(false);
 let cameraStream = null;
+let mediapipeInterval = null;
+const detectionStatus = ref("idle"); // idle | success | fail
+
+const previewBorderClass = computed(() => {
+  if (!cameraActive.value) return "border-idle";
+  if (detectionStatus.value === "success") return "border-success";
+  if (detectionStatus.value === "fail") return "border-fail";
+  return "border-idle";
+});
+
+const cameraStatusText = computed(() => {
+  if (cameraActive.value) {
+    if (detectionStatus.value === "success") return "얼굴 인식 성공! ✅";
+    if (cameraChecking.value) return "얼굴 감지 중...";
+    if (detectionStatus.value === "fail") return "얼굴이 인식되지 않았습니다.";
+    return "얼굴 감지 중...";
+  }
+  return cameraPassed.value ? "얼굴 인식 성공! ✅" : "테스트 필요 ❗";
+});
+
+const stopFaceDetection = () => {
+  if (mediapipeInterval) {
+    clearInterval(mediapipeInterval);
+    mediapipeInterval = null;
+  }
+};
+
+const sendFrameForMediapipe = async () => {
+  const video = videoRef.value;
+  if (!video || video.readyState < 2) return;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = 320;
+  canvas.height = 180;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) return;
+
+  const vw = video.videoWidth || 640;
+  const vh = video.videoHeight || 360;
+  const scale = Math.min(canvas.width / vw, canvas.height / vh);
+  const dw = vw * scale;
+  const dh = vh * scale;
+  const dx = (canvas.width - dw) / 2;
+  const dy = (canvas.height - dh) / 2;
+
+  ctx.drawImage(video, dx, dy, dw, dh);
+
+  canvas.toBlob(async (blob) => {
+    if (!blob) return;
+
+    const formData = new FormData();
+    formData.append("image", blob, "frame.jpg");
+
+    try {
+      const resp = await fetch(
+        `${BACKEND_BASE}/mediapipe/analyze/?session_id=livecoding-setting`,
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
+
+      const data = await resp.json().catch(() => ({}));
+      if (!resp.ok) {
+        detectionStatus.value = "fail";
+        cameraPassed.value = false;
+        return;
+      }
+
+      const faceCount = Number(data.face_count ?? 0);
+      const hasFace = faceCount >= 1;
+      detectionStatus.value = hasFace ? "success" : "fail";
+      cameraPassed.value = hasFace;
+    } catch (err) {
+      detectionStatus.value = "fail";
+      cameraPassed.value = false;
+    }
+  }, "image/jpeg", 0.6);
+};
 
 const startCameraTest = async () => {
   cameraPassed.value = false;
   cameraChecking.value = true;
+  detectionStatus.value = "idle";
 
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
@@ -268,7 +373,11 @@ const startCameraTest = async () => {
 
     setTimeout(() => {
       checkCameraBrightness();
-    }, 1000);
+      stopFaceDetection();
+      mediapipeInterval = setInterval(() => {
+        void sendFrameForMediapipe();
+      }, 1500);
+    }, 800);
   } catch (e) {
     cameraChecking.value = false;
     alert("웹캠 접근이 거부되었습니다. 브라우저 권한 설정을 확인해 주세요.");
@@ -298,9 +407,7 @@ const checkCameraBrightness = () => {
     for (let i = 0; i < data.length; i += 4) {
       total += (data[i] + data[i + 1] + data[i + 2]) / 3;
     }
-    const avgBrightness = total / (width * height);
-
-    cameraPassed.value = avgBrightness > 30;
+    // 밝기 값은 참고용으로만 사용 (통과/실패 판정은 서버 Mediapipe 결과에 따름)
   } catch (e) {
     cameraPassed.value = false;
   } finally {
@@ -309,6 +416,7 @@ const checkCameraBrightness = () => {
 };
 
 const stopCamera = () => {
+  stopFaceDetection();
   if (cameraStream) {
     cameraStream.getTracks().forEach((t) => t.stop());
     cameraStream = null;
@@ -498,6 +606,10 @@ onBeforeUnmount(() => {
   stopCamera();
   stopMic();
 });
+
+onMounted(() => {
+  void warmupLanggraph();
+});
 </script>
 
 <style scoped>
@@ -639,13 +751,39 @@ onBeforeUnmount(() => {
 /* 웹캠 프리뷰 */
 .preview-box {
   margin-top: 18px;
-  flex: 1;
+  flex: 0 0 auto;
   border-radius: 10px;
-  border: 1px dashed #9ca3af;
-  background: #e5e7eb;
+  border: 3px dashed #9ca3af;
+  background: #f1f3f5;
   display: flex;
   align-items: center;
   justify-content: center;
+  position: relative;
+  width: 100%;
+  height: 320px;
+  overflow: hidden;
+}
+
+.preview-active {
+  width: 60%;
+  margin-left: auto;
+  margin-right: auto;
+  transition: width 0.2s ease;
+}
+
+.border-idle {
+  border-style: dashed;
+  border-color: #9ca3af;
+}
+
+.border-success {
+  border-style: dashed;
+  border-color: #9ca3af;
+}
+
+.border-fail {
+  border-style: dashed;
+  border-color: #9ca3af;
 }
 
 .video-preview {
@@ -655,20 +793,60 @@ onBeforeUnmount(() => {
   border-radius: 9px;
 }
 
+.face-target-box {
+  position: absolute;
+  inset: 10%;
+  border: 4px solid #4b5563;
+  border-radius: 16px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
+  pointer-events: none;
+  transition: border-color 0.2s ease;
+}
+
+.target-success {
+  border-color: #10b981;
+}
+
+.target-fail {
+  border-color: #ef4444;
+}
+
 .preview-placeholder {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
-  color: #6b7280;
+  gap: 12px;
+  color: #1f2937;
+  text-align: center;
+  padding: 16px;
 }
 
-.placeholder-icon {
-  font-size: 32px;
+.placeholder-illustration {
+  width: 176px;
+  height: auto;
+  border-radius: 12px;
+  opacity: 0.3;
 }
 
-.placeholder-text {
-  font-size: 13px;
+.placeholder-illustration-wrap {
+  background: transparent;
+  border-radius: 0;
+  padding: 0;
+  box-shadow: none;
+}
+
+.camera-guidance {
+  margin-top: 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #1f2937;
+  text-align: center;
+}
+
+.test-running-text {
+  font-size: 14px;
+  color: #4b5563;
+  font-weight: 600;
 }
 
 /* 마이크 테스트 */

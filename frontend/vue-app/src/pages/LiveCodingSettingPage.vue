@@ -206,6 +206,7 @@
 <script setup>
 import { ref, onBeforeUnmount, nextTick, computed } from "vue";
 import { useRouter } from "vue-router";
+import { onMounted } from "vue"
 
 const router = useRouter();
 const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;

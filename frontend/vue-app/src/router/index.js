@@ -11,7 +11,7 @@ import SignUpPersonalPage from "../pages/SignUpPersonalPage.vue";
 import SignUpCompanyPage from "../pages/SignUpCompanyPage.vue";
 import MyPage from "../pages/MyPage.vue";
 import LiveCodingSettingPage from "../pages/LiveCodingSettingPage.vue";
-import ProfilerEditPage from "../pages/ProfileEditPage.vue";
+import ProfileEditPage from "../pages/ProfileEditPage.vue";
 import TtsTestPage from "../pages/TtsTestPage.vue";
 
 const routes = [

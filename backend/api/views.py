@@ -41,7 +41,6 @@ from .models import (
 )
 from .serializers import SignupSerializer
 from .jwt_utils import jwt_required
-from .tts_module import generate_interview_audio_batch
 from .authentication import JWTAuthentication
 
 

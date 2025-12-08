@@ -77,25 +77,35 @@ class STTClient:
         webm 바이트를 tempfile에 .webm 으로 저장한 뒤,
         해당 파일 객체를 OpenAI whisper-1에 넘긴다.
         """
-        with tempfile.NamedTemporaryFile(suffix=".webm") as tmp:
+        # NamedTemporaryFile 래퍼(tmp) 자체를 넘기지 말고,
+        # 경로를 통해 다시 열린 실제 파일 객체를 OpenAI에 전달합니다.
+        with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as tmp:
             tmp.write(webm_bytes)
             tmp.flush()
-            tmp.seek(0)
+            webm_path = tmp.name
 
-            kwargs: Dict[str, Any] = {
-                "model": self._model,
-                "file": tmp,
-                "response_format": "verbose_json",
-                "temperature": self._temperature,
-            }
-            if self._language != "auto":
-                kwargs["language"] = self._language
-            if self._prompt:
-                kwargs["prompt"] = self._prompt
+        try:
+            with open(webm_path, "rb") as f:
+                kwargs: Dict[str, Any] = {
+                    "model": self._model,
+                    "file": f,
+                    "response_format": "verbose_json",
+                    "temperature": self._temperature,
+                }
+                if self._language != "auto":
+                    kwargs["language"] = self._language
+                if self._prompt:
+                    kwargs["prompt"] = self._prompt
 
-            # 실제 API 호출
-            resp = self._client.audio.transcriptions.create(**kwargs)
-            return resp
+                # 실제 API 호출
+                resp = self._client.audio.transcriptions.create(**kwargs)
+                return resp
+        finally:
+            try:
+                os.remove(webm_path)
+            except Exception:
+                # 임시 파일 삭제 실패는 치명적이지 않으므로 무시
+                pass
 
     # -------------------------
     #  NLP 보정 훅 (현재는 패스스루)

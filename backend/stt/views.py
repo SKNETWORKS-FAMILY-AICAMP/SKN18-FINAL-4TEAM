@@ -35,53 +35,11 @@ def run_stt(request):
         return JsonResponse({"error": "No audio data"}, status=400)
     logger.info("webm len=%s", len(webm_bytes))
 
-    # 1) webm 임시 파일로 저장
-    with tempfile.NamedTemporaryFile(suffix=".webm", delete=False) as f:
-        f.write(webm_bytes)
-        webm_path = f.name
-
-    pcm_path = webm_path + ".s16le"
-
     try:
-        # 2) ffmpeg 로 16kHz mono s16le PCM 으로 변환
-        cmd = [
-            "ffmpeg",
-            "-y",           # 덮어쓰기 허용
-            "-i", webm_path,
-            "-ac", "1",     # mono
-            "-ar", "16000", # 16kHz
-            "-f", "s16le",  # signed 16-bit little endian (raw PCM)
-            pcm_path,
-        ]
-        try:
-            proc = subprocess.run(
-                cmd,
-                check=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-            )
-        except subprocess.CalledProcessError as e:
-            logger.error("ffmpeg 변환 실패: %s", e.stderr.decode("utf-8", "ignore"))
-            return JsonResponse(
-                {"error": "ffmpeg convert failed", "detail": "see server log"},
-                status=500,
-            )
-
-        # 3) 변환된 PCM 바이트 읽기
-        with open(pcm_path, "rb") as f:
-            pcm_bytes = f.read()
-        logger.info("pcm len=%s", len(pcm_bytes))
-
-        if not pcm_bytes:
-            return JsonResponse({"error": "Empty PCM data"}, status=500)
-
-        # 4) WhisperLiveKit STT 실행 (async → sync)
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            lines = loop.run_until_complete(stt_client.transcribe_pcm(pcm_bytes))
-        finally:
-            loop.close()
+        # 1) OpenAI Whisper STT 실행
+        # STTClient는 webm 바이트를 그대로 받아 내부에서 tempfile(.webm)로 저장 후
+        # OpenAI API에 전달합니다.
+        lines = stt_client.transcribe_pcm_sync(webm_bytes)
         logger.info("stt lines=%s", lines)
 
         # 5) langgraph 호출: 세션 상태를 thread_id로 이어서 사용
@@ -206,10 +164,5 @@ def run_stt(request):
         return JsonResponse(response_payload, status=200)
 
     finally:
-        # 6) 임시 파일 정리
-        for p in (webm_path, pcm_path):
-            try:
-                if os.path.exists(p):
-                    os.remove(p)
-            except Exception:
-                pass
+        # 현재는 run_stt에서 생성한 임시 파일이 없으므로 정리할 항목 없음
+        pass

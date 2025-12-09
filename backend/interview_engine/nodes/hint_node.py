@@ -1,4 +1,4 @@
-from interview_engine.state import InterviewState
+from backend.interview_engine.state import InterviewState
 from langchain_core.messages import HumanMessage, SystemMessage
 from interview_engine.llm import LLM
 

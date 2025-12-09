@@ -5,7 +5,7 @@ from typing import List, Tuple
 from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
-from interview_engine.state import InterviewState
+from backend.interview_engine.state import InterviewState
 
 
 def _parse_questions_content(content: str) -> List[str]:

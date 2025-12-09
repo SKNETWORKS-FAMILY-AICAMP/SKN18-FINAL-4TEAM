@@ -2,27 +2,42 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from interview_engine.graph import create_graph_flow
+from backend.interview_engine.graph import (
+    create_chapter1_graph_flow,
+    create_chapter2_graph_flow,
+    create_chapter3_graph_flow
+)
 from interview_engine import llm
 from langgraph.checkpoint.redis import RedisSaver
-
-# langgraph/LLM 재사용을 위한 캐시
-_graph_instance = None
-_llm_instance = None
-
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
 
+# 모듈 전역
+_checkpointer = None
+_graph_cache = {}  # {"chapter1": compiled_graph, ...}
+_llm_instance = None
 
-def get_cached_graph():
-    """create_graph_flow() 결과를 캐싱해 재사용."""
-    global _graph_instance
-    if _graph_instance is None:
-        checkpointer = RedisSaver(REDIS_URL)
-        # Redis 인덱스(checkpoints/checkpoint_writes 등)를 확실히 생성
-        checkpointer.setup()
-        _graph_instance = create_graph_flow(checkpointer=checkpointer)
-    return _graph_instance
+
+def get_checkpointer():
+    global _checkpointer
+    if _checkpointer is None:
+        cp = RedisSaver(REDIS_URL)
+        cp.setup()
+        _checkpointer = cp
+    return _checkpointer
+
+def get_cached_graph(session_id, name: str):
+    if name not in _graph_cache:
+        cp = get_checkpointer()
+        if name == "chapter1":
+            _graph_cache[name] = create_chapter1_graph_flow(checkpointer=cp)
+        elif name == "chapter2":
+            _graph_cache[name] = create_chapter2_graph_flow(checkpointer=cp)
+        elif name == "chapter3":
+            _graph_cache[name] = create_chapter3_graph_flow(checkpointer=cp)
+        else:
+            raise ValueError(f"unknown graph {name}")
+    return _graph_cache[name]
 
 
 def get_cached_llm():

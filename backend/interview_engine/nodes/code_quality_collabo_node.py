@@ -3,7 +3,7 @@ import subprocess
 import tempfile
 from typing import Any, Dict, List
 
-from interview_engine.state import InterviewState
+from backend.interview_engine.state import InterviewState
 
 RUFF_CMD = [
     "ruff",

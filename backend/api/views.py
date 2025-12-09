@@ -152,8 +152,7 @@ class CodingProblemSessionInitView(APIView):
         #  langgraph 호출: 세션 상태를 thread_id로 이어서 사용
         init_state = {
             "event_type": "init",
-            "problem_data": problem_text,
-            "await_human": False,
+            "problem_data": problem_text
         }
 
         session_id = (
@@ -166,24 +165,23 @@ class CodingProblemSessionInitView(APIView):
                 {"detail": "session_id 쿼리 파라미터를 전달해 주세요."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        intro_text = None
-        graph_state = None
+
         sentences_payload = []
         tts_result = {}
-        total_time = None
 
         try:
-            graph = get_cached_graph()
+            graph = get_cached_graph("chapter1")
             graph_state = graph.invoke(
                 init_state,
                 config={
                     "configurable": {
-                        "thread_id": session_id
+                        "thread_id": session_id,
+                        "checkpoint_namespace":"chapter1"
                     }
                 },
             )
             if isinstance(graph_state, dict):
-                intro_text = graph_state.get("tts_text")
+                intro_text = graph_state.get("intro_text")
         except Exception as exc:  # noqa: BLE001
             return Response(
                 {

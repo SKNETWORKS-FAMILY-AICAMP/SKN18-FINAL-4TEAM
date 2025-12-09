@@ -10,19 +10,25 @@ import re
 import time
 import base64
 from typing import Generator, Dict
+
 from openai import OpenAI
 from dotenv import load_dotenv
 
 # 환경변수 로드
 load_dotenv()
 
-# OpenAI 클라이언트 초기화
-client = OpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+# OpenAI 클라이언트 초기화 (전역 싱글턴)
+client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# TTS 설정 (실험 결과 기반 최적값)
-TTS_MODEL = "tts-1"  # 빠른 응답을 위해 tts-1 사용
-TTS_VOICE = "nova"   # 따뜻하고 정중한 여성 목소리
-TTS_SPEED = 1.0      # 정상 속도
+# TTS 설정 (실험 결과 기반 기본값 + 환경변수로 튜닝)
+TTS_MODEL = os.getenv("TTS_MODEL", "tts-1")
+TTS_VOICE = os.getenv("TTS_VOICE", "nova")
+
+# 약간 빠른 재생 속도 (실제 생성 시간에도 소폭 영향)
+TTS_SPEED = float(os.getenv("TTS_SPEED", "1.1"))
+
+# 한 번에 생성할 최대 문장 수 (너무 긴 인트로로 인한 지연 방지)
+TTS_MAX_SENTENCES = int(os.getenv("TTS_MAX_SENTENCES", "4"))
 
 
 def split_into_sentences(text: str) -> list[str]:
@@ -79,10 +85,18 @@ def generate_interview_audio(text: str, config=None) -> Generator[Dict, None, No
         >>>     print(f"문장 {chunk['sentence_number']}: {chunk['text']}")
         >>>     # chunk['audio_base64']를 프론트엔드로 전송
     """
-    
     # 텍스트를 문장 단위로 분리
     sentences = split_into_sentences(text)
-    
+
+    # 전역/설정 기반으로 문장 수 제한 (너무 긴 TTS로 인한 지연 방지)
+    max_sentences = TTS_MAX_SENTENCES
+    if isinstance(config, dict):
+        cfg = config.get("configurable") or {}
+        max_sentences = int(cfg.get("max_sentences") or max_sentences)
+
+    if max_sentences > 0 and len(sentences) > max_sentences:
+        sentences = sentences[:max_sentences]
+
     if not sentences:
         # 빈 텍스트 처리
         return

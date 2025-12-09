@@ -29,8 +29,7 @@ from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
 
-from .interview_utils import get_cached_graph, get_cached_llm
-from tts_client import generate_interview_audio_batch
+from .interview_utils import get_cached_graph, get_cached_llm, _generate_tts_payload
 
 from .models import (
     AuthIdentity,
@@ -40,7 +39,6 @@ from .models import (
     User,
 )
 from .serializers import SignupSerializer
-from .jwt_utils import jwt_required
 from .authentication import JWTAuthentication
 
 
@@ -124,37 +122,31 @@ class RandomCodingProblemView(APIView):
         )
 
 
-class CodingProblemSessionInitView(APIView):
+class CodingProblemTextInitView(APIView):
     """
-    RandomCodingProblemView 결과를 langgraph 초기 state에 넣어 실행한 뒤 상태를 반환합니다.
-    - 프론트에서 RandomCodingProblemView 응답 전체를 POST 바디로 전달하면 DB 조회 없이 그대로 사용합니다.
+    RandomCodingProblemView 응답을 받아 LangGraph 초기 상태만 실행하고,
+    문제 텍스트와 인트로용 tts_text(텍스트만)를 반환하는 경량 엔드포인트.
+
+    - POST /api/coding-problems/session/init/?session_id=...:
+      body: RandomCodingProblemView 응답 전체(JSON)
+      response: {"problem": "...", "tts_text": "..."}
     """
 
     def post(self, request):
-        start_time = time.time()
         payload = request.data or {}
-        # 1) 문자열로 들어온 경우 JSON 파싱 시도 (옵션)
         if isinstance(payload, str):
             try:
                 payload = json.loads(payload)
             except Exception:
                 payload = {}
 
-        # 2) dict 아니면 그냥 빈 dict
         if not isinstance(payload, dict):
             payload = {}
-        
-        # 3) 여기서부터 'problem'만 추출해서 LangGraph용 problem_data 구성
+
         problem_text = ""
         if isinstance(payload.get("problem"), str):
             problem_text = payload["problem"]
-        
-        #  langgraph 호출: 세션 상태를 thread_id로 이어서 사용
-        init_state = {
-            "event_type": "init",
-            "problem_data": problem_text
-        }
-
+            
         session_id = (
             request.query_params.get("session_id")
             or request.headers.get("X-Session-Id")
@@ -166,11 +158,19 @@ class CodingProblemSessionInitView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        sentences_payload = []
-        tts_result = {}
+        init_state = {
+            "meta": {
+                "session_id": session_id,
+                "user_id": request.user.user_id if hasattr(request, "user") else None,
+            },
+            "event_type": "init",
+            "problem_data": problem_text,
+            "intro_flow_done": False,
+        }
 
+        intro_text = ""
         try:
-            graph = get_cached_graph("chapter1")
+            graph = get_cached_graph(session_id=session_id, name ="chapter1")
             graph_state = graph.invoke(
                 init_state,
                 config={
@@ -181,7 +181,7 @@ class CodingProblemSessionInitView(APIView):
                 },
             )
             if isinstance(graph_state, dict):
-                intro_text = graph_state.get("intro_text")
+                intro_text = graph_state.get("tts_text") or ""
         except Exception as exc:  # noqa: BLE001
             return Response(
                 {
@@ -191,45 +191,55 @@ class CodingProblemSessionInitView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # TTS 실행
-        if intro_text:
-            try:
-                tts_result = generate_interview_audio_batch(
-                    intro_text,
-                    config={
-                        "configurable": {
-                            "thread_id": session_id
-                        }
-                    })
-                for chunk in tts_result.get("audio_chunks", []):
-                    audio_b64 = chunk.get("audio_base64")
-                    if not audio_b64:
-                        # 에러난 문장은 스킵 (원하면 error도 같이 넘길 수 있음)
-                        continue
+        return Response(
+            {
+                "tts_text": intro_text,
+            },
+            status=status.HTTP_200_OK,
+        )
 
-                    sentences_payload.append(
-                        {
-                            "text": chunk.get("text", ""),
-                            "audio": audio_b64,
-                        }
-                    )
-                total_time = time.time() - start_time
 
-            except Exception as exc:  # noqa: BLE001
-                return Response(
-                    {
-                        "detail": "TTS 함수를 실행할 수 없습니다.",
-                        "error": str(exc),
-                    },
-                    status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                )
+class TTSView(APIView):
+    """
+    텍스트를 받아 TTS만 수행하는 엔드포인트.
+    - POST /api/tts/intro/?session_id=...
+      body: {"tts_text": "..."} 또는 {"text": "..."}
+      response: CodingProblemSessionInitView와 동일한 오디오 청크 구조
+    """
+
+    def post(self, request):
+        data = request.data or {}
+        text = (data.get("tts_text") or data.get("text") or "").strip()
+        max_sentences = data.get("max_sentences")
+
+        if not text:
+            return Response(
+                {"detail": "tts_text(또는 text) 필드를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session_id = (
+            request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+            or (request.data.get("session_id") if hasattr(request, "data") else None)
+        )
+
+        try:
+            sentences_payload = _generate_tts_payload(text, session_id, max_sentences)
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {
+                    "detail": "TTS 함수를 실행할 수 없습니다.",
+                    "error": str(exc),
+                },
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
 
         return Response(
             {
-                "tts_text": sentences_payload,
-                "first_audio_time": tts_result.get("first_audio_time", 0.0),
-                "total_time": total_time,
-            }
+                "tts_text": sentences_payload
+            },
+            status=status.HTTP_200_OK,
         )
 
 
@@ -245,16 +255,114 @@ class WarmupLanggraphView(APIView):
         try:
             # LLM 모듈 import 및 그래프 컴파일 시도
             llm_instance = get_cached_llm()
-            graph = get_cached_graph()
-            # LLM은 import 시점에 초기화되므로 존재만 확인
-            _ = llm_instance
-            graph.get_graph()  # 실제 실행은 하지 않고 DAG만 준비
+            _ = llm_instance   # LLM은 존재 확인
+            
+            # 쿼리/헤더/바디 어디서든 session_id를 받되, 없으면 400 반환
+            data = request.data if hasattr(request, "data") else {}
+            session_id = None
+            if isinstance(data, dict):
+                session_id = data.get("session_id")
+            session_id = (
+                session_id
+                or request.query_params.get("session_id")
+                or request.headers.get("X-Session-Id")
+            )
+            
+            if not session_id: # session_id 업을 때 예외 처리
+                return Response(
+                    {"detail": "session_id가 필요합니다."},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+                
+        
+            graph1 = get_cached_graph(session_id=session_id, name="chapter1")
+            graph1.get_graph()  # 실제 실행은 하지 않고 DAG만 준비
             return Response({"status": "warmed"}, status=status.HTTP_200_OK)
+        
         except Exception as exc:  # noqa: BLE001
             return Response(
                 {"status": "error", "detail": str(exc)},
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
+
+
+class InterviewIntroEventView(APIView):
+    """
+    STT로 얻은 텍스트를 기반으로 LangGraph 호출하여,
+    다음 질문/피드백/단계 정보를 반환하는 엔드포인트.
+
+    - POST /api/interview/event/
+      body: {
+        "session_id": "...",
+        "stt_text": "...",
+        "event_type": "strategy_submit" | "init"
+    """
+
+    def post(self, request):
+        data = request.data or {}
+        session_id = (
+            data.get("session_id")
+            or request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+        )
+        stt_text = (data.get("stt_text") or "").strip()
+        event_type = "strategy_submit"
+
+        if not session_id:
+            return Response(
+                {"detail": "session_id를 body, 쿼리스트링 또는 X-Session-Id 헤더로 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if not stt_text:
+            return Response(
+                {"detail": "stt_text 필드를 비울 수 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        graph = get_cached_graph(session_id=session_id, name="chapter1")
+
+        update_state = {
+            "event_type": event_type,
+            "stt_text": stt_text,
+        }
+
+        try:
+            result_state = graph.invoke(
+                update_state,
+                config={
+                    "configurable": {
+                        "thread_id": session_id,
+                        "checkpoint_namespace": "chapter1",
+                    }
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"error": "langgraph invoke failed", "detail": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        # LangGraph가 내려준 TTS 텍스트가 있으면 즉시 배치 TTS 실행
+        tts_text = (result_state.get("tts_text") or "").strip()
+        
+        # TTS는 별도 엔드포인트(TTSView)에서 호출하도록 분리
+        user_answer_class = (result_state.get("user_answer_class") or "").strip() or None
+        
+        stage = "intro"
+        if user_answer_class == "strategy":
+            stage = "coding"
+
+        response_payload = {
+            "stt_text": stt_text,
+            "tts_text": tts_text,
+            "user_question": result_state.get("user_question"),
+            "problem_answer": result_state.get("problem_answer"),
+            "user_answer_class": user_answer_class,
+            "intro_flow_done": result_state.get("intro_flow_done"),
+            "stage": stage,
+        }
+
+        return Response(response_payload, status=status.HTTP_200_OK)
 
 
 class SignupView(APIView):
@@ -818,123 +926,6 @@ class LiveCodingCodeSnapshotView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-
-class LiveCodingHintOfferView(APIView):
-    """
-    힌트 버튼 클릭 시 langgraph hint agent를 호출하는 엔드포인트.
-    POST: {"session_id": "...", "prompt": "<optional>", "code": "<optional>", "language": "<optional>"}
-    """
-
-    def _get_meta(self, user, session_id: str):
-        if not session_id:
-            return None, Response(
-                {"detail": "session_id가 필요합니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-        meta_key = f"livecoding:{session_id}:meta"
-        meta = cache.get(meta_key)
-        if not meta:
-            return None, Response(
-                {"detail": "해당 세션 정보를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-        if str(meta.get("user_id")) != str(getattr(user, "user_id", None)):
-            return None, Response(
-                {"detail": "이 세션에 접근할 권한이 없습니다."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-        return meta, None
-
-    def post(self, request):
-        user = getattr(request, "user", None)
-        if not isinstance(user, User):
-            return Response(
-                {"detail": "힌트를 요청하려면 로그인이 필요합니다."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        session_id = request.data.get("session_id") or request.query_params.get("session_id")
-        language = (request.data.get("language") or request.query_params.get("language") or "").lower()
-        code = request.data.get("code")
-
-        meta, error_response = self._get_meta(user, session_id)
-        if error_response is not None:
-            return error_response
-
-        if not language:
-            language = (meta.get("language") or "").lower() or None
-
-        # 코드가 비어 있으면 최근 스냅샷 가져오기
-        if not code:
-            code_data = cache.get(f"livecoding:{session_id}:code") or {}
-            latest = code_data.get("latest") or {}
-            code = latest.get("code") or ""
-
-        # 문제 정보: 클라이언트가 보냈다면 우선 사용, 없으면 DB에서 조회
-        problem_description = (request.data.get("problem") or "").strip()
-        problem_algorithm_category = (request.data.get("category") or "").strip()
-        if not problem_description or not problem_algorithm_category:
-            problem_id = meta.get("problem_id")
-            if problem_id:
-                qs = (
-                    CodingProblemLanguage.objects.select_related("problem")
-                    .filter(problem__problem_id=problem_id)
-                )
-                if language:
-                    qs = qs.filter(language__iexact=language)
-                problem_lang = qs.first()
-                if problem_lang and problem_lang.problem:
-                    if not problem_description:
-                        problem_description = problem_lang.problem.problem or ""
-                    if not problem_algorithm_category:
-                        problem_algorithm_category = problem_lang.problem.category or ""
-
-        # 이전 힌트 카운트 추출(있으면)
-        hint_count = 0
-        try:
-            graph = get_cached_graph()
-            state_snapshot = graph.get_state(
-                config={"configurable": {"thread_id": session_id}}
-            )
-            values = state_snapshot
-            if hasattr(state_snapshot, "values"):
-                values = getattr(state_snapshot, "values", {})
-            if isinstance(values, dict):
-                hint_count = int(values.get("hint_count") or 0)
-        except Exception:
-            graph = get_cached_graph()
-
-        try:
-            graph_state = graph.invoke(
-                {
-                "event_type": "hint_request",
-                "await_human": False,
-                "problem_data": problem_description,
-                "hint": {
-                    "current_user_code": code,
-                    "problem_algorithm_category": problem_algorithm_category,
-                    "hint_trigger": "manual",
-                    "hint_count": hint_count,   
-                    }
-                },
-                config={"configurable": {"thread_id": session_id}},
-            )
-        except Exception as exc:  # noqa: BLE001
-            return Response(
-                {"detail": "langgraph 호출을 할 수 없습니다.", "error": str(exc)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-        hint_text = ""
-        if isinstance(graph_state, dict):
-            hint_text = graph_state.get("hint_text") or graph_state.get("hint") or ""
-
-        return Response(
-            {"hint": hint_text, "state": graph_state},
-            status=status.HTTP_200_OK,
-        )
-
 
 class LiveCodingSessionView(APIView):
     """

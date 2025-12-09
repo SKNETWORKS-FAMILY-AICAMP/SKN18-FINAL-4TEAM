@@ -27,7 +27,7 @@ class STTClient:
         enable_diarization: bool = False,
         enable_translation: bool = False,
         enable_repair: bool = False,
-        openai_model: str = "whisper-1",
+        openai_model: Optional[str] = None,
         openai_api_key: Optional[str] = None,
         temperature: float = 0.0,
         prompt: Optional[str] = None,
@@ -45,7 +45,13 @@ class STTClient:
         self._client = OpenAI(api_key=api_key)
 
         self._language = language
-        self._model = openai_model
+        # 기본값은 기존과 동일하게 whisper-1를 사용하고,
+        # 필요할 때만 환경변수나 파라미터로 덮어쓸 수 있도록 합니다.
+        self._model = (
+            openai_model
+            or os.getenv("STT_OPENAI_MODEL")
+            or "whisper-1"
+        )
         self._temperature = temperature
         self._prompt = (prompt or "").strip()
         self._extra_engine_kwargs: Dict[str, Any] = dict(extra_engine_kwargs)

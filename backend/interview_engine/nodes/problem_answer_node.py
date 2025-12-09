@@ -1,7 +1,7 @@
-from backend.interview_engine.state import IntroState
+from interview_engine.state import IntroState
 from langchain_core.messages import HumanMessage, SystemMessage
 from interview_engine.llm import LLM 
-from problem_intro_node import _get_problem_text
+from interview_engine.nodes.problem_intro_node import _get_problem_text
 
 def problem_answer_agent(state: IntroState) -> IntroState:
     """
@@ -63,7 +63,6 @@ def problem_answer_agent(state: IntroState) -> IntroState:
         # Q&A 답변을 저장
         state["problem_answer"] = content
         state["tts_text"]= content + "\n\n" + requestion_text
-        state["intro_flow_done"] = True # 질문은 한번만!
 
     except Exception:
         # LLM 실패 시에도 플로우가 끊기지 않도록 기본 멘트로 안내

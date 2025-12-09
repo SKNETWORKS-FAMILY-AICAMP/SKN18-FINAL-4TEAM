@@ -1,4 +1,5 @@
-from backend.interview_engine.state import IntroState
+from interview_engine.state import IntroState
+from langgraph.graph import END
 
 
 def chap1_answer_route(state: IntroState) -> str:
@@ -12,9 +13,9 @@ def chap1_answer_route(state: IntroState) -> str:
     
     
 def chap1_main_condition(state: IntroState) -> str:
-    etype = (state.get("user_answer_class") or "").strip()
+    etype = (state.get("event_type") or "").strip()
     
     return {
         "init": "problem_intro_agent",
         "strategy_submit": "answer_classify_agent",
-    }.get(etype, "idle")  # 기본값
+    }.get(etype, END)  # 기본값

@@ -24,22 +24,3 @@ class IntroState(TypedDict, total=False):
     
     tts_text : str
     stt_text : str
-
-# chapter2
-class CodingState(TypedDict, total=False):
-    problem_data: str           # 문제 
-    # 협업능력 평가(코드기준)
-    collaboration_feedback: List[str]
-    # Ruff 분석 결과 캐시
-    ruff_issues: List[Dict[str, Any]]
-    current_user_code: str
-    problem_algorithm_category: str
-    #   - "manual"       : 사용자가 힌트 버튼을 눌렀을 때
-    #   - "auto_quality" : 코드 품질 평가 결과가 낮아서 자동으로 힌트를 줄 때
-    hint_trigger: Literal["manual", "auto_quality"]
-    hint_text: str
-    hint_count: int
-    
-# chapter3
-class EvalState(TypedDict, total=False):
-    pass

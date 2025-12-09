@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (
     EmailSendView,
     EmailVerifyView,
-    CodingProblemSessionInitView,
+    CodingProblemTextInitView,
     FindIdView,
     FindPasswordView,
     GoogleAuthView,
@@ -14,11 +14,13 @@ from .views import (
     LiveCodingStartView,
     LiveCodingCodeSnapshotView,
     LiveCodingSessionView,
-    LiveCodingHintOfferView,
+
+    InterviewIntroEventView,
     RandomCodingProblemView,
     SignupView,
     UserIdCheckView,
     WarmupLanggraphView,
+    TTSView,
     UserMeView,
     ProfileView,
     health,
@@ -40,9 +42,14 @@ urlpatterns = [
     path("auth/logout/", LogoutView.as_view(), name="logout"),
     path("coding-problems/random/", RandomCodingProblemView.as_view(), name="coding-problem-random"),
     path(
-        "coding-problems/random/session/",
-        CodingProblemSessionInitView.as_view(),
-        name="coding-problem-random-session",
+        "coding-problems/session/init/",
+        CodingProblemTextInitView.as_view(),
+        name="coding-problem-session-init-text",
+    ),
+    path(
+        "tts/intro/",
+        TTSView.as_view(),
+        name="tts-intro",
     ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
@@ -55,10 +62,9 @@ urlpatterns = [
         name="livecoding-session-code",
     ),
     path(
-        "livecoding/session/hint/",
-        LiveCodingHintOfferView.as_view(),
-        name="livecoding-session-hint",
+        "interview/event/",
+        InterviewIntroEventView.as_view(),
+        name="interview-event",
     ),
     path("user/profile/", ProfileView.as_view(), name="profile"),
 ]
-

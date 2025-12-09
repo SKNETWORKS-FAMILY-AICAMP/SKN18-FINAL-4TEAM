@@ -20,6 +20,49 @@ stt_client = STTClient(model_size="base")
 
 
 @csrf_exempt
+def transcribe_only(request):
+    """
+    POST /api/stt/transcribe/
+    body: 브라우저에서 보낸 audio/webm 바이트
+    → OpenAI Whisper STT만 수행하고 바로 텍스트/segments를 반환합니다.
+    """
+    if request.method != "POST":
+        return JsonResponse({"error": "POST only"}, status=405)
+
+    webm_bytes = request.body
+    if not webm_bytes:
+        return JsonResponse({"error": "No audio data"}, status=400)
+    logger.info("webm(len)=%s", len(webm_bytes))
+
+    max_bytes = int(os.getenv("STT_MAX_WEBM_BYTES", "2000000"))  # 약 2MB
+    if len(webm_bytes) > max_bytes > 0:
+        webm_bytes = webm_bytes[-max_bytes:]
+        logger.info("trimmed webm to %s bytes", len(webm_bytes))
+
+    try:
+        lines = stt_client.transcribe_pcm_sync(webm_bytes)
+        logger.info("stt lines=%s", lines)
+        text = " ".join(
+            (ln.get("text") or "").strip()
+            for ln in (lines or [])
+            if isinstance(ln, dict)
+        ).strip()
+        return JsonResponse(
+            {
+                "lines": lines,
+                "stt_text": text,
+            },
+            status=200,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.exception("STT transcribe_only failed: %s", exc)
+        return JsonResponse(
+            {"error": "stt_failed", "detail": str(exc)},
+            status=500,
+        )
+
+
+@csrf_exempt
 def run_stt(request):
     """
     POST /api/stt/run/
@@ -34,6 +77,14 @@ def run_stt(request):
     if not webm_bytes:
         return JsonResponse({"error": "No audio data"}, status=400)
     logger.info("webm len=%s", len(webm_bytes))
+
+    # 너무 긴 녹음은 STT 지연을 줄이기 위해 최대 바이트를 잘라냅니다.
+    # 대략 수~십 초 수준으로 제한 (환경변수로 조정 가능).
+    max_bytes = int(os.getenv("STT_MAX_WEBM_BYTES", "2000000"))  # 약 2MB
+    if len(webm_bytes) > max_bytes > 0:
+        # 최근 구간이 더 중요하다고 보고, 마지막 max_bytes만 사용
+        webm_bytes = webm_bytes[-max_bytes:]
+        logger.info("trimmed webm to %s bytes", len(webm_bytes))
 
     try:
         # 1) OpenAI Whisper STT 실행
@@ -92,11 +143,30 @@ def run_stt(request):
                 {"error": "session_id is required (query param or X-Session-Id)"},
                 status=400,
             )
-
         if not text:
             # 음성이 없더라도 흐름이 끊기지 않도록 200으로 반환
             return JsonResponse(
                 {"error": "Empty STT text", "lines": lines},
+                status=200,
+            )
+
+        # fast=1 이면 STT 결과까지만 반환 (LangGraph/TTS는 생략)
+        fast_mode = request.GET.get("fast") == "1"
+        if fast_mode:
+            return JsonResponse(
+                {
+                    "lines": lines,
+                    "stt_text": text,
+                    "tts_text": "",
+                    "tts_audio": [],
+                    "await_human": False,
+                    "user_question": None,
+                    "problem_answer": None,
+                    "user_answer_class": None,
+                    "stage": stage,
+                    "intro_flow_done": None,
+                    "event_type": None,
+                },
                 status=200,
             )
 

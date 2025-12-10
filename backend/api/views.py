@@ -3,9 +3,6 @@ import json
 import secrets
 import string
 import time
-
-
-
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -29,7 +26,7 @@ from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
 
-from .interview_utils import get_cached_graph, get_cached_llm, _generate_tts_payload
+from .interview_utils import get_cached_graph, get_cached_llm, generate_tts_payload
 
 from .models import (
     AuthIdentity,
@@ -76,31 +73,98 @@ def roadmap(request):
     }
     return JsonResponse(data)
 
-
-
-class RandomCodingProblemView(APIView):
+class WarmupLanggraphView(APIView):
     """
-    coding_problem + coding_problem_language 조합에서 언어별 랜덤 문제를 반환합니다.
-    기본 언어는 python 입니다.
+    Langgraph/LLM 모듈을 미리 로드하기 위한 워밍업 엔드포인트.
     """
 
-    permission_classes = [permissions.AllowAny]
+    permission_classes = [permissions.IsAuthenticated]
+    authentication_classes = [JWTAuthentication]
 
     def get(self, request):
-        language = (request.query_params.get("language") or "python").lower()
-        problem_lang = (
-            CodingProblemLanguage.objects.select_related("problem")
-            .prefetch_related("problem__test_cases")
-            .filter(language__iexact=language)
-            .order_by("?")
-            .first()
-        )
+        try:
+            # LLM 모듈 import 및 그래프 컴파일 시도
+            llm_instance = get_cached_llm()
+            _ = llm_instance   # LLM은 존재 확인
+            user = getattr(request, "user", None)
+            user_id = getattr(user, "user_id", None)
+            if not user_id:
+                return Response(
+                    {"detail": "라이브 코딩을 준비하려면 로그인이 필요합니다."},
+                    status=status.HTTP_401_UNAUTHORIZED,
+                )
+            langgraph_id = f"{user_id}-{int(time.time() * 1000)}"
+            graph1 = get_cached_graph(name="chapter1")
+            graph1.get_graph()  # 실제 실행은 하지 않고 DAG만 준비
+            return Response(
+                {
+                    "status": "warmed",
+                    "langgraph_id": langgraph_id,
+                }, 
+                status=status.HTTP_200_OK)
+        
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"status": "error", "detail": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+class LiveCodingPreloadView(APIView):
+    """
+    문제를 미리 선택해 내려주는 엔드포인트. (TTS 텍스트 생성은 CodingProblemTextInitView에서 수행)
+
+    - Authorization: Bearer <access_token>
+    - 요청 본문:
+        - problem_id (optional): 지정하면 해당 문제 사용
+        - language (optional): 기본값 python, problem_id 없을 때 랜덤 선택 기준
+    - 응답:
+        - 문제 정보(problem_id, 문제 본문, 테스트케이스 등)
+        - langgraph_id (user_id-타임스탬프) → 이후 CodingProblemTextInitView 호출 시 session_id로 사용
+    """
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "라이브 코딩을 준비하려면 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        langgraph_id = request.data.get("langgraph_id")
+        if not langgraph_id:
+            return Response(
+                {"detail": "langgraph_id가 필요합니다. 먼저 warmup/langgraph 호출 후 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        problem_id = request.data.get("problem_id")
+        language = (request.data.get("language") or "python").lower()
+
+        if problem_id:
+            qs = (
+                CodingProblemLanguage.objects.select_related("problem")
+                .prefetch_related("problem__test_cases")
+                .filter(problem__problem_id=problem_id)
+            )
+            if language:
+                qs = qs.filter(language__iexact=language)
+            problem_lang = qs.first()
+        else:
+            problem_lang = (
+                CodingProblemLanguage.objects.select_related("problem")
+                .prefetch_related("problem__test_cases")
+                .filter(language__iexact=language)
+                .order_by("?")
+                .first()
+            )
 
         if not problem_lang:
-            return Response(
-                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
+            detail = (
+                f"요청한 문제/언어 조합을 찾을 수 없습니다."
+                if problem_id
+                else f"요청한 언어({language})의 문제를 찾을 수 없습니다."
             )
+            return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
 
         problem = problem_lang.problem
         test_cases = [
@@ -118,16 +182,16 @@ class RandomCodingProblemView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
-            }
+            },
+            status=status.HTTP_200_OK,
         )
-
-
+        
 class CodingProblemTextInitView(APIView):
     """
     RandomCodingProblemView 응답을 받아 LangGraph 초기 상태만 실행하고,
     문제 텍스트와 인트로용 tts_text(텍스트만)를 반환하는 경량 엔드포인트.
 
-    - POST /api/coding-problems/session/init/?session_id=...:
+    - POST /api/coding-problems/session/init/?langgraph_id=...:
       body: RandomCodingProblemView 응답 전체(JSON)
       response: {"problem": "...", "tts_text": "..."}
     """
@@ -147,35 +211,31 @@ class CodingProblemTextInitView(APIView):
         if isinstance(payload.get("problem"), str):
             problem_text = payload["problem"]
             
-        session_id = (
-            request.query_params.get("session_id")
-            or request.headers.get("X-Session-Id")
-            or (request.data.get("session_id") if hasattr(request, "data") else None)
-        )
-        if not session_id:
+        user_id = request.user.user_id if hasattr(request, "user") else None
+
+        if isinstance(request.data, dict):
+            langgraph_id = request.data.get("langgraph_id")
+        if not langgraph_id:
             return Response(
-                {"detail": "session_id 쿼리 파라미터를 전달해 주세요."},
+                {"detail": "langgraph_id가 필요합니다. warmup/langgraph -> preload에서 받은 값을 전달해 주세요."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-
         init_state = {
             "meta": {
-                "session_id": session_id,
-                "user_id": request.user.user_id if hasattr(request, "user") else None,
+                "user_id": user_id,
             },
             "event_type": "init",
             "problem_data": problem_text,
             "intro_flow_done": False,
         }
-
         intro_text = ""
         try:
-            graph = get_cached_graph(session_id=session_id, name ="chapter1")
+            graph = get_cached_graph(session_id=langgraph_id, name ="chapter1")
             graph_state = graph.invoke(
                 init_state,
                 config={
                     "configurable": {
-                        "thread_id": session_id,
+                        "thread_id": langgraph_id,
                         "checkpoint_namespace":"chapter1"
                     }
                 },
@@ -194,6 +254,7 @@ class CodingProblemTextInitView(APIView):
         return Response(
             {
                 "tts_text": intro_text,
+                "langgraph_id":langgraph_id
             },
             status=status.HTTP_200_OK,
         )
@@ -202,7 +263,7 @@ class CodingProblemTextInitView(APIView):
 class TTSView(APIView):
     """
     텍스트를 받아 TTS만 수행하는 엔드포인트.
-    - POST /api/tts/intro/?session_id=...
+    - POST /api/tts/intro/?langgraph_id=...
       body: {"tts_text": "..."} 또는 {"text": "..."}
       response: CodingProblemSessionInitView와 동일한 오디오 청크 구조
     """
@@ -218,14 +279,17 @@ class TTSView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        session_id = (
-            request.query_params.get("session_id")
-            or request.headers.get("X-Session-Id")
-            or (request.data.get("session_id") if hasattr(request, "data") else None)
-        )
+        langgraph_id = None
+        if isinstance(request.data, dict):
+            langgraph_id = request.data.get("langgraph_id")
+        if not langgraph_id:
+            return Response(
+                {"detail": "langgraph_id를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         try:
-            sentences_payload = _generate_tts_payload(text, session_id, max_sentences)
+            sentences_payload = generate_tts_payload(text, langgraph_id, max_sentences)
         except Exception as exc:  # noqa: BLE001
             return Response(
                 {
@@ -243,49 +307,6 @@ class TTSView(APIView):
         )
 
 
-class WarmupLanggraphView(APIView):
-    """
-    Langgraph/LLM 모듈을 미리 로드하기 위한 워밍업 엔드포인트.
-    """
-
-    permission_classes = [AllowAny]
-    authentication_classes = []
-
-    def get(self, request):
-        try:
-            # LLM 모듈 import 및 그래프 컴파일 시도
-            llm_instance = get_cached_llm()
-            _ = llm_instance   # LLM은 존재 확인
-            
-            # 쿼리/헤더/바디 어디서든 session_id를 받되, 없으면 400 반환
-            data = request.data if hasattr(request, "data") else {}
-            session_id = None
-            if isinstance(data, dict):
-                session_id = data.get("session_id")
-            session_id = (
-                session_id
-                or request.query_params.get("session_id")
-                or request.headers.get("X-Session-Id")
-            )
-            
-            if not session_id: # session_id 업을 때 예외 처리
-                return Response(
-                    {"detail": "session_id가 필요합니다."},
-                    status=status.HTTP_400_BAD_REQUEST,
-                )
-                
-        
-            graph1 = get_cached_graph(session_id=session_id, name="chapter1")
-            graph1.get_graph()  # 실제 실행은 하지 않고 DAG만 준비
-            return Response({"status": "warmed"}, status=status.HTTP_200_OK)
-        
-        except Exception as exc:  # noqa: BLE001
-            return Response(
-                {"status": "error", "detail": str(exc)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            )
-
-
 class InterviewIntroEventView(APIView):
     """
     STT로 얻은 텍스트를 기반으로 LangGraph 호출하여,
@@ -300,17 +321,21 @@ class InterviewIntroEventView(APIView):
 
     def post(self, request):
         data = request.data or {}
-        session_id = (
-            data.get("session_id")
-            or request.query_params.get("session_id")
-            or request.headers.get("X-Session-Id")
-        )
+        langgraph_id = None
+        if isinstance(data, dict):
+                langgraph_id = data.get("langgraph_id")
+                
+        if not langgraph_id:
+            return Response(
+                {"detail": "langgraph_id를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         stt_text = (data.get("stt_text") or "").strip()
         event_type = "strategy_submit"
 
-        if not session_id:
+        if not langgraph_id:
             return Response(
-                {"detail": "session_id를 body, 쿼리스트링 또는 X-Session-Id 헤더로 전달해 주세요."},
+                {"detail": "langgraph_id를 body, 쿼리스트링 또는 X-Langgraph-Id 헤더로 전달해 주세요."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
         if not stt_text:
@@ -319,7 +344,7 @@ class InterviewIntroEventView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        graph = get_cached_graph(session_id=session_id, name="chapter1")
+        graph = get_cached_graph(session_id=langgraph_id, name="chapter1")
 
         update_state = {
             "event_type": event_type,
@@ -331,7 +356,7 @@ class InterviewIntroEventView(APIView):
                 update_state,
                 config={
                     "configurable": {
-                        "thread_id": session_id,
+                        "thread_id": langgraph_id,
                         "checkpoint_namespace": "chapter1",
                     }
                 },
@@ -713,7 +738,12 @@ class LiveCodingStartView(APIView):
     """
     라이브 코딩 세션을 시작하면서 세션 메타 정보를 저장하는 엔드포인트.
     - Authorization: Bearer <access_token> (LoginView/GoogleAuthView에서 발급한 토큰)
-    - 요청 본문(optional): {"language": "python"} 등
+    - 요청 본문:
+        - problem_id (선택): 지정하면 해당 문제로 시작
+        - language (선택): 지정 안 하면 python
+        - langgraph_id (선택): 프런트에서 생성한 ID가 있으면 저장
+    - 동작:
+        - problem_id 없으면 language 기준으로 랜덤 문제 선택
     - 저장되는 키: livecoding:{session_id}:meta
       값: { state, problem_id, user_id, session_id }
     """
@@ -726,38 +756,46 @@ class LiveCodingStartView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
+        problem_data = request.data.get("problem_data")
         language = (request.data.get("language") or "python").lower()
-        problem_lang = (
-            CodingProblemLanguage.objects.select_related("problem")
-            .prefetch_related("problem__test_cases")
-            .filter(language__iexact=language)
-            .order_by("?")
-            .first()
-        )
-
-        if not problem_lang:
+        langgraph_id = request.data.get("langgraph_id")
+        if not langgraph_id:
             return Response(
-                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
+                {"detail": "langgraph_id가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
             )
-        problem = problem_lang.problem
-        session_id = secrets.token_hex(16)
 
-        test_cases = [
-            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
-        ]
+        # 프런트가 preload에서 전달한 문제를 그대로 사용 (DB 재조회 없음)
+        if not problem_data:
+            return Response(
+                {"detail": "problem_data가 필요합니다. 설정 단계를 다시 진행해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        selected_problem_id = problem_data.get("problem_id")
+        if not selected_problem_id:
+            return Response(
+                {"detail": "problem_data에 problem_id가 없습니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # problem_data에 언어가 있으면 그것을 우선 사용
+        language = (problem_data.get("language") or language).lower()
+
+        session_id = secrets.token_hex(16)
 
         # Redis(캐시)에 저장할 세션 메타 정보
         start_at = timezone.now()
         meta = {
             "state": "in_progress",
-            "problem_id": problem.problem_id,
+            "problem_id": selected_problem_id,
             "user_id": user.user_id,
             "session_id": session_id,
-            "language": problem_lang.language,
-            "time_limit_seconds": 40 * 60,
+            "language": language,
+            "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
+            "langgraph_id": langgraph_id,
+            "problem_data": problem_data,  # 프런트가 넘긴 문제 그대로 저장
         }
 
         # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
@@ -773,18 +811,12 @@ class LiveCodingStartView(APIView):
             {
                 "session_id": session_id,
                 "state": meta["state"],
-                "user_id": meta["user_id"],
-                "problem_id": meta["problem_id"],
-                "problem": problem.problem,
-                "difficulty": problem.difficulty,
-                "category": problem.category,
-                "language": problem_lang.language,
-                "function_name": problem_lang.function_name,
-                "starter_code": problem_lang.starter_code,
-                "test_cases": test_cases,
                 "time_limit_seconds": meta["time_limit_seconds"],
                 "start_at": meta["start_at"],
                 "remaining_seconds": meta["time_limit_seconds"],
+                "problem_id": selected_problem_id,
+                "language": language,
+                "problem_data": problem_data,
             },
             status=status.HTTP_201_CREATED,
         )
@@ -1045,8 +1077,8 @@ class LiveCodingActiveSessionView(APIView):
         session_id = cache.get(mapping_key)
         if not session_id:
             return Response(
-                {"detail": "진행 중인 라이브 코딩 세션이 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
+                {"available": False},
+                status=status.HTTP_200_OK,
             )
 
         meta_key = f"livecoding:{session_id}:meta"
@@ -1054,8 +1086,8 @@ class LiveCodingActiveSessionView(APIView):
         meta = cache.get(meta_key)
         if not meta:
             return Response(
-                {"detail": "세션 메타 정보를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
+                {"available": False},
+                status=status.HTTP_200_OK,
             )
 
         # 다른 사용자의 세션에 접근하지 못하도록 검증
@@ -1105,9 +1137,11 @@ class LiveCodingActiveSessionView(APIView):
 
         return Response(
             {
+                "available": True,
                 "session_id": session_id,
                 "state": meta.get("state"),
                 "user_id": meta.get("user_id"),
+                "langgraph_id": meta.get("langgraph_id"),
                 "problem_id": meta.get("problem_id"),
                 "problem": problem.problem,
                 "difficulty": problem.difficulty,

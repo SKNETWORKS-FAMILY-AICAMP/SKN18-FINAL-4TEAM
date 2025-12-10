@@ -959,26 +959,44 @@ const stopWebcamMonitor = () => {
   }
 };
 
-const loadProblemFromSettingPage = () => {
-  const raw = sessionStorage.getItem("jobtory_livecoding_problem_data");
-  if (!raw) {
-    console.log("[LiveCoding] sessionStorage에 문제 없음");
+const loadSessionFromApi = async () => {
+  const sessionId = route.query.session_id;
+  if (!sessionId) {
+    problemError.value = "session_id가 없습니다. 설정을 다시 진행해 주세요.";
     return false;
   }
 
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    problemError.value = "로그인이 필요합니다.";
+    router.push({ name: "login" });
+    return false;
+  }
+
+  isLoadingProblem.value = true;
+  problemError.value = "";
+
   try {
-    let parsed = JSON.parse(raw);
-    // 세션스토리지에 meta 형태로 저장된 경우 problem_data 내부를 사용
-    if (parsed && parsed.problem_data) {
-      parsed = parsed.problem_data;
-    }
-    if (!parsed || !parsed.problem_id) {
-      console.log("[LiveCoding] 문제 데이터 구조 이상", parsed);
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/session/?session_id=${encodeURIComponent(
+        sessionId
+      )}`,
+      {
+        method: "GET",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      problemError.value =
+        data?.detail || "세션 정보를 불러오지 못했습니다. 설정을 다시 진행해 주세요.";
       return false;
     }
 
-    console.log("[LiveCoding] 세팅 페이지 문제 로드 성공:", parsed.problem_id);
-    problemData.value = parsed;
+    problemData.value = data;
 
     // 타이머 / 상태 초기화
     hasPlayedIntroTts.value = false;
@@ -986,36 +1004,38 @@ const loadProblemFromSettingPage = () => {
     isRecording.value = false;
     introSecondChanceUsed.value = false;
 
-    timeLimitSeconds.value = Number(parsed.time_limit_seconds || 40 * 60);
-    remainingSeconds.value = timeLimitSeconds.value;
+    timeLimitSeconds.value = Number(data.time_limit_seconds || 40 * 60);
+    remainingSeconds.value =
+      data.remaining_seconds !== undefined && data.remaining_seconds !== null
+        ? Number(data.remaining_seconds)
+        : timeLimitSeconds.value;
 
     // 언어 & starter code 세팅
-    const mappedLang = mapProblemLanguage((parsed.language || "").toLowerCase());
+    const mappedLang = mapProblemLanguage((data.language || "").toLowerCase());
     selectedLanguage.value = mappedLang;
-    if (parsed.starter_code) {
-      code.value = parsed.starter_code;
+    if (data.starter_code) {
+      code.value = data.starter_code;
     } else {
       code.value = languageTemplates[mappedLang] || languageTemplates.python3;
     }
 
-    // 카운트다운 시작
     startCountdown();
+    await loadSavedCodeIfExists(sessionId, token, mappedLang);
 
     return true;
-  } catch (e) {
-    console.error("[LiveCoding] 세팅 문제 JSON 파싱 실패:", e);
+  } catch (err) {
+    console.error("[LiveCoding] 세션 정보 로드 실패:", err);
+    problemError.value = "세션 정보를 불러오는 중 오류가 발생했습니다.";
     return false;
+  } finally {
+    isLoadingProblem.value = false;
   }
 };
 
 onMounted(async () => {
-  const loaded = loadProblemFromSettingPage();
+  const loaded = await loadSessionFromApi();
   if (loaded) {
-    // 세팅 페이지에서 가져온 문제 기준으로 인트로 TTS 재생
     playIntroTtsFromSession();
-  } else {
-    problemError.value =
-      "설정 페이지에서 문제를 불러오지 못했습니다. 설정을 다시 진행해 주세요.";
   }
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({

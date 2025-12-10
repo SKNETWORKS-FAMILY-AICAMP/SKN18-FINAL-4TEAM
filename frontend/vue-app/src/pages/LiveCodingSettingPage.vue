@@ -332,6 +332,8 @@ const warmupLanggraph = async () => {
 };
 
 const preloadProblem = async () => {
+  // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
+  if (problemData.value) return true;
   if (isPreloading.value) return !!langgraphId.value && problemData.value;
   isPreloading.value = true;
   try {
@@ -358,12 +360,12 @@ const preloadProblem = async () => {
       window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
       return false;
     }
+    console.log("[livecoding][preload] problem loaded", {
+      langgraph_id: langgraphId.value,
+      problem_id: data.problem_id,
+      language: data.language,
+    });
     problemData.value = data;
-    // 세션 페이지가 sessionStorage에서 읽어가므로 동일 저장소에 저장
-    sessionStorage.setItem(
-      "jobtory_livecoding_problem_data",
-      JSON.stringify(problemData.value)
-    );
     return true;
   } catch (err) {
     console.error(err);
@@ -399,6 +401,12 @@ const prepareIntroTts = async () => {
         body: JSON.stringify({ ...problemData.value, langgraph_id: langgraphId.value }),
       }
     );
+    console.log("[livecoding][init] sending to langgraph", {
+      langgraph_id: langgraphId.value,
+      problem_id: problemData.value?.problem_id,
+      language: problemData.value?.language,
+      problem_preview: (problemData.value?.problem || "").slice(0, 120),
+    });
     const data = await resp.json().catch(() => ({}));
     if (resp.ok && typeof data?.tts_text === "string") {
       introText.value = data.tts_text;
@@ -481,17 +489,17 @@ const preloadIntroTtsAudio = async () => {
   }
 };
 
-/* ----- 초기 자동 셋업: warmup → preloadProblem → prepareIntroTts ----- */
+const ensureLanggraphId = async () => warmupLanggraph();
+
+/* ----- 초기 자동 셋업: warmup + preload 병렬, 이후 TTS 준비 ----- */
 const runInitialSetup = async () => {
   if (hasInitRun.value) return true;
   try {
-    const warmed = await warmupLanggraph();
-    if (!warmed) return false;
-
-    const preloaded = await preloadProblem();
+    // langgraph 워밍업(id 생성)과 문제 프리로드를 병렬로 진행
+    const warmupPromise = ensureLanggraphId();
+    const preloaded = await Promise.all([preloadProblem(), warmupPromise]).then(([pre]) => pre);
     if (!preloaded) return false;
 
-    
     const introOk = await prepareIntroTts();
     if (!introOk) return false;
 
@@ -875,10 +883,6 @@ const startTest = async () => {
     }
 
     if (data.session_id) {
-      sessionStorage.setItem(
-        "jobtory_livecoding_problem_data",
-        JSON.stringify(data.problem_data)
-      );
       // 메모리의 problemData도 백엔드 응답으로 동기화
       problemData.value = data.problem_data;
       localStorage.setItem("jobtory_livecoding_session_id", data.session_id);

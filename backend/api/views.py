@@ -115,11 +115,11 @@ class LiveCodingPreloadView(APIView):
 
     - Authorization: Bearer <access_token>
     - 요청 본문:
-        - problem_id (optional): 지정하면 해당 문제 사용
-        - language (optional): 기본값 python, problem_id 없을 때 랜덤 선택 기준
+        - language (optional): 기본값 python, 해당 언어로 랜덤 선택
+        - langgraph_id (optional): warmup/langgraph에서 받은 값이 있으면 전달 (없어도 동작)
     - 응답:
         - 문제 정보(problem_id, 문제 본문, 테스트케이스 등)
-        - langgraph_id (user_id-타임스탬프) → 이후 CodingProblemTextInitView 호출 시 session_id로 사용
+        - (langgraph_id는 preload에서 필수가 아님; CodingProblemTextInitView에서는 필요)
     """
 
     def post(self, request):
@@ -130,40 +130,18 @@ class LiveCodingPreloadView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        langgraph_id = request.data.get("langgraph_id")
-        if not langgraph_id:
-            return Response(
-                {"detail": "langgraph_id가 필요합니다. 먼저 warmup/langgraph 호출 후 전달해 주세요."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        problem_id = request.data.get("problem_id")
         language = (request.data.get("language") or "python").lower()
 
-        if problem_id:
-            qs = (
-                CodingProblemLanguage.objects.select_related("problem")
-                .prefetch_related("problem__test_cases")
-                .filter(problem__problem_id=problem_id)
-            )
-            if language:
-                qs = qs.filter(language__iexact=language)
-            problem_lang = qs.first()
-        else:
-            problem_lang = (
-                CodingProblemLanguage.objects.select_related("problem")
-                .prefetch_related("problem__test_cases")
-                .filter(language__iexact=language)
-                .order_by("?")
-                .first()
-            )
+        problem_lang = (
+            CodingProblemLanguage.objects.select_related("problem")
+            .prefetch_related("problem__test_cases")
+            .filter(language__iexact=language)
+            .order_by("?")
+            .first()
+        )
 
         if not problem_lang:
-            detail = (
-                f"요청한 문제/언어 조합을 찾을 수 없습니다."
-                if problem_id
-                else f"요청한 언어({language})의 문제를 찾을 수 없습니다."
-            )
+            detail = f"요청한 언어({language})의 문제를 찾을 수 없습니다."
             return Response({"detail": detail}, status=status.HTTP_404_NOT_FOUND)
 
         problem = problem_lang.problem
@@ -188,8 +166,7 @@ class LiveCodingPreloadView(APIView):
         
 class CodingProblemTextInitView(APIView):
     """
-    RandomCodingProblemView 응답을 받아 LangGraph 초기 상태만 실행하고,
-    문제 텍스트와 인트로용 tts_text(텍스트만)를 반환하는 경량 엔드포인트.
+    인트로용 tts_text(텍스트만)를 반환하는 경량 엔드포인트.
 
     - POST /api/coding-problems/session/init/?langgraph_id=...:
       body: RandomCodingProblemView 응답 전체(JSON)
@@ -236,7 +213,8 @@ class CodingProblemTextInitView(APIView):
                 config={
                     "configurable": {
                         "thread_id": langgraph_id,
-                        "checkpoint_namespace":"chapter1"
+                        # 세션별로 체크포인트 네임스페이스를 분리해 이전 세션 문제 데이터가 섞이지 않도록 한다.
+                        "checkpoint_namespace": f"chapter1:{langgraph_id}",
                     }
                 },
             )
@@ -322,9 +300,10 @@ class InterviewIntroEventView(APIView):
     def post(self, request):
         data = request.data or {}
         langgraph_id = None
+        session_id = None
         if isinstance(data, dict):
-                langgraph_id = data.get("langgraph_id")
-                
+            langgraph_id = data.get("langgraph_id")
+            session_id = data.get("session_id")
         if not langgraph_id:
             return Response(
                 {"detail": "langgraph_id를 전달해 주세요."},
@@ -347,6 +326,10 @@ class InterviewIntroEventView(APIView):
         graph = get_cached_graph(session_id=langgraph_id, name="chapter1")
 
         update_state = {
+            "meta": {
+                "session_id": session_id,
+            },
+            
             "event_type": event_type,
             "stt_text": stt_text,
         }
@@ -357,7 +340,7 @@ class InterviewIntroEventView(APIView):
                 config={
                     "configurable": {
                         "thread_id": langgraph_id,
-                        "checkpoint_namespace": "chapter1",
+                        "checkpoint_namespace": f"chapter1:{langgraph_id}",
                     }
                 },
             )
@@ -998,29 +981,48 @@ class LiveCodingSessionView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        problem_id = meta.get("problem_id")
-        language = meta.get("language")
+        # 세션 생성 시 저장한 문제 데이터를 우선 사용 (langgraph와 프런트 일관성 보장)
+        meta_problem = meta.get("problem_data") or {}
+        problem_id = meta_problem.get("problem_id") or meta.get("problem_id")
+        language = meta_problem.get("language") or meta.get("language")
 
-        qs = (
-            CodingProblemLanguage.objects.select_related("problem")
-            .prefetch_related("problem__test_cases")
-            .filter(problem__problem_id=problem_id)
-        )
-        if language:
-            qs = qs.filter(language__iexact=language)
+        problem_lang = None
+        problem = None
+        test_cases = []
 
-        problem_lang = qs.first()
-        if not problem_lang:
-            return Response(
-                {"detail": "세션의 문제 정보를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
+        # 메타에 problem_data가 있으면 그대로 사용 (problem 텍스트가 없어도 일관성 위해 DB 조회 생략)
+        if meta_problem:
+            problem = type("obj", (), {})()
+            problem.problem = meta_problem.get("problem")
+            problem.difficulty = meta_problem.get("difficulty")
+            problem.category = meta_problem.get("category")
+            test_cases = meta_problem.get("test_cases") or []
+            # language/function_name/starter_code는 아래 응답에서 meta_problem 사용
+            problem_lang = type("obj", (), {})()
+            problem_lang.language = meta_problem.get("language")
+            problem_lang.function_name = meta_problem.get("function_name")
+            problem_lang.starter_code = meta_problem.get("starter_code")
+        else:
+            qs = (
+                CodingProblemLanguage.objects.select_related("problem")
+                .prefetch_related("problem__test_cases")
+                .filter(problem__problem_id=problem_id)
             )
+            if language:
+                qs = qs.filter(language__iexact=language)
 
-        problem = problem_lang.problem
-        test_cases = [
-            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
-        ]
+            problem_lang = qs.first()
+            if not problem_lang:
+                return Response(
+                    {"detail": "세션의 문제 정보를 찾을 수 없습니다."},
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+
+            problem = problem_lang.problem
+            test_cases = [
+                {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+                for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
+            ]
 
         start_at_str = meta.get("start_at")
         time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
@@ -1041,14 +1043,15 @@ class LiveCodingSessionView(APIView):
                 "session_id": session_id,
                 "state": meta.get("state"),
                 "user_id": meta.get("user_id"),
-                "problem_id": meta.get("problem_id"),
-                "problem": problem.problem,
-                "difficulty": problem.difficulty,
-                "category": problem.category,
-                "language": problem_lang.language,
-                "function_name": problem_lang.function_name,
-                "starter_code": problem_lang.starter_code,
+                "problem_id": meta_problem.get("problem_id") or meta.get("problem_id"),
+                "problem": getattr(problem, "problem", None),
+                "difficulty": getattr(problem, "difficulty", None),
+                "category": getattr(problem, "category", None),
+                "language": meta_problem.get("language") or getattr(problem_lang, "language", None),
+                "function_name": meta_problem.get("function_name") or getattr(problem_lang, "function_name", None),
+                "starter_code": meta_problem.get("starter_code") or getattr(problem_lang, "starter_code", None),
                 "test_cases": test_cases,
+                "problem_data": meta_problem or None,
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": start_at_str,
                 "remaining_seconds": remaining_seconds,

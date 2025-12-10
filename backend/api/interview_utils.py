@@ -3,6 +3,7 @@ from tts_client import generate_interview_audio_batch
 from dotenv import load_dotenv
 from interview_engine.graph import (
     create_chapter1_graph_flow,
+    create_chapter2_graph_flow
 
 )
 from interview_engine import llm
@@ -29,6 +30,8 @@ def get_cached_graph(session_id, name: str):
         cp = get_checkpointer()
         if name == "chapter1":
             _graph_cache[name] = create_chapter1_graph_flow(checkpointer=cp)
+        elif name == "chapter2":
+            _graph_cache[name] = create_chapter2_graph_flow(checkpointer=cp)
         else:
             raise ValueError(f"unknown graph {name}")
     return _graph_cache[name]

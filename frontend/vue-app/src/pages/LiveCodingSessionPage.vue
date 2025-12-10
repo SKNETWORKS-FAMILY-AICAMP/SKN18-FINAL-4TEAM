@@ -719,8 +719,17 @@ const requestHint = async () => {
       return;
     }
 
-    // TODO: 받은 힌트를 UI에 표시하도록 연결
     console.log("hint result", data);
+
+    // 힌트가 TTS 오디오로 내려오면 바로 재생
+    const ttsChunks = Array.isArray(data?.tts_audio) ? data.tts_audio : [];
+    if (ttsChunks.length) {
+      try {
+        await playTtsChunks(ttsChunks);
+      } catch (err) {
+        console.error("failed to play hint TTS", err);
+      }
+    }
   } catch (err) {
     console.error("hint request error", err);
     showAntiCheat("sttError", "힌트 요청 중 오류가 발생했습니다.");

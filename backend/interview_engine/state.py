@@ -24,3 +24,20 @@ class IntroState(TypedDict, total=False):
     
     tts_text : str
     stt_text : str
+
+# chapter2
+class InterviewState(TypedDict, total=False):
+    # 1. 핵심 컨텍스트 (Redis Shared Data)
+    current_user_code: str          # 현재 에디터 코드
+    problem_description: str        # 문제 지문
+    user_algorithm_category: str    # Step1에서 사용자가 선택한 알고리즘 (예: Greedy)
+    real_algorithm_category: str    # 실제 문제 알고리즘 (예: DP)
+    test_cases: str                 # 테스트 케이스 정보 (JSON 문자열 등)
+    
+    # 2. 힌트 제어 플래그
+    hint_trigger: str               # "manual" (버튼) | "auto_quality" (자동 감지)
+    hint_count: int                 # 현재까지 사용한 힌트 횟수
+    
+    # 3. 출력 데이터 (업데이트 대상)
+    hint_text: str                  # 생성된 힌트 내용
+    conversation_log: List[Any]     # 대화 내역 (질문 에이전트와 공유)

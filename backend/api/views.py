@@ -927,6 +927,141 @@ class LiveCodingCodeSnapshotView(APIView):
             status=status.HTTP_200_OK,
         )
 
+class LiveCodingHintView(APIView):
+    """
+    라이브코딩 세션 중 힌트 요청을 LangGraph(챕터2)로 전달합니다.
+    - Authorization: Bearer <access_token>
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "힌트 요청을 위해서는 로그인/인증이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        data = request.data or {}
+        session_id = (
+            data.get("session_id")
+            or request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+        )
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "본인 세션에만 접근할 수 있습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        language = (data.get("language") or meta.get("language") or "").lower() or None
+        code = data.get("code") or ""
+        user_algorithm_category = (
+            data.get("problem_algorithm_category")
+            or data.get("user_algorithm_category")
+            or ""
+        )
+        real_algorithm_category = data.get("real_algorithm_category") or ""
+        problem_description = data.get("problem_description") or ""
+        hint_trigger = data.get("hint_trigger") or "manual"
+        hint_count_raw = data.get("hint_count")
+        conversation_log = data.get("conversation_log") if isinstance(data.get("conversation_log"), list) else None
+        test_cases_payload = data.get("test_cases")
+
+        try:
+            hint_count = int(hint_count_raw) if hint_count_raw is not None else 0
+        except Exception:
+            hint_count = 0
+
+        problem_lang = None
+        if meta.get("problem_id"):
+            qs = (
+                CodingProblemLanguage.objects.select_related("problem")
+                .prefetch_related("problem__test_cases")
+                .filter(problem__problem_id=meta.get("problem_id"))
+            )
+            if language:
+                qs = qs.filter(language__iexact=language)
+            problem_lang = qs.first()
+
+        if problem_lang:
+            problem_obj = problem_lang.problem
+            if not problem_description:
+                problem_description = problem_obj.problem or ""
+            if not real_algorithm_category:
+                real_algorithm_category = problem_obj.category or ""
+            if not test_cases_payload:
+                test_cases_payload = [
+                    {"input": tc.input_data, "output": tc.output_data}
+                    for tc in (problem_obj.test_cases.all() if hasattr(problem_obj, "test_cases") else [])
+                ]
+
+        test_cases_str = ""
+        if isinstance(test_cases_payload, str):
+            test_cases_str = test_cases_payload
+        elif test_cases_payload is not None:
+            try:
+                test_cases_str = json.dumps(test_cases_payload, ensure_ascii=False)
+            except Exception:
+                test_cases_str = str(test_cases_payload)
+
+        state = {
+            "meta": {"session_id": session_id, "user_id": str(user.user_id)},
+            "current_user_code": code,
+            "problem_description": problem_description,
+            "user_algorithm_category": user_algorithm_category,
+            "real_algorithm_category": real_algorithm_category,
+            "test_cases": test_cases_str,
+            "hint_trigger": hint_trigger,
+            "hint_count": hint_count,
+        }
+        if conversation_log is not None:
+            state["conversation_log"] = conversation_log
+
+        try:
+            graph = get_cached_graph(session_id=session_id, name="chapter2")
+            result_state = graph.invoke(
+                state,
+                config={
+                    "configurable": {
+                        "thread_id": session_id,
+                        "checkpoint_namespace": "chapter2",
+                    }
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"detail": "langgraph invoke failed", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        hint_text = (result_state.get("hint_text") or "").strip()
+        tts_audio = []
+        if hint_text:
+            try:
+                # 힌트를 바로 읽어줄 수 있도록 오디오 청크도 함께 반환
+                tts_audio = _generate_tts_payload(hint_text, session_id, max_sentences=2)
+            except Exception:
+                tts_audio = []
+
+        return Response(
+            {
+                "hint_text": hint_text,
+                "hint_count": result_state.get("hint_count", hint_count),
+                "conversation_log": result_state.get("conversation_log"),
+                "hint_trigger": hint_trigger,
+                "tts_audio": tts_audio,
+            },
+            status=status.HTTP_200_OK,
+        )
+
 class LiveCodingSessionView(APIView):
     """
     Redis에 저장된 라이브 코딩 세션 정보를 가져오는 엔드포인트.

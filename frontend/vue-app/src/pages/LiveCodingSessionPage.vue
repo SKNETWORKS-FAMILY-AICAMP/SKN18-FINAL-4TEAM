@@ -106,11 +106,11 @@
               type="button"
               class="hint-button"
               @click="requestHint"
-              :disabled="isHintLoading || hintCount >= HINT_LIMIT"
+              :disabled="isHintDisabled"
             >
               {{ isHintLoading ? "힌트 생성 중..." : "힌트 요청" }}
             </button>
-            <span class="hint-counter">힌트 {{ Math.max(0, HINT_LIMIT - hintCount) }}/{{ HINT_LIMIT }}</span>
+            <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
             <span v-if="answerCountdown !== null" class="hint countdown-inline">
               {{ answerCountdown }}초 후 자동 답변 시작
             </span>
@@ -184,6 +184,7 @@ const ANSWER_COUNTDOWN_SECONDS = 30;
 const HINT_LIMIT = 3;
 const hintCount = ref(0);
 const isHintLoading = ref(false);
+const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= HINT_LIMIT);
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
@@ -724,6 +725,7 @@ const requestHint = async () => {
         code: code.value,
         problem_description: problemData.value?.problem || "",
         problem_algorithm_category: problemData.value?.category || "",
+        hint_count: hintCount.value,
       }),
     });
 

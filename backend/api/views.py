@@ -971,14 +971,21 @@ class LiveCodingHintView(APIView):
         real_algorithm_category = data.get("real_algorithm_category") or ""
         problem_description = data.get("problem_description") or ""
         hint_trigger = data.get("hint_trigger") or "manual"
-        hint_count_raw = data.get("hint_count")
         conversation_log = data.get("conversation_log") if isinstance(data.get("conversation_log"), list) else None
+        hint_count_raw = data.get("hint_count")
         test_cases_payload = data.get("test_cases")
 
         try:
-            hint_count = int(hint_count_raw) if hint_count_raw is not None else 0
+            hint_count = int(hint_count_raw) if hint_count_raw is not None else None
         except Exception:
-            hint_count = 0
+            hint_count = None
+
+        # 요청에 값이 없으면 로그에서 힌트 횟수를 추정
+        if hint_count is None:
+            if conversation_log:
+                hint_count = sum(1 for entry in conversation_log if isinstance(entry, dict) and entry.get("type") == "hint")
+            else:
+                hint_count = 0
 
         problem_lang = None
         if meta.get("problem_id"):

@@ -102,8 +102,15 @@
               {{ isSttRunning ? "분석 중..." : (isRecording ? "제출하기" : "음성입력") }}
             </span>
           </button>
-            <button type="button" class="hint-button" @click="requestHint">힌트요청</button>
-            <span class="hint-counter">힌트 3/3</span>
+            <button
+              type="button"
+              class="hint-button"
+              @click="requestHint"
+              :disabled="isHintLoading || hintCount >= HINT_LIMIT"
+            >
+              {{ isHintLoading ? "힌트 생성 중..." : "힌트 요청" }}
+            </button>
+            <span class="hint-counter">힌트 {{ Math.max(0, HINT_LIMIT - hintCount) }}/{{ HINT_LIMIT }}</span>
             <span v-if="answerCountdown !== null" class="hint countdown-inline">
               {{ answerCountdown }}초 후 자동 답변 시작
             </span>
@@ -174,6 +181,9 @@ const isTtsPlaying = ref(false);
 const answerCountdown = ref(null);
 let answerCountdownTimer = null;
 const ANSWER_COUNTDOWN_SECONDS = 30;
+const HINT_LIMIT = 3;
+const hintCount = ref(0);
+const isHintLoading = ref(false);
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
@@ -691,12 +701,17 @@ const fetchRandomProblem = async () => {
 const requestHint = async () => {
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
+  if (hintCount.value >= HINT_LIMIT) {
+    showAntiCheat("sttError", "사용 가능한 힌트가 모두 소진되었습니다.");
+    return;
+  }
   if (!token || !sessionId) {
     showAntiCheat("sttError", "세션이나 로그인 정보가 없습니다.");
     return;
   }
 
   try {
+    isHintLoading.value = true;
     const resp = await fetch(`${BACKEND_BASE}/api/livecoding/session/hint/`, {
       method: "POST",
       headers: {
@@ -721,6 +736,13 @@ const requestHint = async () => {
 
     console.log("hint result", data);
 
+    // 힌트 사용 횟수 반영 (백엔드 응답 우선, 없으면 +1)
+    if (data && typeof data.hint_count === "number") {
+      hintCount.value = Math.min(HINT_LIMIT, Math.max(0, data.hint_count));
+    } else {
+      hintCount.value = Math.min(HINT_LIMIT, hintCount.value + 1);
+    }
+
     // 힌트가 TTS 오디오로 내려오면 바로 재생
     const ttsChunks = Array.isArray(data?.tts_audio) ? data.tts_audio : [];
     if (ttsChunks.length) {
@@ -733,6 +755,8 @@ const requestHint = async () => {
   } catch (err) {
     console.error("hint request error", err);
     showAntiCheat("sttError", "힌트 요청 중 오류가 발생했습니다.");
+  } finally {
+    isHintLoading.value = false;
   }
 };
 

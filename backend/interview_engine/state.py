@@ -35,7 +35,7 @@ class InterviewState(TypedDict, total=False):
     test_cases: str                 # 테스트 케이스 정보 (JSON 문자열 등)
     
     # 2. 힌트 제어 플래그
-    hint_trigger: str               # "manual" (버튼) | "auto_quality" (자동 감지)
+    hint_trigger: str               # "manual" (버튼)
     hint_count: int                 # 현재까지 사용한 힌트 횟수
     
     # 3. 출력 데이터 (업데이트 대상)

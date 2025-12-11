@@ -35,12 +35,8 @@ class CodingState(TypedDict, total=False):
     # 코드 비교/진행도 판단을 위한 보조 필드들
     starter_code: str
     prev_code: str
-    snapshot_index: int
-    last_snapshot_index: int
     code_quality_feedback: str
     collaboration_feedback: str
     question_cnt: int
     tts_text: str
     stt_text: str
-    hint_cnt: int
-    is_done: bool

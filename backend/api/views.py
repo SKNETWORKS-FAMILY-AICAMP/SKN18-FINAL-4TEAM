@@ -1124,13 +1124,13 @@ class LiveCodingHintView(APIView):
             state["conversation_log"] = conversation_log
 
         try:
-            graph = get_cached_graph(session_id=session_id, name="chapter2")
+            graph = get_cached_graph(session_id=session_id, name="chapter2_hint")
             result_state = graph.invoke(
                 state,
                 config={
                     "configurable": {
                         "thread_id": session_id,
-                        "checkpoint_namespace": "chapter2",
+                        "checkpoint_namespace": "chapter2_hint",
                     }
                 },
             )

@@ -109,8 +109,8 @@
             </span>
           </div>
           <div class="footer-right">
-            <button type="button" class="run-button">실행하기</button>
-            <span class="hint">실행 결과는 추후 연동 예정</span>
+            <button type="button" class="run-button" @click="onSubmitClick">제출하기</button>
+            <span class="hint">제출 후 렌더링 페이지로 이동 (추후 연동 예정)</span>
           </div>
         </footer>
       </section>
@@ -248,6 +248,25 @@ const ringStrokeOffset = computed(() => {
   );
   return ringCircumference * (1 - progress);
 });
+
+/* -----------------------------
+  📤 코드 제출 버튼 (렌더링 페이지 이동 예정)
+----------------------------- */
+const onSubmitClick = () => {
+  const sessionId = route.query.session_id;
+  // 렌더링/리포트 페이지 라우트는 추후 구현 예정입니다.
+  // 여기서는 예상 라우트 이름으로 네비게이션만 연결해 두고,
+  // 아직 라우트가 없으면 경고만 출력합니다.
+  try {
+    router.push({
+      name: "livecoding-render", // TODO: 렌더링 페이지 라우트 이름 확정 시 맞추어 수정
+      query: sessionId ? { session_id: sessionId } : {},
+    });
+  } catch (err) {
+    console.warn("렌더링 페이지 라우트가 아직 정의되지 않았습니다.", err);
+    window.alert("제출 후 렌더링 페이지 연동은 추후 구현될 예정입니다.");
+  }
+};
 
 /* -----------------------------
   🎙️ 녹음 시작

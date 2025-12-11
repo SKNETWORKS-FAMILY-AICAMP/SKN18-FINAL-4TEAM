@@ -354,9 +354,6 @@ class InterviewIntroEventView(APIView):
                 {
                     "stt_text": stt_text,
                     "tts_text": reply_tts,
-                    "user_question": None,
-                    "problem_answer": None,
-                    "user_answer_class": None,
                     "intro_flow_done": False,
                     "stage": "coding",
                     "coding_intro_text": "",

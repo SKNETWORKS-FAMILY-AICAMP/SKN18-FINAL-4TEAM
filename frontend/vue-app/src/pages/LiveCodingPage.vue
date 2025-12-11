@@ -76,6 +76,14 @@ const hasCheckedActiveSession = ref(false);
 
 const hasActiveSession = computed(() => !!activeSessionId.value);
 
+const resetLivecodingCaches = () => {
+  sessionStorage.removeItem("jobtory_intro_tts_text");
+  sessionStorage.removeItem("jobtory_intro_tts_audio");
+  sessionStorage.removeItem("jobtory_livecoding_problem_data");
+  localStorage.removeItem("jobtory_livecoding_session_id");
+  localStorage.removeItem("jobtory_langgraph_id");
+};
+
 const loadActiveSession = async (token) => {
   if (isCheckingActiveSession.value || hasCheckedActiveSession.value) return;
   isCheckingActiveSession.value = true;
@@ -172,8 +180,11 @@ const handleStartNewSession = async () => {
         }
       }).catch(() => {});
       activeSessionId.value = null;
-      localStorage.removeItem("jobtory_livecoding_session_id");
+      resetLivecodingCaches();
     }
+
+    // 혹시 남아 있는 캐시를 정리하고 완전 새로 시작
+    resetLivecodingCaches();
 
     router.push({ name: "coding-settings" });
   } catch (err) {

@@ -1,21 +1,21 @@
-from interview_engine.state import InterviewState
+from interview_engine.state import IntroState
+from langgraph.graph import END
 
 
-def route_loop(state: InterviewState) -> str:
-    """
-    event_type와 await_human 플래그를 기반으로 다음 노드 결정.
-    """
-    if state.get("await_human"):
-        return "idle"
-
+def chap1_answer_route(state: IntroState) -> str:
+    user_answer_class = (state.get("user_answer_class") or "").strip()
+    
+    return {
+        "irrelevant": "finish",
+        "strategy": "finish",
+        "problem_question": "problem_answer_agent",
+    }.get(user_answer_class, "finish")  # 기본값
+    
+    
+def chap1_main_condition(state: IntroState) -> str:
     etype = (state.get("event_type") or "").strip()
-
-    routes = {
-        "init": "problem_intro_agent",          # 문제 소개/Q&A
-        "strategy_submit": "answer_classify_agent",  # STT로 받은 답변 분류
-        "code_init": "collaboration_eval_agent",      # 코드 평가 시작
-        "hint_request": "hint_agent",           # 힌트 요청
-    }
-
-    return routes.get(etype, "idle")
-
+    
+    return {
+        "init": "problem_intro_agent",
+        "strategy_submit": "answer_classify_agent",
+    }.get(etype, END)  # 기본값

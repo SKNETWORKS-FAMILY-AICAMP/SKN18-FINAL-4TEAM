@@ -1,56 +1,29 @@
 from langgraph.graph import StateGraph, END
-from interview_engine.state import InterviewState
+from interview_engine.state import IntroState
 from interview_engine.nodes.problem_intro_node import problem_intro_agent
-from interview_engine.nodes.hint_node import hint_agent
-from interview_engine.nodes.question_generation_node import question_generation_agent
+from interview_engine.nodes.problem_answer_node import problem_answer_agent
 from interview_engine.nodes.answer_classify import answer_classify_agent
-from interview_engine.nodes.problem_solving_eval_node import problem_solving_eval_agent
-from interview_engine.conditional_edges import route_loop
-from interview_engine.nodes.code_quality_collabo_node import collaboration_eval_agent
+from interview_engine.conditional_edges import chap1_main_condition, chap1_answer_route
 
-def session_manager(state: InterviewState) -> InterviewState:
-    # 그냥 state 그대로 리턴, 라우팅은 route_main_loop가 결정
-    return state
 
-def create_graph_flow(checkpointer=None):
-    graph = StateGraph(InterviewState)
+
+def create_chapter1_graph_flow(checkpointer=None):
+    graph = StateGraph(IntroState)
 
     # chapter 1: Intro
-    graph.add_node("session_manager", session_manager)
-    graph.add_node("problem_intro_agent", problem_intro_agent)
-    graph.add_node("answer_classify_agent", answer_classify_agent)
-    
-    # chapter 2: Coding
-    graph.add_node("hint_agent", hint_agent)
-    graph.add_node("collaboration_eval_agent",collaboration_eval_agent)
-    graph.add_node("question_generation_agent", question_generation_agent)
-    
-    # chapter 3: 평가
-    graph.add_node("problem_solving_eval_agent", problem_solving_eval_agent)
-    
-    
-    graph.set_entry_point("session_manager")
+    graph.add_node("problem_intro_agent",problem_intro_agent)
+    graph.add_node("problem_answer_agent",problem_answer_agent)
+    graph.add_node("answer_classify_agent",answer_classify_agent)
 
-    # session_manager -> (어떤 노드를 탈지) 조건부 라우팅
+    graph.set_conditional_entry_point(chap1_main_condition)
+    graph.add_edge("problem_intro_agent", END)
     graph.add_conditional_edges(
-        "session_manager",
-        route_loop,
+        "answer_classify_agent",
+        chap1_answer_route,
         {
-            "problem_intro_agent": "problem_intro_agent",
-            "answer_classify_agent":"answer_classify_agent",
-            "hint_agent":"hint_agent",
-            "collaboration_eval_agent":"collaboration_eval_agent",
-            "problem_solving_eval_agent":"problem_solving_eval_agent",
-            "idle": END
-        },
-    )
-
-    # 워커 노드들은 일을 끝내고 항상 main_loop로 돌아온다
-    graph.add_edge("answer_classify_agent", "session_manager")
-    graph.add_edge("problem_intro_agent", "session_manager")
-    graph.add_edge("hint_agent","session_manager")
-    graph.add_edge("question_generation_agent","session_manager")
-    graph.add_edge("collaboration_eval_agent","question_generation_agent")
-    graph.add_edge("collaboration_eval_agent", "session_manager")
-    graph.add_edge("problem_solving_eval_agent", "session_manager")
-    return graph.compile(checkpointer=checkpointer) if checkpointer else graph.compile()
+            "finish": END,
+            "problem_answer_agent": "problem_answer_agent",
+        })
+    graph.add_edge("problem_answer_agent", END)
+    
+    return graph.compile(checkpointer=checkpointer)

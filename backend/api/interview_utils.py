@@ -3,10 +3,11 @@ from tts_client import generate_interview_audio_batch
 from dotenv import load_dotenv
 from interview_engine.graph import (
     create_chapter1_graph_flow,
-
+    create_chapter2_graph_flow,
 )
 from interview_engine import llm
 from langgraph.checkpoint.redis import RedisSaver
+from .stt_buffer import append_conversation_event
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
 
@@ -29,6 +30,8 @@ def get_cached_graph(session_id, name: str):
         cp = get_checkpointer()
         if name == "chapter1":
             _graph_cache[name] = create_chapter1_graph_flow(checkpointer=cp)
+        elif name == "chapter2":
+            _graph_cache[name] = create_chapter2_graph_flow(checkpointer=cp)
         else:
             raise ValueError(f"unknown graph {name}")
     return _graph_cache[name]
@@ -62,4 +65,15 @@ def _generate_tts_payload(text: str, session_id: str | None = None, max_sentence
         if not audio_b64:
             continue
         sentences_payload.append({"text": chunk.get("text", ""), "audio": audio_b64})
+
+    # 생성된 TTS 텍스트를 공용 대화 버퍼에도 기록
+    if session_id and text:
+        append_conversation_event(
+            session_id,
+            role="system",
+            channel="tts",
+            text=text,
+            stage=None,
+            meta={"source": "tts"},
+        )
     return sentences_payload

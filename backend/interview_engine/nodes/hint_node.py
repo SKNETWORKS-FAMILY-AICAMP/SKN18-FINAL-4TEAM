@@ -1,10 +1,10 @@
-from interview_engine.state import InterviewState
+from interview_engine.state import CodingState
 from typing import TypedDict, List, Any, Optional
 from langchain_core.messages import HumanMessage, SystemMessage
 from interview_engine.llm import LLM 
 
 
-def hint_agent(state: InterviewState) -> InterviewState:
+def hint_agent(state: CodingState) -> CodingState:
     """
         Step 2: Hint Agent
 

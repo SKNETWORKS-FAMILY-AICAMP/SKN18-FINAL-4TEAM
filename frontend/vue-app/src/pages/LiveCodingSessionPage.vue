@@ -201,6 +201,8 @@ const onAskButtonClick = async () => {
   if (isSttRunning.value) return;
 
   if (!isRecording.value) {
+    // 사용자가 말하기 시작하면 코딩 질문 타이머는 잠시 정지
+    stopCodingQuestionTimer();
     // 수동으로 질문하기 버튼을 눌렀을 때 녹음 시작
     await startRecording();
     isRecording.value = true;
@@ -222,6 +224,8 @@ const onAskButtonClick = async () => {
 const onAnswerButtonClick = async () => {
   clearAnswerCountdown();
   if (isSttRunning.value || isRecording.value) return;
+   // 자동 답변 타이머로 말하기 시작할 때도 코딩 질문 타이머 정지
+  stopCodingQuestionTimer();
   await startRecording();
   isRecording.value = true;
 };
@@ -378,6 +382,11 @@ const runSttClient = async () => {
     const replyText = (eventData?.tts_text || "").trim();
     const userAnswerClass = (eventData?.user_answer_class || "").trim();
     const introFlowDone = Boolean(eventData?.intro_flow_done);
+    const stageFromServer = (eventData?.stage || "").trim().toLowerCase();
+    const codingIntroText = (eventData?.coding_intro_text || "").trim();
+    if (stageFromServer) {
+      currentStage.value = stageFromServer;
+    }
 
     const isFirstNonStrategy =
       introFlowDone && userAnswerClass !== "strategy" && !introSecondChanceUsed.value;
@@ -394,6 +403,39 @@ const runSttClient = async () => {
       replyText &&
       userAnswerClass !== "strategy" &&
       (!introFlowDone || isFirstNonStrategy);
+
+    // 코딩 스테이지로 막 전환된 경우, 별도의 인트로 멘트를 한 번 재생
+    if (stageFromServer === "coding" && codingIntroText) {
+      try {
+        const ttsResp = await fetch(
+          `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
+            sessionId
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              tts_text: codingIntroText,
+              max_sentences: 2,
+            }),
+          }
+        );
+        const ttsData = await ttsResp.json().catch(() => ({}));
+        if (ttsResp.ok) {
+          const chunks = Array.isArray(ttsData?.tts_text)
+            ? ttsData.tts_text
+            : [];
+          if (chunks.length) {
+            await playTtsChunks(chunks);
+          }
+        }
+      } catch (err) {
+        console.error("코딩 스테이지 인트로 TTS 요청/재생 오류:", err);
+      }
+    }
 
     if (allowTts) {
       if (isFirstNonStrategy) {
@@ -431,6 +473,10 @@ const runSttClient = async () => {
     console.error("STT 요청 실패:", err);
     showAntiCheat("sttError", "서버 통신 오류");
   }
+  // 사용자의 발화/분석이 끝난 뒤, 코딩 단계라면 질문 타이머를 다시 시작
+  if (currentStage.value === "coding") {
+    startCodingQuestionTimer();
+  }
 };
 
 /* -----------------------------
@@ -450,6 +496,98 @@ const playTtsChunks = async (chunks = []) => {
       audio.onended = resolve;
       audio.onerror = resolve;
     });
+  }
+};
+
+/* -----------------------------
+  ⏱ 코딩 단계: 2분마다 코드 기반 질문 요청
+------------------------------ */
+const currentStage = ref("intro");
+const CODING_QUESTION_INTERVAL_MS = 120000; // 2분
+let codingQuestionTimer = null;
+const isQuestionPolling = ref(false);
+
+const requestCodingQuestion = async () => {
+  // 아직 코딩 스테이지가 아니거나, 사용자가 말하는 중이면 아무 것도 하지 않음
+  if (currentStage.value !== "coding") return;
+  if (isRecording.value || isSttRunning.value) return;
+  if (isQuestionPolling.value) return;
+
+  const token = localStorage.getItem("jobtory_access_token");
+  const sessionId = route.query.session_id;
+  if (!token || !sessionId) return;
+
+  isQuestionPolling.value = true;
+  try {
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/session/question/`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ session_id: sessionId }),
+      }
+    );
+    const data = await resp.json().catch(() => ({}));
+
+    if (!resp.ok || data.skipped) {
+      // 질문을 건너뛴 경우 조용히 반환
+      return;
+    }
+
+    // 서버에서 이미 TTS 오디오까지 내려온 경우
+    if (Array.isArray(data.tts_audio) && data.tts_audio.length) {
+      await playTtsChunks(data.tts_audio);
+      return;
+    }
+
+    const questionText = (data.question || "").trim();
+    if (!questionText) return;
+
+    // 텍스트만 온 경우, 인트로 TTS API를 통해 읽어준다.
+    try {
+      const ttsResp = await fetch(
+        `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
+          sessionId
+        )}`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ tts_text: questionText, max_sentences: 2 }),
+        }
+      );
+      const ttsData = await ttsResp.json().catch(() => ({}));
+      if (!ttsResp.ok) return;
+      const chunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
+      if (chunks.length) {
+        await playTtsChunks(chunks);
+      }
+    } catch (err) {
+      console.error("coding question TTS 요청 실패:", err);
+    }
+  } catch (err) {
+    console.error("coding question 요청 실패:", err);
+  } finally {
+    isQuestionPolling.value = false;
+  }
+};
+
+const startCodingQuestionTimer = () => {
+  if (codingQuestionTimer) return;
+  codingQuestionTimer = setInterval(() => {
+    void requestCodingQuestion();
+  }, CODING_QUESTION_INTERVAL_MS);
+};
+
+const stopCodingQuestionTimer = () => {
+  if (codingQuestionTimer) {
+    clearInterval(codingQuestionTimer);
+    codingQuestionTimer = null;
   }
 };
 
@@ -529,9 +667,9 @@ const requestAndPlayTts = async (problemPayload) => {
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
     } else {
       // 오디오 청크가 없어도 타이머는 시작
-      hasPlayedIntroTts.value = true;
-      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-    }
+    hasPlayedIntroTts.value = true;
+    startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
+  }
   } catch (err) {
     console.error("TTS 요청/재생 오류:", err);
   } finally {
@@ -688,8 +826,16 @@ const fetchRandomProblem = async () => {
 
     // 세션/언어별로 저장된 코드가 있다면 불러와서 이어서 작성할 수 있도록 합니다.
     await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
-    // 문제 안내 음성 자동 재생 (TTS 응답이 느려도 UI 로딩을 막지 않도록 fire-and-forget)
-    void requestAndPlayTts(problemData.value);
+
+    // 새로 시작하기인 경우에만 문제 설명 인트로 TTS를 재생하고,
+    // 이어하기(resume=1)로 들어온 경우에는 이미 들었던 인트로이므로 생략합니다.
+    const isResume = Boolean(route.query.resume);
+    if (!isResume) {
+      // 문제 안내 음성 자동 재생 (TTS 응답이 느려도 UI 로딩을 막지 않도록 fire-and-forget)
+      void requestAndPlayTts(problemData.value);
+    }
+    // 코딩 단계 질문용 타이머 시작 (stage는 intro→coding 전환 시점에만 실제 동작)
+    startCodingQuestionTimer();
   } catch (err) {
     console.error(err);
     problemError.value = err?.message || "문제를 불러오지 못했습니다.";
@@ -1174,6 +1320,7 @@ onBeforeUnmount(() => {
     saveCodeTimer = null;
   }
   clearAnswerCountdown();
+  stopCodingQuestionTimer();
 });
 </script>
 

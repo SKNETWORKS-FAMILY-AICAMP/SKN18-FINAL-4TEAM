@@ -3,6 +3,9 @@ import os
 import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.core.cache import cache
+
+from api.stt_buffer import append_conversation_event
 from .stt_client import STTClient
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,22 @@ def transcribe_only(request):
             for ln in (lines or [])
             if isinstance(ln, dict)
         ).strip()
+
+        # STT 텍스트를 공용 대화 버퍼에 기록 (가능한 경우)
+        session_id = request.GET.get("session_id") or request.headers.get("X-Session-Id")
+        if session_id and text:
+            meta_key = f"livecoding:{session_id}:meta"
+            meta = cache.get(meta_key) or {}
+            stage = (meta.get("stage") or "").strip() or None
+            append_conversation_event(
+                session_id,
+                role="user",
+                channel="stt",
+                text=text,
+                stage=stage,
+                meta={"source": "stt.transcribe_only"},
+            )
+
         return JsonResponse(
             {
                 "lines": lines,

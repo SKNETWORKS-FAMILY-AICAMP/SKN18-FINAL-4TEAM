@@ -4,8 +4,6 @@ import secrets
 import string
 import time
 
-
-
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -16,7 +14,6 @@ from rest_framework import status, permissions
 import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
-from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
 
 from .email_utils import send_verification_code, verify_code
@@ -319,6 +316,54 @@ class InterviewIntroEventView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
+        # 현재 세션 stage 확인 (meta 기준)
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key) or {}
+        current_stage = meta.get("stage") or "intro"
+
+        # 코딩 단계에서는 chapter2 그래프의 답변 리액션 노드만 호출해
+        # 짧은 피드백 멘트를 생성한다.
+        if current_stage == "coding":
+            try:
+                coding_graph = get_cached_graph(session_id=session_id, name="chapter2")
+                coding_state = {
+                    "meta": {
+                        "session_id": session_id,
+                        "user_id": getattr(request.user, "user_id", None),
+                    },
+                    "event_type": "question_answer",
+                    "stt_text": stt_text,
+                }
+                coding_result = coding_graph.invoke(
+                    coding_state,
+                    config={
+                        "configurable": {
+                            "thread_id": session_id,
+                            "checkpoint_namespace": "chapter2",
+                        }
+                    },
+                )
+                reply_tts = (coding_result.get("tts_text") or "").strip()
+            except Exception:
+                # LangGraph 호출 실패 시에도 기본 멘트로 폴백
+                reply_tts = (
+                    "답변 잘 들었습니다. 이제 다시 문제 풀이를 이어가 주세요."
+                )
+
+            return Response(
+                {
+                    "stt_text": stt_text,
+                    "tts_text": reply_tts,
+                    "user_question": None,
+                    "problem_answer": None,
+                    "user_answer_class": None,
+                    "intro_flow_done": False,
+                    "stage": "coding",
+                    "coding_intro_text": "",
+                },
+                status=status.HTTP_200_OK,
+            )
+
         graph = get_cached_graph(session_id=session_id, name="chapter1")
 
         update_state = {
@@ -342,15 +387,57 @@ class InterviewIntroEventView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        # LangGraph가 내려준 TTS 텍스트가 있으면 즉시 배치 TTS 실행
+        # LangGraph가 내려준 TTS 텍스트
         tts_text = (result_state.get("tts_text") or "").strip()
-        
+
         # TTS는 별도 엔드포인트(TTSView)에서 호출하도록 분리
         user_answer_class = (result_state.get("user_answer_class") or "").strip() or None
-        
-        stage = "intro"
+
+        # stage는 meta 기준으로 결정 (intro -> coding 단방향)
+        stage = meta.get("stage") or "intro"
+        coding_intro_text = ""
         if user_answer_class == "strategy":
+            # 1) stage 전환
             stage = "coding"
+            meta["stage"] = "coding"
+            cache.set(meta_key, meta, timeout=60 * 60)
+
+            # 2) 코딩 스테이지 인트로: chapter2 그래프 내 coding_intro 노드만 실행
+            try:
+                coding_graph = get_cached_graph(session_id=session_id, name="chapter2")
+                coding_state = {
+                    "meta": {
+                        "session_id": session_id,
+                        "user_id": getattr(request.user, "user_id", None),
+                    },
+                    "event_type": "coding_intro",
+                    # 언어 정보가 메타에 있다면 넘겨주고, 없으면 python 기본값
+                    "language": (meta.get("language") or "python"),
+                }
+                coding_result = coding_graph.invoke(
+                    coding_state,
+                    config={
+                        "configurable": {
+                            "thread_id": session_id,
+                            "checkpoint_namespace": "chapter2",
+                        }
+                    },
+                )
+                coding_intro_text = (coding_result.get("tts_text") or "").strip()
+            except Exception as exc:
+                # LangGraph 쪽에서 문제가 나더라도 코딩 인트로 멘트는 반드시 한 번 재생되도록
+                # 간단한 폴백 멘트를 설정해 둔다.
+                coding_intro_text = (
+                    "좋습니다. 이제 코딩 테스트를 시작하겠습니다. "
+                    "너무 긴장하지 마시고, 평소 하시던 방식대로 차분히 코드를 작성해 주세요."
+                )
+
+        # 코딩 스테이지로 전환되면서 추가 멘트가 있다면 기존 TTS 텍스트 뒤에 붙인다.
+        if coding_intro_text:
+            if tts_text:
+                tts_text = f"{tts_text}\n\n{coding_intro_text}"
+            else:
+                tts_text = coding_intro_text
 
         response_payload = {
             "stt_text": stt_text,
@@ -360,6 +447,8 @@ class InterviewIntroEventView(APIView):
             "user_answer_class": user_answer_class,
             "intro_flow_done": result_state.get("intro_flow_done"),
             "stage": stage,
+            # 코딩 스테이지로 막 전환될 때만 설정되는 인트로 멘트 텍스트
+            "coding_intro_text": coding_intro_text or "",
         }
 
         return Response(response_payload, status=status.HTTP_200_OK)
@@ -756,6 +845,8 @@ class LiveCodingStartView(APIView):
             "user_id": user.user_id,
             "session_id": session_id,
             "language": problem_lang.language,
+            # starter_code를 메타에도 보관해 두어, 이후 코드 진행 여부 판단에 사용
+            "starter_code": problem_lang.starter_code,
             "time_limit_seconds": 40 * 60,
             "start_at": start_at.isoformat(),
         }
@@ -1400,6 +1491,155 @@ class ProfileView(APIView):
                 "name": user.name,
                 "phone_number": user.phone_number,
                 "birthdate": _format_birthdate(user.birthdate),
+            },
+            status=status.HTTP_200_OK,
+        )
+
+# backend/api/views.py
+
+class CodingQuestionView(APIView):
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response(
+                {"detail": "질문 생성을 위해서는 로그인이 필요합니다."},
+                status=status.HTTP_401_UNAUTHORIZED,
+            )
+
+        session_id = request.data.get("session_id") or request.query_params.get("session_id")
+        if not session_id:
+            return Response(
+                {"detail": "session_id가 필요합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        # 1) 세션 메타 / 코드 스냅샷 로드
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key) or {}
+        if not meta:
+            return Response(
+                {"detail": "해당 세션 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
+            )
+        if str(meta.get("user_id")) != str(getattr(user, "user_id", None)):
+            return Response(
+                {"detail": "이 세션에 접근할 권한이 없습니다."},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        question_cnt = int(meta.get("question_cnt") or 0)
+        # 최대 3회까지만 질문
+        if question_cnt >= 3:
+            return Response(
+                {
+                    "skipped": True,
+                    "reason": "max_questions_reached",
+                    "question": "",
+                    "tts_audio": [],
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        code_key = f"livecoding:{session_id}:code"
+        code_data = cache.get(code_key) or {}
+        history = code_data.get("history") or []
+        latest = code_data.get("latest") or {}
+
+        if not latest:
+            return Response(
+                {
+                    "skipped": True,
+                    "reason": "no_code_snapshot",
+                    "question": "",
+                    "tts_audio": [],
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        latest_code = latest.get("code") or ""
+        language = (latest.get("language") or meta.get("language") or "python").lower()
+        last_snapshot_index = int(meta.get("last_question_snapshot_index") or 0)
+        snapshot_index = len(history) or 1
+
+        last_question_text = (meta.get("last_question_text") or "").strip()
+
+        # 이전에 질문을 했던 스냅샷 기준 코드 (없으면 빈 문자열)
+        prev_code = ""
+        if last_snapshot_index and 0 < last_snapshot_index <= len(history):
+            try:
+                prev_code = history[last_snapshot_index - 1].get("code") or ""
+            except Exception:
+                prev_code = ""
+
+        starter_code = (meta.get("starter_code") or "").strip()
+
+        # 2) LangGraph(chapter2) 호출
+        graph = get_cached_graph(session_id=session_id, name="chapter2")
+        coding_state = {
+            "meta": {"session_id": session_id, "user_id": user.user_id},
+            "code": latest_code,
+            "language": language,
+            "question_cnt": question_cnt,
+             # 코드 진행도 판단용 보조 필드
+            "starter_code": starter_code,
+            "prev_code": prev_code,
+            "snapshot_index": snapshot_index,
+            "last_snapshot_index": last_snapshot_index,
+            "last_question_text": last_question_text,
+        }
+        try:
+            result = graph.invoke(
+                coding_state,
+                config={
+                    "configurable": {
+                        "thread_id": session_id,
+                        "checkpoint_namespace": "chapter2",
+                    }
+                },
+            )
+        except Exception as exc:  # noqa: BLE001
+            return Response(
+                {"detail": "코딩 질문 그래프 호출에 실패했습니다.", "error": str(exc)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        question_text = (
+            (result.get("question") or "") or (result.get("tts_text") or "")
+        ).strip()
+        if not question_text:
+            return Response(
+                {
+                    "skipped": True,
+                    "reason": "empty_question",
+                    "question": "",
+                    "tts_audio": [],
+                },
+                status=status.HTTP_200_OK,
+            )
+
+        # 3) 질문 횟수/스냅샷 인덱스 메타에 반영
+        meta["question_cnt"] = question_cnt + 1
+        meta["last_question_snapshot_index"] = snapshot_index
+        meta["last_question_text"] = question_text
+        cache.set(meta_key, meta, timeout=60 * 60)
+
+        # 4) 질문 텍스트를 TTS로 변환해 프론트로 내려줌
+        try:
+            tts_chunks = _generate_tts_payload(
+                question_text,
+                session_id=session_id,
+                max_sentences=2,
+            )
+        except Exception:
+            tts_chunks = []
+
+        return Response(
+            {
+                "skipped": False,
+                "reason": None,
+                "question": question_text,
+                "tts_audio": tts_chunks,
+                "state": result,
             },
             status=status.HTTP_200_OK,
         )

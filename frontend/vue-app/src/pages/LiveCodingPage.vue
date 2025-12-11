@@ -151,7 +151,11 @@ const handleResumeSession = () => {
     return;
   }
   showSessionChoice.value = false;
-  router.push({ name: "coding-session", query: { session_id: activeSessionId.value } });
+  // 이어하기 진입임을 명시하기 위해 resume 플래그를 함께 전달
+  router.push({
+    name: "coding-session",
+    query: { session_id: activeSessionId.value, resume: "1" },
+  });
 };
 
 const handleStartNewSession = async () => {

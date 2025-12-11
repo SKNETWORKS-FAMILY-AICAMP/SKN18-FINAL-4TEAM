@@ -41,3 +41,23 @@ class InterviewState(TypedDict, total=False):
     # 3. 출력 데이터 (업데이트 대상)
     hint_text: str                  # 생성된 힌트 내용
     conversation_log: List[Any]     # 대화 내역 (질문 에이전트와 공유)
+    
+class CodingState(TypedDict, total=False):
+    meta: MetaState
+    event_type: str
+    language: str
+    question: str
+    last_question_text: str
+    code: str
+    # 코드 비교/진행도 판단을 위한 보조 필드들
+    starter_code: str
+    prev_code: str
+    snapshot_index: int
+    last_snapshot_index: int
+    code_quality_feedback: str
+    collaboration_feedback: str
+    question_cnt: int
+    tts_text: str
+    stt_text: str
+    hint_cnt: int
+    is_done: bool

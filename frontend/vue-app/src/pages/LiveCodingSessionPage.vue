@@ -95,21 +95,30 @@
               type="button"
               class="mic-button"
               @click="onAskButtonClick"
-              :disabled="isSttRunning"
+              :disabled="isSttRunning || isTtsPlaying || isMicCooldown"
               :class="{ 'is-active': isRecording }"
             >
               <span class="mic-label">
                 {{ isSttRunning ? "분석 중..." : (isRecording ? "제출하기" : "음성입력") }}
               </span>
             </button>
-            <button type="button" class="hint-button" @click="requestHint">힌트요청</button>
+            <button
+              type="button"
+              class="hint-button"
+              @click="requestHint"
+              :disabled="isSttRunning || isTtsPlaying"
+            >
+              힌트요청
+            </button>
             <span class="hint-counter">힌트 3/3</span>
             <span v-if="answerCountdown !== null" class="hint countdown-inline">
               {{ answerCountdown }}초 후 자동 답변 시작
             </span>
           </div>
           <div class="footer-right">
-            <button type="button" class="run-button">실행하기</button>
+            <button type="button" class="run-button" :disabled="isSttRunning || isTtsPlaying">
+              실행하기
+            </button>
             <span class="hint">실행 결과는 추후 연동 예정</span>
           </div>
         </footer>
@@ -187,8 +196,10 @@ const audioBlob = ref(null);
 const isRecording = ref(false);
 const isSttRunning = ref(false);
 const isTtsPlaying = ref(false);
+const isMicCooldown = ref(false);
 const answerCountdown = ref(null);
 let answerCountdownTimer = null;
+let micCooldownTimer = null;
 const ANSWER_COUNTDOWN_SECONDS = 30;
 const ringRadius = 46;
 const ringSize = 140;
@@ -208,6 +219,17 @@ const introSecondChanceUsed = ref(false);
    🔥 버튼 클릭 로직
 ----------------------------- */
 const onAskButtonClick = async () => {
+  if (isMicCooldown.value) return;
+  if (micCooldownTimer) {
+    clearTimeout(micCooldownTimer);
+    micCooldownTimer = null;
+  }
+  isMicCooldown.value = true;
+  micCooldownTimer = setTimeout(() => {
+    isMicCooldown.value = false;
+    micCooldownTimer = null;
+  }, 1000);
+
   if (isSttRunning.value) return;
 
   if (!isRecording.value) {
@@ -316,6 +338,26 @@ const stopRecording = () => {
   });
 };
 
+const endSessionAndReturnToCodingTest = async (reason = "intro_flow_done_without_strategy") => {
+  clearCountdown();
+  try {
+    const token = localStorage.getItem("jobtory_access_token");
+    if (token) {
+      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ session_id: route.query.session_id, reason }),
+      }).catch(() => {});
+    }
+  } finally {
+    localStorage.removeItem("jobtory_livecoding_session_id");
+    router.replace({ name: "home", query: { alert: reason } });
+  }
+};
+
 /* -----------------------------
    📤 서버 전송 & STT 실행
 ----------------------------- */
@@ -346,20 +388,26 @@ const runSttClient = async () => {
       }
     );
 
-    const sttData = await sttResp.json().catch(() => ({}));
-    if (!sttResp.ok) {
-      console.warn("STT 요청 실패", sttResp.status, sttData);
-      showAntiCheat("sttError", sttData?.error || "음성을 인식하지 못했습니다.");
-      return;
-    }
+  const sttData = await sttResp.json().catch(() => ({}));
+  if (!sttResp.ok) {
+    console.warn("STT 요청 실패", sttResp.status, sttData);
+    showAntiCheat("sttError", sttData?.error || "음성을 인식하지 못했습니다.");
+    return;
+  }
 
-    const sttText = (sttData?.stt_text || "").trim();
-    console.log("STT 결과:", sttData);
+  const sttText = (sttData?.stt_text || "").trim();
+  console.log("STT 결과:", sttData);
 
-    if (!sttText) {
-      showAntiCheat("sttError", "음성에서 유효한 문장을 인식하지 못했습니다.");
-      return;
-    }
+  if (!sttText) {
+    showAntiCheat("sttError", "음성에서 유효한 문장을 인식하지 못했습니다. 다시 한번 말해주세요.");
+    // 로딩 오버레이를 제거하고 안내 음성을 재생한다.
+    isSttRunning.value = false;
+    isTtsPlaying.value = true;
+    const played = await playInlineTts("음성에서 유효한 문장을 인식하지 못했습니다. 다시 한번 말해주세요.");
+    if (!played) void playWarningBeep();
+    isTtsPlaying.value = false;
+    return;
+  }
 
     // 2단계: STT 텍스트를 LangGraph 이벤트 API에 전달
     const eventResp = await fetch(`${BACKEND_BASE}/api/interview/event/`, {
@@ -386,6 +434,7 @@ const runSttClient = async () => {
     const replyText = (eventData?.tts_text || "").trim();
     const userAnswerClass = (eventData?.user_answer_class || "").trim();
     const introFlowDone = Boolean(eventData?.intro_flow_done);
+    const endIntro = Boolean(eventData?.end_intro);
     const nextStage = (eventData?.stage || "").trim() || "intro";
     stage.value = nextStage;
     if (sessionId) {
@@ -400,6 +449,11 @@ const runSttClient = async () => {
       introFlowDone && userAnswerClass !== "strategy" && !introSecondChanceUsed.value;
     const shouldEndIntro =
       introFlowDone && userAnswerClass !== "strategy" && !isFirstNonStrategy;
+
+    if (endIntro && nextStage === "intro") {
+      await endSessionAndReturnToCodingTest("intro_flow_done_without_strategy");
+      return;
+    }
 
     // intro_flow_done인데 이미 한 번 기회를 준 뒤에도 strategy가 아니면 종료
     if (shouldEndIntro) {
@@ -489,6 +543,61 @@ const playTtsChunks = async (chunks = [], opts = { throwOnError: false }) => {
     if (!finished) return false;
   }
   return true;
+};
+
+const playWarningBeep = async (durationMs = 400, freq = 880) => {
+  try {
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return false;
+    const ctx = new Ctor();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.type = "sine";
+    osc.frequency.value = freq;
+    gain.gain.setValueAtTime(0.18, ctx.currentTime);
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.start();
+    osc.stop(ctx.currentTime + durationMs / 1000);
+    return await new Promise((resolve) => {
+      osc.onended = () => {
+        ctx.close().catch(() => {});
+        resolve(true);
+      };
+    });
+  } catch (err) {
+    console.warn("warning beep failed:", err);
+    return false;
+  }
+};
+
+const playInlineTts = async (text = "") => {
+  if (!text.trim()) return false;
+  const token = localStorage.getItem("jobtory_access_token");
+  const langgraphId = localStorage.getItem("jobtory_langgraph_id") || "inline-tts";
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/tts/intro/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        tts_text: text,
+        langgraph_id: langgraphId,
+        max_sentences: 1,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    const chunks = normalizeTtsChunks(data.tts_audio || data.tts_text);
+    if (resp.ok && chunks.length) {
+      await playTtsChunks(chunks, { throwOnError: false });
+      return true;
+    }
+  } catch (err) {
+    console.warn("inline TTS 재생 실패:", err);
+  }
+  return false;
 };
 
 const normalizeTtsChunks = (payload) => {
@@ -1267,6 +1376,10 @@ onBeforeUnmount(() => {
   void saveCodeSnapshot(code.value);
   clearCountdown();
   clearIntroGestureHandler();
+  if (micCooldownTimer) {
+    clearTimeout(micCooldownTimer);
+    micCooldownTimer = null;
+  }
 
   if (mediaStream) {
     mediaStream.getTracks().forEach((t) => t.stop());

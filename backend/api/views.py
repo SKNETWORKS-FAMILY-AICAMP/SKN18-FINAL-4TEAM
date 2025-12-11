@@ -368,6 +368,7 @@ class InterviewIntroEventView(APIView):
             "user_answer_class": user_answer_class,
             "intro_flow_done": result_state.get("intro_flow_done"),
             "stage": stage,
+            "end_intro": result_state.get("end_intro") or False,
         }
 
         return Response(response_payload, status=status.HTTP_200_OK)

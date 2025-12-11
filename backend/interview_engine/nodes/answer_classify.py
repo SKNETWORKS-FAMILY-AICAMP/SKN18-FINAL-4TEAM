@@ -61,18 +61,22 @@ def answer_classify_agent(state: IntroState) -> IntroState:
     intro_flow_done = bool(state.get("intro_flow_done"))
     
     if answer_class == "strategy":
-            state["user_answer_class"] = answer_class
-            state["user_strategy_answer"] = user_text
-            state["intro_flow_done"] = True
-            
+        state["user_answer_class"] = answer_class
+        state["user_strategy_answer"] = user_text
+        state["intro_flow_done"] = True
+        state["end_intro"] = False
+
     elif intro_flow_done:
-        state["user_answer_class"] = "irrelevant"
-            
+        # 이미 한 번 기회를 준 뒤에도 strategy가 아니면 인트로 플로우 종료 신호를 보낸다.
+        state["user_answer_class"] = answer_class
+        state["end_intro"] = True
+
     else:
         state["user_answer_class"] = answer_class
         # 첫 비전략 응답 이후에는 한 번 더 기회를 주고 그 다음부터는 종료
         state["intro_flow_done"] = True
-        
+        state["end_intro"] = False
+
         if answer_class == "problem_question":
             state["user_question"] = user_text
         else:

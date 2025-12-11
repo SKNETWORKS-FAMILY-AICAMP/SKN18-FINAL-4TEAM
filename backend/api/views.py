@@ -1051,7 +1051,7 @@ class LiveCodingSessionView(APIView):
                 "function_name": meta_problem.get("function_name") or getattr(problem_lang, "function_name", None),
                 "starter_code": meta_problem.get("starter_code") or getattr(problem_lang, "starter_code", None),
                 "test_cases": test_cases,
-                "problem_data": meta_problem or None,
+                "langgraph_id": meta.get("langgraph_id"),
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": start_at_str,
                 "remaining_seconds": remaining_seconds,

@@ -63,9 +63,9 @@ def problem_intro_agent(state: IntroState) -> IntroState:
             "코드를 작성하시기 전에, 이 문제를 어떤 방식으로 해결할지 풀이 방향을 설명해 주세요. "
             "사용하실 알고리즘과 예상되는 시간 복잡도까지 함께 말씀해 주시면 됩니다."
         )
-
-        state["intro_text"] = raw
-        state["tts_text"] = raw + "\n" + strategy_question
+        intro_text = raw + "\n" + strategy_question
+        state["intro_text"] = intro_text
+        state["tts_text"] = intro_text
 
     except Exception:
         # 실패 시 state 그대로 반환

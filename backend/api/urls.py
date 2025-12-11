@@ -14,6 +14,7 @@ from .views import (
     LiveCodingStartView,
     LiveCodingCodeSnapshotView,
     LiveCodingSessionView,
+    CodingQuestionView,
 
     InterviewIntroEventView,
     RandomCodingProblemView,
@@ -60,6 +61,11 @@ urlpatterns = [
         "livecoding/session/code/",
         LiveCodingCodeSnapshotView.as_view(),
         name="livecoding-session-code",
+    ),
+    path(
+        "livecoding/session/question/",
+        CodingQuestionView.as_view(),
+        name="livecoding-session-question",
     ),
     path(
         "interview/event/",

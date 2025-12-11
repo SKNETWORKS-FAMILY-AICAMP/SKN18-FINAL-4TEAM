@@ -1441,8 +1441,6 @@ class CodingQuestionView(APIView):
              # 코드 진행도 판단용 보조 필드
             "starter_code": starter_code,
             "prev_code": prev_code,
-            "snapshot_index": snapshot_index,
-            "last_snapshot_index": last_snapshot_index,
             "last_question_text": last_question_text,
         }
         try:

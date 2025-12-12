@@ -201,14 +201,6 @@
       </section>
     </div>
 
-    <!-- ✅ 전체 화면 로딩 오버레이 -->
-    <div v-if="showFullLoading" class="full-loading-overlay">
-      <div class="loading-container">
-        <div class="spinner"></div>
-        <p class="loading-text">라이브 코딩 환경을 준비하고 있어요...</p>
-        <p class="loading-sub">문제와 평가 에이전트를 초기화하는 중입니다.</p>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -226,7 +218,6 @@ const resetLivecodingCaches = () => {
   sessionStorage.removeItem("jobtory_intro_tts_audio");
   sessionStorage.removeItem("jobtory_livecoding_problem_data");
   localStorage.removeItem("jobtory_livecoding_session_id");
-  localStorage.removeItem("jobtory_langgraph_id");
 };
 
 /* ----- 공통: 로그인 보장 헬퍼 ----- */
@@ -239,9 +230,6 @@ const ensureLoggedIn = () => {
   }
   return token;
 };
-
-/* ----- 전체 화면 로딩 상태 ----- */
-const showFullLoading = ref(false);
 
 /* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
 // rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
@@ -291,23 +279,14 @@ const goPrev = () => {
 };
 
 /* -----------------------------------------
-   LangGraph / 문제 / 인트로 TTS 문구 준비
+   LangGraph / 문제
 -------------------------------------------- */
-const langgraphId = ref(null);
 const problemData = ref(null);
-const introText = ref("");
+const hasInitRun = ref(false);
 const isWarmed = ref(false);
 const isPreloading = ref(false);
-const isInitLoading = ref(false);
-const hasInitRun = ref(false);
-type TtsChunk = {
-  text: string;
-  audio: string;
-};
-const introAudios = ref<TtsChunk[] | null>(null);
-
 const warmupLanggraph = async () => {
-  if (isWarmed.value && langgraphId.value) return true;
+  if (isWarmed.value) return true;
   try {
     const token = ensureLoggedIn();
     if (!token) return false;
@@ -319,10 +298,8 @@ const warmupLanggraph = async () => {
       },
     });
     const data = await resp.json().catch(() => ({}));
-    if (resp.ok && data?.langgraph_id) {
+    if (resp.ok && data?.status === "warmed") {
       isWarmed.value = true;
-      langgraphId.value = data.langgraph_id;
-      localStorage.setItem("jobtory_langgraph_id", data.langgraph_id);
       return true;
     }
   } catch (err) {
@@ -334,7 +311,7 @@ const warmupLanggraph = async () => {
 const preloadProblem = async () => {
   // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
   if (problemData.value) return true;
-  if (isPreloading.value) return !!langgraphId.value && problemData.value;
+  if (isPreloading.value) return !!problemData.value;
   isPreloading.value = true;
   try {
     const token = ensureLoggedIn();
@@ -348,7 +325,6 @@ const preloadProblem = async () => {
       },
       body: JSON.stringify({
         language: DEFAULT_LANGUAGE,
-        langgraph_id: langgraphId.value,
       }),
     });
     const data = await resp.json().catch(() => ({}));
@@ -361,7 +337,6 @@ const preloadProblem = async () => {
       return false;
     }
     console.log("[livecoding][preload] problem loaded", {
-      langgraph_id: langgraphId.value,
       problem_id: data.problem_id,
       language: data.language,
     });
@@ -376,147 +351,12 @@ const preloadProblem = async () => {
   }
 };
 
-const prepareIntroTts = async () => {
-  if (isInitLoading.value) {
-    const cachedAudio = sessionStorage.getItem("jobtory_intro_tts_audio");
-    return !!cachedAudio || !!(introAudios.value && introAudios.value.length);
-  }
-  const cachedAudio = sessionStorage.getItem("jobtory_intro_tts_audio");
-  if (cachedAudio) {
-    const parsed = normalizeTtsChunks(JSON.parse(cachedAudio));
-    if (parsed.length) {
-      introAudios.value = parsed;
-      const cachedText = sessionStorage.getItem("jobtory_intro_tts_text") || "";
-      if (cachedText) introText.value = cachedText;
-      return true;
-    }
-  }
-
-  if (!langgraphId.value || !problemData.value) return false;
-  isInitLoading.value = true;
-
-  const token = ensureLoggedIn();
-  if (!token) {
-    isInitLoading.value = false;
-    return false;
-  }
-
-  try {
-    const resp = await fetch(
-      `${BACKEND_BASE}/api/coding-problems/session/init/?langgraph_id=${encodeURIComponent(
-        langgraphId.value
-      )}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ ...problemData.value, langgraph_id: langgraphId.value }),
-      }
-    );
-    console.log("[livecoding][init] sending to langgraph", {
-      langgraph_id: langgraphId.value,
-      problem_id: problemData.value?.problem_id,
-      language: problemData.value?.language,
-      problem_preview: (problemData.value?.problem || "").slice(0, 120),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (resp.ok) {
-      const chunks = normalizeTtsChunks(data?.tts_text || data?.tts_audio);
-      if (Array.isArray(chunks) && chunks.length) {
-        introAudios.value = chunks;
-        sessionStorage.setItem("jobtory_intro_tts_audio", JSON.stringify(chunks));
-        const joinedText = chunks
-          .map((c) => (c.text || "").trim())
-          .filter(Boolean)
-          .join(" ");
-        if (joinedText) {
-          introText.value = joinedText;
-          sessionStorage.setItem("jobtory_intro_tts_text", joinedText);
-        } else {
-          sessionStorage.removeItem("jobtory_intro_tts_text");
-        }
-        return true;
-      }
-    }
-  } catch (err) {
-    console.warn("init warmup failed", err);
-  } finally {
-    isInitLoading.value = false;
-  }
-  return false;
-};
-
-const normalizeTtsChunks = (payload: unknown): TtsChunk[] => {
-  if (Array.isArray(payload)) {
-    return payload
-      .map((c) => {
-        if (!c) return null;
-        if (typeof c === "string") return { audio: c, text: "" };
-        if (
-          typeof c === "object" &&
-          (("audio" in c && c.audio) || ("audio_base64" in c && c.audio_base64) || "text" in c)
-        ) {
-          const obj = c as Record<string, unknown>;
-          const audio = (obj.audio as string) || (obj.audio_base64 as string) || "";
-          const text = (obj.text as string) || "";
-          if (audio || text) {
-            return { audio, text } as TtsChunk;
-          }
-        }
-        return null;
-      })
-      .filter((v): v is TtsChunk => Boolean(v && (v.audio || v.text)));
-  }
-  if (typeof payload === "string" && payload.trim()) {
-    return [{ audio: payload.trim(), text: "" }];
-  }
-  return [];
-};
-
-const preloadIntroTtsAudio = async () => {
-  const cached = sessionStorage.getItem("jobtory_intro_tts_audio");
-  if (cached) {
-    try {
-      const parsed = normalizeTtsChunks(JSON.parse(cached));
-      if (parsed.length) {
-        introAudios.value = parsed;
-        return true;
-      }
-    } catch (e) {
-      console.warn("캐시된 intro 오디오 파싱 실패:", e);
-    }
-  }
-
-  if (introAudios.value && introAudios.value.length) {
-    sessionStorage.setItem("jobtory_intro_tts_audio", JSON.stringify(introAudios.value));
-    return true;
-  }
-
-  return prepareIntroTts();
-};
-
-const ensureLanggraphId = async () => warmupLanggraph();
-
-/* ----- 초기 자동 셋업: warmup + preload 병렬, 이후 TTS 준비 ----- */
+/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
 const runInitialSetup = async () => {
   if (hasInitRun.value) return true;
   try {
-    // langgraph 워밍업(id 생성)과 문제 프리로드를 병렬로 진행
-    const warmupPromise = ensureLanggraphId();
-    const preloaded = await Promise.all([preloadProblem(), warmupPromise]).then(([pre]) => pre);
-    if (!preloaded) return false;
-
-    const introOk = await prepareIntroTts();
-    if (!introOk) return false;
-
-    const hasAudio = !!sessionStorage.getItem("jobtory_intro_tts_audio") ||
-      !!(introAudios.value && introAudios.value.length);
-    if (!hasAudio) {
-      const audioOk = await preloadIntroTtsAudio();
-      if (!audioOk) return false;
-    }
+    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
+    if (!warmOk || !preloaded) return false;
 
     hasInitRun.value = true;
     return true;
@@ -524,42 +364,6 @@ const runInitialSetup = async () => {
     console.error("runInitialSetup 실패:", e);
     return false;
   }
-};
-
-// 준비 단계: 최대 maxAttempts까지 시도하고, 오디오가 없으면 실패 처리
-const waitUntilPrepared = async (delayMs = 800, maxAttempts = 30) => {
-  let attempts = 0;
-  while (attempts < maxAttempts) {
-    const hasAudio =
-      !!sessionStorage.getItem("jobtory_intro_tts_audio") ||
-      !!(introAudios.value && introAudios.value.length);
-    const hasText = !!introText.value;
-
-    if (langgraphId.value && problemData.value && hasAudio) {
-      return true;
-    }
-
-    // 텍스트는 준비됐는데 오디오만 없는 경우: 오디오만 재시도
-    if (langgraphId.value && problemData.value && !hasAudio) {
-      const audioOk = await preloadIntroTtsAudio();
-      if (audioOk) return true;
-    } else {
-      const ok = await runInitialSetup();
-      if (ok) {
-        const hasAudioNow = !!sessionStorage.getItem("jobtory_intro_tts_audio");
-        if (langgraphId.value && problemData.value && hasAudioNow) {
-          return true;
-        }
-      }
-    }
-
-    attempts += 1;
-    await new Promise((r) => setTimeout(r, delayMs));
-  }
-
-  // 오디오가 끝내 안 만들어진 경우
-  console.warn("[LiveCoding] intro TTS audio 미생성 → 시작 중단");
-  return false;
 };
 
 /* ----- 웹캠 체크 ----- */
@@ -839,6 +643,7 @@ const confirmSpeakerHeard = () => {
   speakerPassed.value = true;
 };
 
+
 /* ----- 마지막: 테스트 시작 ----- */
 const isStarting = ref(false);
 
@@ -849,28 +654,16 @@ const startTest = async () => {
   if (!token) return;
 
   isStarting.value = true;
-  showFullLoading.value = true;
 
   try {
-    const hasIntroAudio =
-      !!sessionStorage.getItem("jobtory_intro_tts_audio") ||
-      !!(introAudios.value && introAudios.value.length);
-
-    if (!langgraphId.value || !problemData.value || !hasIntroAudio) {
-      // 준비가 덜 된 경우 최대 약 1분까지 재시도
-      const ok = await waitUntilPrepared(1000, 60);
+    // 기본 준비(warmup + 문제 프리로드)가 되어 있는지 확인
+    if (!problemData.value) {
+      const ok = await runInitialSetup();
       if (!ok) {
-        window.alert("페이지가 종료되어 준비를 완료하지 못했습니다.");
+        window.alert("환경 준비에 실패했습니다. 다시 시도해 주세요.");
         return;
       }
     }
-
-    // 여전히 intro 오디오가 없으면 새로 시작하지 않음
-    if (!sessionStorage.getItem("jobtory_intro_tts_audio")) {
-      window.alert("인트로 음성을 준비하지 못했습니다. 다시 시도해 주세요.");
-      return;
-    }
-
 
     const resp = await fetch(`${BACKEND_BASE}/api/livecoding/start/`, {
       method: "POST",
@@ -880,7 +673,6 @@ const startTest = async () => {
       },
       body: JSON.stringify({
         problem_data: problemData.value,
-        langgraph_id: langgraphId.value,
       }),
     });
 
@@ -891,25 +683,28 @@ const startTest = async () => {
       return;
     }
 
-    // 백엔드가 반환한 problem_data가 반드시 있어야 front와 langgraph가 일치
+    // 백엔드가 반환한 problem_data가 반드시 있어야 front와 서버가 일치
     if (!data.problem_data) {
       window.alert("problem_data를 받지 못했습니다. 설정을 다시 진행해 주세요.");
       return;
     }
 
-    if (data.session_id) {
-      // 메모리의 problemData도 백엔드 응답으로 동기화
-      problemData.value = data.problem_data;
-      localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
-      router.replace({
-        name: "coding-session",
-        query: {
-          session_id: data.session_id,
-        },
-      });
-    } else {
+    if (!data.session_id) {
       window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
+      return;
     }
+
+    // 메모리의 problemData도 백엔드 응답으로 동기화
+    problemData.value = data.problem_data;
+    localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+
+ 
+    router.replace({
+      name: "coding-session",
+      query: {
+        session_id: data.session_id,
+      },
+    });
   } catch (err) {
     console.error(err);
     window.alert(
@@ -917,7 +712,6 @@ const startTest = async () => {
     );
   } finally {
     isStarting.value = false;
-    showFullLoading.value = false;
   }
 };
 
@@ -1296,62 +1090,6 @@ onMounted(() => {
 /* 숨김 캔버스 */
 .hidden-canvas {
   display: none;
-}
-
-/* ✅ 전체 화면 로딩 오버레이 */
-.full-loading-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.65);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 99999;
-  backdrop-filter: blur(3px);
-}
-
-.loading-container {
-  text-align: center;
-  color: #fff;
-  animation: fadeIn 0.3s ease-out;
-}
-
-.spinner {
-  width: 64px;
-  height: 64px;
-  border: 6px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #ffffff;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 16px;
-}
-
-.loading-text {
-  font-size: 20px;
-  font-weight: 700;
-  margin-bottom: 6px;
-}
-
-.loading-sub {
-  font-size: 14px;
-  opacity: 0.85;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.97);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
 }
 
 @media (max-width: 900px) {

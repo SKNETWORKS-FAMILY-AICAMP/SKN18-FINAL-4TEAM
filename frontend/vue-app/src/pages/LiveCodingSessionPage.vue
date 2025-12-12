@@ -21,6 +21,15 @@
     </header>
 
     <main class="session-main">
+      <!-- 인트로 준비 오버레이 -->
+      <div v-if="isIntroPreparing" class="intro-loading-overlay">
+        <div class="intro-loading-card">
+          <div class="intro-spinner"></div>
+          <p class="intro-loading-text">라이브 코딩 환경을 준비하고 있어요...</p>
+          <p class="intro-loading-sub">문제와 평가 에이전트를 초기화하는 중입니다.</p>
+        </div>
+      </div>
+
       <div class="left-column">
         <section class="camera-pane">
           <header class="pane-header">
@@ -213,6 +222,7 @@ const introPlayBlocked = ref(false);
 const showReloadIntroModal = ref(false);
 const cameFromReload = ref(false);
 let introGestureHandler = null;
+const isIntroPreparing = ref(false);
 
 /* -----------------------------
    🔥 버튼 클릭 로직
@@ -373,7 +383,6 @@ const runSttClient = async () => {
   }
 
   const token = localStorage.getItem("jobtory_access_token");
-  const langgraphId = localStorage.getItem("jobtory_langgraph_id");
   try {
     // 1단계: STT 전용 엔드포인트로 음성 → 텍스트 변환
     const sttResp = await fetch(
@@ -417,7 +426,6 @@ const runSttClient = async () => {
       },
       body: JSON.stringify({
         session_id: sessionId,
-        langgraph_id:langgraphId,
         stt_text: sttText,
       }),
     });
@@ -439,10 +447,12 @@ const runSttClient = async () => {
       sessionStorage.setItem(STAGE_KEY(sessionId), nextStage);
     }
     if (nextStage === "end_session" || nextStage === "end") {
+      isIntroPreparing.value = false;
       await endSessionAndReturnToCodingTest("intro_flow_done_without_strategy");
       return;
     }
     if (nextStage === "coding") {
+      isIntroPreparing.value = false;
       hasPlayedIntroTts.value = true;
       clearAnswerCountdown();
     }
@@ -578,8 +588,8 @@ const normalizeTtsChunks = (payload) => {
 
 const fetchIntroTtsAudio = async () => {
   const token = localStorage.getItem("jobtory_access_token");
-  const langgraphId = localStorage.getItem("jobtory_langgraph_id");
-  if (!token || !langgraphId || !problemData?.value) return null;
+  const sessionId = route.query.session_id;
+  if (!token || !sessionId || !problemData?.value) return null;
 
   const cachedAudio = sessionStorage.getItem("jobtory_intro_tts_audio");
   if (cachedAudio) {
@@ -592,22 +602,17 @@ const fetchIntroTtsAudio = async () => {
   }
 
   try {
-    const initResp = await fetch(
-      `${BACKEND_BASE}/api/coding-problems/session/init/?langgraph_id=${encodeURIComponent(
-        langgraphId
-      )}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          ...problemData.value,
-          langgraph_id: langgraphId,
-        }),
-      }
-    );
+    const initResp = await fetch(`${BACKEND_BASE}/api/coding-problems/session/init/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        ...problemData.value,
+        session_id: sessionId,
+      }),
+    });
     const initData = await initResp.json().catch(() => ({}));
     if (!initResp.ok) {
       console.warn("intro TTS 데이터를 가져오지 못했습니다.", initData);
@@ -689,8 +694,16 @@ const confirmReloadIntro = async () => {
 };
 
 const playIntroTtsFromSession = async () => {
-  if (isTtsPlaying.value || hasPlayedIntroTts.value) return;
-  if (stage.value !== "intro") return;
+  if (isTtsPlaying.value || hasPlayedIntroTts.value) {
+    isIntroPreparing.value = false;
+    return;
+  }
+  if (stage.value !== "intro") {
+    isIntroPreparing.value = false;
+    return;
+  }
+
+  isIntroPreparing.value = true;
 
   const sessionId = route.query.session_id;
   // stage가 intro이면 이전 재생 플래그는 무시하고 항상 재생을 시도한다.
@@ -716,6 +729,7 @@ const playIntroTtsFromSession = async () => {
     if (Array.isArray(fetched) && fetched.length) {
       chunks = fetched;
     } else {
+      isIntroPreparing.value = false;
       window.alert("인트로 오디오가 준비되지 않았습니다. 다시 시작해 주세요.");
       return;
     }
@@ -723,6 +737,7 @@ const playIntroTtsFromSession = async () => {
 
   introPlayBlocked.value = false;
   isTtsPlaying.value = true;
+  isIntroPreparing.value = false;
   try {
     const completed = await playTtsChunks(chunks, { throwOnError: true });
     if (completed && stage.value === "intro") {
@@ -1240,11 +1255,6 @@ const loadSessionFromApi = async () => {
       return false;
     }
 
-    // 세션에 저장된 langgraph_id를 로컬에 반영 (이어하기 시 STT/이벤트 호출용)
-    if (data.langgraph_id) {
-      localStorage.setItem("jobtory_langgraph_id", data.langgraph_id);
-    }
-
     problemData.value = data;
 
     // 타이머 / 상태 초기화
@@ -1289,6 +1299,7 @@ const loadSessionFromApi = async () => {
 onMounted(async () => {
   const loaded = await loadSessionFromApi();
   if (loaded) {
+    isIntroPreparing.value = stage.value === "intro";
     const lastPath = sessionStorage.getItem(LAST_PATH_KEY) || "";
     const currentPath = window.location.pathname;
     const isReload = isReloadNavigation() && lastPath === currentPath;
@@ -1420,6 +1431,7 @@ onBeforeUnmount(() => {
   grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr);
   gap: 1px;
   background: #030712;
+  position: relative;
 }
 
 .left-column {
@@ -1762,6 +1774,51 @@ onBeforeUnmount(() => {
   margin-top: 10px;
   color: #f3f4f6;
   font-size: 14px;
+}
+
+.intro-loading-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.9);
+  z-index: 1002;
+  backdrop-filter: blur(4px);
+  pointer-events: all;
+}
+
+.intro-loading-card {
+  background: #0b1220;
+  border: 1px solid #1f2937;
+  border-radius: 12px;
+  padding: 20px 24px;
+  min-width: 260px;
+  text-align: center;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+}
+
+.intro-spinner {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 12px;
+  border-radius: 50%;
+  border: 5px solid rgba(255, 255, 255, 0.2);
+  border-top-color: #38bdf8;
+  animation: spin 0.85s linear infinite;
+}
+
+.intro-loading-text {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 15px;
+  color: #f9fafb;
+}
+
+.intro-loading-sub {
+  margin: 0;
+  font-size: 13px;
+  color: #9ca3af;
 }
 
 .refresh-modal-overlay {

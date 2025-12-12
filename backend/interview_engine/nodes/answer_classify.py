@@ -9,6 +9,7 @@ AnswerClass = Literal["irrelevant", "strategy", "problem_question"]
 
 def answer_classify_agent(state: IntroState) -> IntroState:
     user_text = (state.get("stt_text") or "").strip()
+    non_strategy_count = int(state.get("intro_non_strategy_count") or 0)
     
     if not user_text:
         state["tts_text"] = "다시 대답해 주시겠어요?"
@@ -58,21 +59,15 @@ def answer_classify_agent(state: IntroState) -> IntroState:
         
     parsed = json.loads(content)
     answer_class: AnswerClass = parsed.get("answer_class", "irrelevant")
-    intro_flow_done = state.get("intro_flow_done")
-    
     if answer_class == "strategy":
         state["user_answer_class"] = answer_class
         state["user_strategy_answer"] = user_text
         state["tts_text"] = "자, 이제 문제 풀이를 시작해주세요"
+        state["intro_non_strategy_count"] = 0
 
-    elif intro_flow_done:
-        # 이미 한 번 기회를 준 뒤에도 strategy가 아니면 인트로 플로우 종료 신호를 보낸다.
-        state["user_answer_class"] = answer_class
-        
     else:
         state["user_answer_class"] = answer_class
-        # 첫 비전략 응답 이후에는 한 번 더 기회를 주고 그 다음부터는 종료
-
+        state["intro_non_strategy_count"] = non_strategy_count + 1
         if answer_class == "problem_question":
             state["user_question"] = user_text
         else:

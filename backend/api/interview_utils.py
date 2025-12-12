@@ -37,11 +37,11 @@ def get_checkpointer():
             _checkpointer = cp
             return _checkpointer
         except Exception as exc:  # noqa: BLE001
-            logger.warning("RedisSaver 초기화 실패, MemorySaver로 폴백합니다: %s", exc)
+            logger.warning("RedisSaver 초기화 실패: %s", exc)
 
     return _checkpointer
 
-def get_cached_graph(name: str, session_id=None):
+def get_cached_graph(name: str):
     if name not in _graph_cache:
         cp = get_checkpointer()
         if name == "chapter1":

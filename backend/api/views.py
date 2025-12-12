@@ -660,7 +660,6 @@ class LiveCodingSessionView(APIView):
                 "function_name": meta_problem.get("function_name") or getattr(problem_lang, "function_name", None),
                 "starter_code": meta_problem.get("starter_code") or getattr(problem_lang, "starter_code", None),
                 "test_cases": test_cases,
-                "langgraph_id": meta.get("langgraph_id"),
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": start_at_str,
                 "remaining_seconds": remaining_seconds,
@@ -753,7 +752,6 @@ class LiveCodingActiveSessionView(APIView):
                 "session_id": session_id,
                 "state": meta.get("state"),
                 "user_id": meta.get("user_id"),
-                "langgraph_id": meta.get("langgraph_id"),
                 "problem_id": meta.get("problem_id"),
                 "problem": problem.problem,
                 "difficulty": problem.difficulty,
@@ -915,7 +913,6 @@ class LiveCodingStartView(APIView):
     - 요청 본문:
         - problem_id (선택): 지정하면 해당 문제로 시작
         - language (선택): 지정 안 하면 python
-        - langgraph_id (선택): 프런트에서 생성한 ID가 있으면 저장
     - 동작:
         - problem_id 없으면 language 기준으로 랜덤 문제 선택
     - 저장되는 키: livecoding:{session_id}:meta
@@ -937,13 +934,7 @@ class LiveCodingStartView(APIView):
                 {"detail": "problem_data가 필요합니다. 설정 단계를 다시 진행해 주세요."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
-        
-        langgraph_id = request.data.get("langgraph_id")
-        if not langgraph_id:
-            return Response(
-                {"detail": "langgraph_id가 필요합니다."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
+
 
         session_id = secrets.token_hex(16)
         # Redis(캐시)에 저장할 세션 메타 정보
@@ -952,7 +943,6 @@ class LiveCodingStartView(APIView):
             "state": "in_progress",
             "user_id": user.user_id,
             "session_id": session_id,
-            "langgraph_id": langgraph_id,
             "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
             "problem_id": problem_data.get("problem_id"),

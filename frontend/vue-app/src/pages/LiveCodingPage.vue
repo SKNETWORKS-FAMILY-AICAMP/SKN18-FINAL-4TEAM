@@ -81,7 +81,6 @@ const resetLivecodingCaches = () => {
   sessionStorage.removeItem("jobtory_intro_tts_audio");
   sessionStorage.removeItem("jobtory_livecoding_problem_data");
   localStorage.removeItem("jobtory_livecoding_session_id");
-  localStorage.removeItem("jobtory_langgraph_id");
 };
 
 const loadActiveSession = async (token) => {

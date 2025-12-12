@@ -25,7 +25,7 @@ from .throttling import (
 from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
-from .interview_utils import _generate_tts_payload
+from .interview_utils import _generate_tts_payload, get_cached_graph
 
 from .models import (
     AuthIdentity,

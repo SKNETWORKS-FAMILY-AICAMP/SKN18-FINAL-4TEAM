@@ -377,7 +377,21 @@ const preloadProblem = async () => {
 };
 
 const prepareIntroTts = async () => {
-  if (isInitLoading.value) return !!introText.value;
+  if (isInitLoading.value) {
+    const cachedAudio = sessionStorage.getItem("jobtory_intro_tts_audio");
+    return !!cachedAudio || !!(introAudios.value && introAudios.value.length);
+  }
+  const cachedAudio = sessionStorage.getItem("jobtory_intro_tts_audio");
+  if (cachedAudio) {
+    const parsed = normalizeTtsChunks(JSON.parse(cachedAudio));
+    if (parsed.length) {
+      introAudios.value = parsed;
+      const cachedText = sessionStorage.getItem("jobtory_intro_tts_text") || "";
+      if (cachedText) introText.value = cachedText;
+      return true;
+    }
+  }
+
   if (!langgraphId.value || !problemData.value) return false;
   isInitLoading.value = true;
 
@@ -408,9 +422,23 @@ const prepareIntroTts = async () => {
       problem_preview: (problemData.value?.problem || "").slice(0, 120),
     });
     const data = await resp.json().catch(() => ({}));
-    if (resp.ok && typeof data?.tts_text === "string") {
-      introText.value = data.tts_text;
-      return true;
+    if (resp.ok) {
+      const chunks = normalizeTtsChunks(data?.tts_text || data?.tts_audio);
+      if (Array.isArray(chunks) && chunks.length) {
+        introAudios.value = chunks;
+        sessionStorage.setItem("jobtory_intro_tts_audio", JSON.stringify(chunks));
+        const joinedText = chunks
+          .map((c) => (c.text || "").trim())
+          .filter(Boolean)
+          .join(" ");
+        if (joinedText) {
+          introText.value = joinedText;
+          sessionStorage.setItem("jobtory_intro_tts_text", joinedText);
+        } else {
+          sessionStorage.removeItem("jobtory_intro_tts_text");
+        }
+        return true;
+      }
     }
   } catch (err) {
     console.warn("init warmup failed", err);
@@ -426,8 +454,16 @@ const normalizeTtsChunks = (payload: unknown): TtsChunk[] => {
       .map((c) => {
         if (!c) return null;
         if (typeof c === "string") return { audio: c, text: "" };
-        if (typeof c === "object" && ("audio" in c || "text" in c)) {
-          return c as TtsChunk;
+        if (
+          typeof c === "object" &&
+          (("audio" in c && c.audio) || ("audio_base64" in c && c.audio_base64) || "text" in c)
+        ) {
+          const obj = c as Record<string, unknown>;
+          const audio = (obj.audio as string) || (obj.audio_base64 as string) || "";
+          const text = (obj.text as string) || "";
+          if (audio || text) {
+            return { audio, text } as TtsChunk;
+          }
         }
         return null;
       })
@@ -440,53 +476,25 @@ const normalizeTtsChunks = (payload: unknown): TtsChunk[] => {
 };
 
 const preloadIntroTtsAudio = async () => {
-  // introText가 없으면 프리로드 불가
-  if (!introText.value) return false;
-
-  const token = ensureLoggedIn();
-  if (!token) return false;
-
-  const lgId =
-    langgraphId.value || localStorage.getItem("jobtory_langgraph_id");
-  if (!lgId) {
-    console.warn("langgraph_id 없음 → intro TTS audio 프리로드 불가");
-    return false;
+  const cached = sessionStorage.getItem("jobtory_intro_tts_audio");
+  if (cached) {
+    try {
+      const parsed = normalizeTtsChunks(JSON.parse(cached));
+      if (parsed.length) {
+        introAudios.value = parsed;
+        return true;
+      }
+    } catch (e) {
+      console.warn("캐시된 intro 오디오 파싱 실패:", e);
+    }
   }
 
-  try {
-    const resp = await fetch(`${BACKEND_BASE}/api/tts/intro/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        tts_text: introText.value,
-        langgraph_id: lgId,
-        max_sentences: 5,
-      }),
-    });
-
-    const data = await resp.json().catch(() => ({}));
-    let chunks: TtsChunk[] = normalizeTtsChunks(data.tts_audio);
-    if (!chunks.length) {
-      chunks = normalizeTtsChunks(data.tts_text);
-    }
-
-    if (resp.ok && Array.isArray(chunks) && chunks.length) {
-      introAudios.value = chunks;
-      // 세션 페이지에서 그대로 재생할 수 있도록 저장
-      sessionStorage.setItem("jobtory_intro_tts_audio", JSON.stringify(chunks));
-      return true;
-    }
-
-    // 실패 시 기존 잘못된 값 제거
-    sessionStorage.removeItem("jobtory_intro_tts_audio");
-    return false;
-  } catch (err) {
-    console.error("intro TTS audio 프리로드 오류:", err);
-    return false;
+  if (introAudios.value && introAudios.value.length) {
+    sessionStorage.setItem("jobtory_intro_tts_audio", JSON.stringify(introAudios.value));
+    return true;
   }
+
+  return prepareIntroTts();
 };
 
 const ensureLanggraphId = async () => warmupLanggraph();
@@ -503,8 +511,12 @@ const runInitialSetup = async () => {
     const introOk = await prepareIntroTts();
     if (!introOk) return false;
 
-    const audioOk = await preloadIntroTtsAudio();
-    if (!audioOk) return false;
+    const hasAudio = !!sessionStorage.getItem("jobtory_intro_tts_audio") ||
+      !!(introAudios.value && introAudios.value.length);
+    if (!hasAudio) {
+      const audioOk = await preloadIntroTtsAudio();
+      if (!audioOk) return false;
+    }
 
     hasInitRun.value = true;
     return true;
@@ -518,22 +530,24 @@ const runInitialSetup = async () => {
 const waitUntilPrepared = async (delayMs = 800, maxAttempts = 30) => {
   let attempts = 0;
   while (attempts < maxAttempts) {
-    const hasAudio = !!sessionStorage.getItem("jobtory_intro_tts_audio");
+    const hasAudio =
+      !!sessionStorage.getItem("jobtory_intro_tts_audio") ||
+      !!(introAudios.value && introAudios.value.length);
     const hasText = !!introText.value;
 
-    if (langgraphId.value && problemData.value && hasText && hasAudio) {
+    if (langgraphId.value && problemData.value && hasAudio) {
       return true;
     }
 
     // 텍스트는 준비됐는데 오디오만 없는 경우: 오디오만 재시도
-    if (langgraphId.value && problemData.value && hasText && !hasAudio) {
+    if (langgraphId.value && problemData.value && !hasAudio) {
       const audioOk = await preloadIntroTtsAudio();
       if (audioOk) return true;
     } else {
       const ok = await runInitialSetup();
       if (ok) {
         const hasAudioNow = !!sessionStorage.getItem("jobtory_intro_tts_audio");
-        if (langgraphId.value && problemData.value && introText.value && hasAudioNow) {
+        if (langgraphId.value && problemData.value && hasAudioNow) {
           return true;
         }
       }
@@ -838,9 +852,11 @@ const startTest = async () => {
   showFullLoading.value = true;
 
   try {
-    const hasIntroAudio = !!sessionStorage.getItem("jobtory_intro_tts_audio");
+    const hasIntroAudio =
+      !!sessionStorage.getItem("jobtory_intro_tts_audio") ||
+      !!(introAudios.value && introAudios.value.length);
 
-    if (!langgraphId.value || !problemData.value || !introText.value || !hasIntroAudio) {
+    if (!langgraphId.value || !problemData.value || !hasIntroAudio) {
       // 준비가 덜 된 경우 최대 약 1분까지 재시도
       const ok = await waitUntilPrepared(1000, 60);
       if (!ok) {
@@ -864,7 +880,6 @@ const startTest = async () => {
       },
       body: JSON.stringify({
         problem_data: problemData.value,
-        language: problemData.value.language || DEFAULT_LANGUAGE,
         langgraph_id: langgraphId.value,
       }),
     });

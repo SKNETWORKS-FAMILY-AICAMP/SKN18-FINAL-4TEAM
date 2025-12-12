@@ -1,16 +1,13 @@
 import logging
 import os
 from dotenv import load_dotenv
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.redis import RedisSaver
-
 from tts_client import generate_interview_audio_batch
 from interview_engine import llm
 from interview_engine.graph import (
     create_chapter1_graph_flow,
 
 )
-
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
 logger = logging.getLogger(__name__)
@@ -42,8 +39,6 @@ def get_checkpointer():
         except Exception as exc:  # noqa: BLE001
             logger.warning("RedisSaver 초기화 실패, MemorySaver로 폴백합니다: %s", exc)
 
-    # 폴백: 인메모리 체크포인터 (프로세스 내에서만 유지됨)
-    _checkpointer = MemorySaver()
     return _checkpointer
 
 def get_cached_graph(name: str, session_id=None):
@@ -55,7 +50,6 @@ def get_cached_graph(name: str, session_id=None):
             raise ValueError(f"unknown graph {name}")
     return _graph_cache[name]
 
-
 def get_cached_llm():
     """interview_engine.llm.LLM 인스턴스를 캐싱해 재사용."""
     global _llm_instance
@@ -64,7 +58,7 @@ def get_cached_llm():
         _llm_instance = getattr(llm, "LLM", None)
     return _llm_instance
 
-def generate_tts_payload(text: str, thread_id: str | None = None, max_sentences=None):
+def intro_tts_payload(text: str, thread_id: str | None = None, max_sentences=None):
     """
     LangGraph thread_id와 문장 수 제한을 반영해 배치 TTS를 수행하고
     프론트로 내려줄 청크 페이로드를 생성합니다.

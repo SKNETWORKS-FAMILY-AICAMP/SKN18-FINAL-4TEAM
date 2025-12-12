@@ -58,24 +58,20 @@ def answer_classify_agent(state: IntroState) -> IntroState:
         
     parsed = json.loads(content)
     answer_class: AnswerClass = parsed.get("answer_class", "irrelevant")
-    intro_flow_done = bool(state.get("intro_flow_done"))
+    intro_flow_done = state.get("intro_flow_done")
     
     if answer_class == "strategy":
         state["user_answer_class"] = answer_class
         state["user_strategy_answer"] = user_text
-        state["intro_flow_done"] = True
-        state["end_intro"] = False
+        state["tts_text"] = "자, 이제 문제 풀이를 시작해주세요"
 
     elif intro_flow_done:
         # 이미 한 번 기회를 준 뒤에도 strategy가 아니면 인트로 플로우 종료 신호를 보낸다.
         state["user_answer_class"] = answer_class
-        state["end_intro"] = True
-
+        
     else:
         state["user_answer_class"] = answer_class
         # 첫 비전략 응답 이후에는 한 번 더 기회를 주고 그 다음부터는 종료
-        state["intro_flow_done"] = True
-        state["end_intro"] = False
 
         if answer_class == "problem_question":
             state["user_question"] = user_text

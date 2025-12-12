@@ -3,7 +3,6 @@ from django.urls import path
 from .views import (
     EmailSendView,
     EmailVerifyView,
-    CodingProblemTextInitView,
     FindIdView,
     FindPasswordView,
     GoogleAuthView,
@@ -11,20 +10,22 @@ from .views import (
     LogoutView,
     LiveCodingActiveSessionView,
     LiveCodingEndSessionView,
-    LiveCodingPreloadView,
-    LiveCodingStartView,
     LiveCodingCodeSnapshotView,
     LiveCodingSessionView,
-
-    InterviewIntroEventView,
+    LiveCodingStartView,
     SignupView,
     UserIdCheckView,
-    WarmupLanggraphView,
-    TTSView,
     UserMeView,
     ProfileView,
     health,
     roadmap,
+)
+
+from .chap1_views import (
+    CodingProblemTextInitView,
+    LiveCodingPreloadView,
+    InterviewIntroEventView,
+    WarmupLanggraphView,
 )
 
 urlpatterns = [
@@ -46,7 +47,6 @@ urlpatterns = [
     path("livecoding/preload/", LiveCodingPreloadView.as_view(), name="livecoding-preload"),
     path("coding-problems/session/init/",CodingProblemTextInitView.as_view(),name="coding-problem-session-init-text",),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
-    path("tts/intro/",TTSView.as_view(),name="tts-intro",),
     path("interview/event/",InterviewIntroEventView.as_view(),name="interview-event",),
     
     # livecoding 관련 

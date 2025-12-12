@@ -1113,7 +1113,7 @@ class CodingQuestionView(APIView):
         starter_code = (meta.get("starter_code") or "").strip()
 
         # 2) LangGraph(chapter2) 호출
-        graph = get_cached_graph(session_id=session_id, name="chapter2")
+        graph = get_cached_graph(name="chapter2")
         coding_state = {
             "meta": {"session_id": session_id, "user_id": user.user_id},
             "code": latest_code,

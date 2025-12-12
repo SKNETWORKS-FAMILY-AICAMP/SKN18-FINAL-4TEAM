@@ -20,7 +20,7 @@ class IntroState(TypedDict, total=False):
     ]
     user_question: Optional[str]   # 문제에 대해 되묻는 질문 텍스트
     problem_answer: Optional[str]   # 문제 관련 질문에 대한 답
-    intro_flow_done: bool     # 한번 loop(질문/분류 플로우)
+    intro_non_strategy_count: int # loop용
     
     tts_text : str
     stt_text : str

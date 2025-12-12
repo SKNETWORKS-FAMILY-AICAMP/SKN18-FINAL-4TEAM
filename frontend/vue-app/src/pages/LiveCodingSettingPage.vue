@@ -200,17 +200,36 @@
         </div>
       </section>
     </div>
+
   </div>
 </template>
 
-<script setup>
-import { ref, onBeforeUnmount, nextTick, computed } from "vue";
+<script setup lang="ts">
+import { ref, onBeforeUnmount, nextTick, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { onMounted } from "vue"
 
 const router = useRouter();
 const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+const DEFAULT_LANGUAGE = "python";
+
+const resetLivecodingCaches = () => {
+  sessionStorage.removeItem("jobtory_intro_tts_text");
+  sessionStorage.removeItem("jobtory_intro_tts_audio");
+  sessionStorage.removeItem("jobtory_livecoding_problem_data");
+  localStorage.removeItem("jobtory_livecoding_session_id");
+};
+
+/* ----- 공통: 로그인 보장 헬퍼 ----- */
+const ensureLoggedIn = () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
+    router.push({ name: "login" });
+    return null;
+  }
+  return token;
+};
 
 /* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
 // rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
@@ -259,12 +278,91 @@ const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
 };
 
-// Langgraph/LLM 워밍업 호출
+/* -----------------------------------------
+   LangGraph / 문제
+-------------------------------------------- */
+const problemData = ref(null);
+const hasInitRun = ref(false);
+const isWarmed = ref(false);
+const isPreloading = ref(false);
 const warmupLanggraph = async () => {
+  if (isWarmed.value) return true;
   try {
-    await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, { method: "GET" });
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data?.status === "warmed") {
+      isWarmed.value = true;
+      return true;
+    }
   } catch (err) {
     console.warn("warmup failed", err);
+  }
+  return false;
+};
+
+const preloadProblem = async () => {
+  // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
+  if (problemData.value) return true;
+  if (isPreloading.value) return !!problemData.value;
+  isPreloading.value = true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        language: DEFAULT_LANGUAGE,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
+      return false;
+    }
+    if (!data?.problem_id) {
+      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
+      return false;
+    }
+    console.log("[livecoding][preload] problem loaded", {
+      problem_id: data.problem_id,
+      language: data.language,
+    });
+    problemData.value = data;
+    return true;
+  } catch (err) {
+    console.error(err);
+    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    return false;
+  } finally {
+    isPreloading.value = false;
+  }
+};
+
+/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
+const runInitialSetup = async () => {
+  if (hasInitRun.value) return true;
+  try {
+    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
+    if (!warmOk || !preloaded) return false;
+
+    hasInitRun.value = true;
+    return true;
+  } catch (e) {
+    console.error("runInitialSetup 실패:", e);
+    return false;
   }
 };
 
@@ -545,34 +643,38 @@ const confirmSpeakerHeard = () => {
   speakerPassed.value = true;
 };
 
-/* ----- 마지막: 테스트 시작 (파일2의 API 연동 버전) ----- */
+
+/* ----- 마지막: 테스트 시작 ----- */
 const isStarting = ref(false);
 
 const startTest = async () => {
   if (isStarting.value) return;
 
-  const token = localStorage.getItem("jobtory_access_token");
-  if (!token) {
-    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
-    router.push({ name: "login" });
-    return;
-  }
+  const token = ensureLoggedIn();
+  if (!token) return;
 
   isStarting.value = true;
+
   try {
-    const resp = await fetch(
-      `${
-        import.meta.env.VITE_API_BASE || "http://localhost:8000"
-      }/api/livecoding/start/`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({}),
+    // 기본 준비(warmup + 문제 프리로드)가 되어 있는지 확인
+    if (!problemData.value) {
+      const ok = await runInitialSetup();
+      if (!ok) {
+        window.alert("환경 준비에 실패했습니다. 다시 시도해 주세요.");
+        return;
       }
-    );
+    }
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/start/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        problem_data: problemData.value,
+      }),
+    });
 
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
@@ -581,16 +683,28 @@ const startTest = async () => {
       return;
     }
 
-    if (data.session_id) {
-      localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
-      // 세션 화면으로 이동할 때 히스토리를 교체하여 뒤로가기를 누르면 설정 페이지 대신 이전 화면으로 이동합니다.
-      router.replace({
-        name: "coding-session",
-        query: { session_id: data.session_id },
-      });
-    } else {
-      window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
+    // 백엔드가 반환한 problem_data가 반드시 있어야 front와 서버가 일치
+    if (!data.problem_data) {
+      window.alert("problem_data를 받지 못했습니다. 설정을 다시 진행해 주세요.");
+      return;
     }
+
+    if (!data.session_id) {
+      window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
+      return;
+    }
+
+    // 메모리의 problemData도 백엔드 응답으로 동기화
+    problemData.value = data.problem_data;
+    localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+
+ 
+    router.replace({
+      name: "coding-session",
+      query: {
+        session_id: data.session_id,
+      },
+    });
   } catch (err) {
     console.error(err);
     window.alert(
@@ -608,7 +722,9 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  void warmupLanggraph();
+  // 새 세션 시작 시 이전 세션 캐시를 정리
+  resetLivecodingCaches();
+  void runInitialSetup();
 });
 </script>
 

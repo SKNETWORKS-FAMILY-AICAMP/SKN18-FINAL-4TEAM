@@ -1,6 +1,9 @@
+import logging
 import os
-from tts_client import generate_interview_audio_batch
 from dotenv import load_dotenv
+from langgraph.checkpoint.redis import RedisSaver
+from tts_client import generate_interview_audio_batch
+from interview_engine import llm
 from interview_engine.graph import (
     create_chapter1_graph_flow,
     create_chapter2_graph_flow,
@@ -10,6 +13,7 @@ from langgraph.checkpoint.redis import RedisSaver
 from .stt_buffer import append_conversation_event
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
+logger = logging.getLogger(__name__)
 
 # 모듈 전역
 _checkpointer = None
@@ -18,14 +22,29 @@ _llm_instance = None
 
 
 def get_checkpointer():
+    """RedisSaver를 우선 사용하되, 실패 시 인메모리로 폴백.
+
+    - cp.setup()을 호출해 애플리케이션 시작 시점에 연결 풀을 미리 올려
+      첫 호출 지연을 줄인다.
+    - Redis 설정이 없거나 실패하면 MemorySaver로 전환해 가용성을 보장한다.
+    """
+
     global _checkpointer
-    if _checkpointer is None:
-        cp = RedisSaver(REDIS_URL)
-        cp.setup()
-        _checkpointer = cp
+    if _checkpointer is not None:
+        return _checkpointer
+
+    if REDIS_URL:
+        try:
+            cp = RedisSaver(REDIS_URL)
+            cp.setup()  # 연결 풀 및 키스페이스 준비
+            _checkpointer = cp
+            return _checkpointer
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("RedisSaver 초기화 실패: %s", exc)
+
     return _checkpointer
 
-def get_cached_graph(session_id, name: str):
+def get_cached_graph(name: str):
     if name not in _graph_cache:
         cp = get_checkpointer()
         if name == "chapter1":
@@ -35,7 +54,6 @@ def get_cached_graph(session_id, name: str):
         else:
             raise ValueError(f"unknown graph {name}")
     return _graph_cache[name]
-
 
 def get_cached_llm():
     """interview_engine.llm.LLM 인스턴스를 캐싱해 재사용."""

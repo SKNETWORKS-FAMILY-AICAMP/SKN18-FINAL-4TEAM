@@ -183,11 +183,8 @@ const handleStartNewSession = async () => {
         }
       }).catch(() => {});
       activeSessionId.value = null;
-      resetLivecodingCaches();
+      localStorage.removeItem("jobtory_livecoding_session_id");
     }
-
-    // 혹시 남아 있는 캐시를 정리하고 완전 새로 시작
-    resetLivecodingCaches();
 
     router.push({ name: "coding-settings" });
   } catch (err) {

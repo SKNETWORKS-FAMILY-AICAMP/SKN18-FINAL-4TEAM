@@ -1,10 +1,10 @@
 from langgraph.graph import StateGraph, END
-
 from interview_engine.state import IntroState, CodingState
 from interview_engine.nodes.problem_intro_node import problem_intro_agent
 from interview_engine.nodes.problem_answer_node import problem_answer_agent
 from interview_engine.nodes.answer_classify import answer_classify_agent
 from interview_engine.conditional_edges import chap1_main_condition, chap1_answer_route
+from interview_engine.nodes.hint_node import hint_agent
 from interview_engine.nodes.code_quality_collabo_node import code_quality_collabo_agent
 from interview_engine.nodes.question_generate_node import question_generation_agent
 from interview_engine.nodes.coding_intro_node import coding_stage_intro_agent
@@ -45,9 +45,9 @@ def create_chapter2_graph_flow(checkpointer=None):
     - coding_answer_feedback_agent: 질문에 대한 사용자의 답변에 짧게 반응하는 멘트 생성
 
     event_type에 따라 엔트리 노드가 달라진다.
-      - event_type == "coding_intro"    → coding_intro → END
-      - event_type == "question_answer" → coding_answer_feedback → END
-      - 그 외                            → code_quality_collabo → question_generate → END
+    - event_type == "coding_intro"    → coding_intro → END
+    - event_type == "question_answer" → coding_answer_feedback → END
+    - 그 외                            → code_quality_collabo → question_generate → END
     """
     graph = StateGraph(CodingState)
 
@@ -72,4 +72,13 @@ def create_chapter2_graph_flow(checkpointer=None):
     graph.add_edge("code_quality_collabo", "question_generate")
     graph.add_edge("question_generate", END)
 
+    return graph.compile(checkpointer=checkpointer)
+
+def create_chapter2_hint_graph(checkpointer=None):
+    graph = StateGraph(CodingState)
+
+    # chapter 2: Hint
+    graph.add_node("hint_agent",hint_agent)
+    graph.set_entry_point("hint_agent")
+    
     return graph.compile(checkpointer=checkpointer)

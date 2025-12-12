@@ -204,9 +204,10 @@
   </div>
 </template>
 
-<script setup lang="ts">
-import { ref, onBeforeUnmount, nextTick, computed, onMounted } from "vue";
+<script setup>
+import { ref, onBeforeUnmount, nextTick, computed } from "vue";
 import { useRouter } from "vue-router";
+import { onMounted } from "vue"
 
 const router = useRouter();
 const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;
@@ -722,9 +723,7 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  // 새 세션 시작 시 이전 세션 캐시를 정리
-  resetLivecodingCaches();
-  void runInitialSetup();
+  void warmupLanggraph();
 });
 </script>
 

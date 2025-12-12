@@ -12,6 +12,7 @@ from .views import (
     LiveCodingEndSessionView,
     LiveCodingCodeSnapshotView,
     LiveCodingSessionView,
+    LiveCodingHintView,
     CodingQuestionView,
     TTSView,
     LiveCodingStartView,
@@ -43,13 +44,20 @@ urlpatterns = [
     path("auth/google/", GoogleAuthView.as_view(), name="google-auth"),
     path("auth/me/", UserMeView.as_view(), name="me"),
     path("auth/logout/", LogoutView.as_view(), name="logout"),
-    
-    # langgraph에서 사용
+    path(
+        "coding-problems/session/init/",
+        CodingProblemTextInitView.as_view(),
+        name="coding-problem-session-init-text",
+    ),
+    path(
+        "tts/intro/",
+        TTSView.as_view(),
+        name="tts-intro",
+    ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
-    path("livecoding/preload/", LiveCodingPreloadView.as_view(), name="livecoding-preload"),
-    path("coding-problems/session/init/",CodingProblemTextInitView.as_view(),name="coding-problem-session-init-text",),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
     path("interview/event/",InterviewIntroEventView.as_view(),name="interview-event",),
+    path("livecoding/preload/", LiveCodingPreloadView.as_view(), name="livecoding-preload"),
     
     # livecoding 관련 
     path("livecoding/session/", LiveCodingSessionView.as_view(), name="livecoding-session"),
@@ -59,6 +67,11 @@ urlpatterns = [
         "livecoding/session/code/",
         LiveCodingCodeSnapshotView.as_view(),
         name="livecoding-session-code",
+    ),
+    path(
+        "livecoding/session/hint/",
+        LiveCodingHintView.as_view(),
+        name="livecoding-session-hint",
     ),
     path(
         "livecoding/session/question/",

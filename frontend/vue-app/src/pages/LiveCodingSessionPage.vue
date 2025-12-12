@@ -115,14 +115,11 @@
               type="button"
               class="hint-button"
               @click="requestHint"
-              :disabled="isSttRunning || isTtsPlaying"
+              :disabled="isSttRunning || isTtsPlaying || isHintDisabled"
             >
-              힌트요청
+              {{ isHintLoading ? "힌트 생성 중..." : "힌트 요청" }}
             </button>
-            <span class="hint-counter">힌트 3/3</span>
-            <span v-if="answerCountdown !== null" class="hint countdown-inline">
-              {{ answerCountdown }}초 후 자동 답변 시작
-            </span>
+            <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
           </div>
           <div class="footer-right">
             <button type="button" class="run-button" @click="onSubmitClick">제출하기</button>
@@ -208,11 +205,17 @@ const answerCountdown = ref(null);
 let answerCountdownTimer = null;
 let micCooldownTimer = null;
 const ANSWER_COUNTDOWN_SECONDS = 30;
+const HINT_LIMIT = 3;
+const hintCount = ref(0);
+const isHintLoading = ref(false);
+const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= HINT_LIMIT);
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
 const hasPlayedIntroTts = ref(false);
 const INTRO_PLAYED_KEY = (sid) => `jobtory_intro_played_${sid}`;
+const INTRO_AUDIO_KEY = (sid) => `jobtory_intro_tts_audio_${sid}`;
+const INTRO_TEXT_KEY = (sid) => `jobtory_intro_tts_text_${sid}`;
 const STAGE_KEY = (sid) => `jobtory_stage_${sid}`;
 const LAST_PATH_KEY = "jobtory_last_path";
 const stage = ref("intro"); // intro | coding | end_session
@@ -688,7 +691,10 @@ const fetchIntroTtsAudio = async () => {
   const sessionId = route.query.session_id;
   if (!token || !sessionId || !problemData?.value) return null;
 
-  const cachedAudio = sessionStorage.getItem("jobtory_intro_tts_audio");
+  const audioKey = INTRO_AUDIO_KEY(sessionId);
+  const textKey = INTRO_TEXT_KEY(sessionId);
+
+  const cachedAudio = sessionStorage.getItem(audioKey);
   if (cachedAudio) {
     try {
       const parsed = normalizeTtsChunks(JSON.parse(cachedAudio));
@@ -718,13 +724,13 @@ const fetchIntroTtsAudio = async () => {
 
     const refreshed = normalizeTtsChunks(initData.tts_text || initData.tts_audio);
     if (refreshed.length) {
-      sessionStorage.setItem("jobtory_intro_tts_audio", JSON.stringify(refreshed));
+      sessionStorage.setItem(audioKey, JSON.stringify(refreshed));
       const joined = refreshed
         .map((c) => (c.text || "").trim())
         .filter(Boolean)
         .join(" ");
       if (joined) {
-        sessionStorage.setItem("jobtory_intro_tts_text", joined);
+        sessionStorage.setItem(textKey, joined);
       }
       return refreshed;
     }
@@ -732,7 +738,7 @@ const fetchIntroTtsAudio = async () => {
     const fallbackText =
       typeof initData?.tts_text === "string" ? initData.tts_text.trim() : "";
     if (fallbackText) {
-      sessionStorage.setItem("jobtory_intro_tts_text", fallbackText);
+      sessionStorage.setItem(textKey, fallbackText);
     }
     console.warn("intro TTS 오디오를 다시 준비하지 못했습니다.", initData);
   } catch (err) {
@@ -808,7 +814,8 @@ const playIntroTtsFromSession = async () => {
     sessionStorage.removeItem(INTRO_PLAYED_KEY(sessionId));
   }
 
-  const audio = sessionStorage.getItem("jobtory_intro_tts_audio");
+  const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
+  const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
 
   let chunks;
   if (audio) {
@@ -1220,12 +1227,17 @@ const fetchRandomProblem = async () => {
 const requestHint = async () => {
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
+  if (hintCount.value >= HINT_LIMIT) {
+    showAntiCheat("sttError", "사용 가능한 힌트가 모두 소진되었습니다.");
+    return;
+  }
   if (!token || !sessionId) {
     showAntiCheat("sttError", "세션이나 로그인 정보가 없습니다.");
     return;
   }
 
   try {
+    isHintLoading.value = true;
     const resp = await fetch(`${BACKEND_BASE}/api/livecoding/session/hint/`, {
       method: "POST",
       headers: {
@@ -1238,6 +1250,7 @@ const requestHint = async () => {
         code: code.value,
         problem_description: problemData.value?.problem || "",
         problem_algorithm_category: problemData.value?.category || "",
+        hint_count: hintCount.value,
       }),
     });
 
@@ -1248,11 +1261,29 @@ const requestHint = async () => {
       return;
     }
 
-    // TODO: 받은 힌트를 UI에 표시하도록 연결
     console.log("hint result", data);
+
+    // 힌트 사용 횟수 반영 (백엔드 응답 우선, 없으면 +1)
+    if (data && typeof data.hint_count === "number") {
+      hintCount.value = Math.min(HINT_LIMIT, Math.max(0, data.hint_count));
+    } else {
+      hintCount.value = Math.min(HINT_LIMIT, hintCount.value + 1);
+    }
+
+    // 힌트가 TTS 오디오로 내려오면 바로 재생
+    const ttsChunks = Array.isArray(data?.tts_audio) ? data.tts_audio : [];
+    if (ttsChunks.length) {
+      try {
+        await playTtsChunks(ttsChunks);
+      } catch (err) {
+        console.error("failed to play hint TTS", err);
+      }
+    }
   } catch (err) {
     console.error("hint request error", err);
     showAntiCheat("sttError", "힌트 요청 중 오류가 발생했습니다.");
+  } finally {
+    isHintLoading.value = false;
   }
 };
 
@@ -2093,16 +2124,16 @@ onBeforeUnmount(() => {
   color: #0b1a13;
 }
 
+.hint-counter {
+  font-size: 12px;
+  color: #9ca3af;
+}
+
 .mic-label {
   font-size: 13px;
   font-weight: 700;
   color: inherit;
   white-space: nowrap;
-}
-
-.hint-counter {
-  font-size: 12px;
-  color: #9ca3af;
 }
 
 .countdown-inline {

@@ -134,9 +134,7 @@ class CodingProblemTextInitView(APIView):
                 init_state,
                 config={
                     "configurable": {
-                        "thread_id": session_id,
-                        # 세션별로 체크포인트 네임스페이스를 분리해 이전 세션 문제 데이터가 섞이지 않도록 한다.
-                        "checkpoint_namespace": f"chapter1",
+                        "thread_id": f"{session_id}:chapter1"
                     }
                 },
             )
@@ -218,8 +216,7 @@ class InterviewIntroEventView(APIView):
                     coding_state,
                     config={
                         "configurable": {
-                            "thread_id": session_id,
-                            "checkpoint_namespace": "chapter2",
+                            "thread_id": f"{session_id}:chapter2"
                         }
                     },
                 )
@@ -253,8 +250,7 @@ class InterviewIntroEventView(APIView):
                 update_state,
                 config={
                     "configurable": {
-                        "thread_id": session_id,
-                        "checkpoint_namespace": "chapter1",
+                        "thread_id":f"{session_id}:chapter1"
                     }
                 },
             )
@@ -295,8 +291,7 @@ class InterviewIntroEventView(APIView):
                     coding_state,
                     config={
                         "configurable": {
-                            "thread_id": session_id,
-                            "checkpoint_namespace": "chapter2",
+                            "thread_id": f"{session_id}:chapter2"
                         }
                     },
                 )

@@ -1,14 +1,31 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, asdict
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, Optional, Tuple
 
 import cv2
+import joblib
 import mediapipe as mp
 import numpy as np
+import pandas as pd
 
 
 mp_face_mesh = mp.solutions.face_mesh
+FEATURE_ORDER = [
+    "pitch",
+    "yaw",
+    "roll",
+    "gaze_lr",
+    "gaze_ud",
+    "final_lr",
+    "final_ud",
+    "face_count",
+    "face_visible",
+]
+
+ML_THRESHOLD = 0.8
 
 
 @dataclass
@@ -216,6 +233,76 @@ def _describe_gaze(final_lr: str, final_ud: str, yaw: Optional[float]) -> str:
     return final_text
 
 
+@lru_cache(maxsize=1)
+def _load_model():
+    """
+    anti_cheat_hgb.pkl을 한 번만 로드해 재사용합니다.
+    """
+    base_dir = Path(__file__).resolve().parents[1]  # backend/
+    candidates = [
+        base_dir / "anti_cheat" / "model" / "anti_cheat_hgb.pkl",  # backend/anti_cheat/model/...
+        base_dir / "anti_cheat_hgb.pkl",        # backend/anti_cheat_hgb.pkl
+        base_dir.parent / "anti_cheat_hgb.pkl", # repo root
+        Path.cwd() / "anti_cheat_hgb.pkl",      # current working dir
+    ]
+    for path in candidates:
+        if path.exists():
+            return joblib.load(path)
+    tried = ", ".join(str(p) for p in candidates)
+    raise FileNotFoundError(f"ML 모델 파일을 찾을 수 없습니다. 확인 경로: {tried}")
+
+
+def _encode_row(feats: Dict[str, Any]) -> pd.DataFrame:
+    """
+    scikit-learn 입력 형식으로 단일 샘플을 변환합니다.
+    - 모델이 학습 시 사용한 feature_names_in_을 기준으로 원-핫 컬럼을 채웁니다.
+    - 대응하는 컬럼이 없으면 0으로 둡니다.
+    """
+    model = _load_model()
+    names_raw = getattr(model, "feature_names_in_", None)
+    feature_names = list(names_raw.tolist() if hasattr(names_raw, "tolist") else (names_raw or []))
+
+    # 기본값 0으로 초기화
+    row: Dict[str, float] = {name: 0.0 for name in feature_names}
+
+    # 연속형 컬럼 채우기
+    for num_key in ["pitch", "yaw", "roll", "face_count", "face_visible"]:
+        if num_key in row and num_key in feats:
+            try:
+                row[num_key] = float(feats[num_key])
+            except Exception:
+                row[num_key] = 0.0
+
+    # 카테고리 원-핫 컬럼 채우기 (모델에 존재할 때만 1로 설정)
+    for cat_key in ["gaze_lr", "gaze_ud", "final_lr", "final_ud"]:
+        val = str(feats.get(cat_key, "NONE"))
+        col_name = f"{cat_key}_{val}"
+        if col_name in row:
+            row[col_name] = 1.0
+
+    # feature_names_in_이 없는 경우(레거시) 대비: 기존 FEATURE_ORDER 사용
+    if not feature_names:
+        for key in FEATURE_ORDER:
+            val = feats.get(key)
+            try:
+                row[key] = float(val)
+            except Exception:
+                row[key] = 0.0
+        feature_names = FEATURE_ORDER
+
+    return pd.DataFrame([row], columns=feature_names)
+
+
+def _predict_with_model(feats: Dict[str, Any]) -> Tuple[bool, float]:
+    """
+    ML 모델로 부정행위 여부와 확률을 반환합니다.
+    """
+    model = _load_model()
+    X = _encode_row(feats)
+    prob = float(model.predict_proba(X)[0][1])  # 클래스 1을 부정행위로 가정
+    return prob >= ML_THRESHOLD, prob
+
+
 def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
     """
     전체 파이프라인을 담당하는 메인 함수
@@ -274,15 +361,26 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
             raw_score=1.0,
         )
 
-    # TODO: 기준: 정면이 아니면 의심 이부분 수정 필요!
-    is_center = final_lr == "CENTER" and final_ud == "CENTER"
-    is_cheating = not is_center
+    features = {
+        "pitch": pitch,
+        "yaw": yaw,
+        "roll": roll,
+        "gaze_lr": gaze_lr,
+        "gaze_ud": gaze_ud,
+        "final_lr": final_lr,
+        "final_ud": final_ud,
+        "face_count": face_count,
+        "face_visible": 1,
+    }
 
-    reason = _describe_gaze(final_lr, final_ud, yaw)
+    is_cheating, prob = _predict_with_model(features)
+    raw_score = prob
+    # 사용자 알림용으로 간단한 서술형 사유를 구성
+    gaze_text = _describe_gaze(final_lr, final_ud, yaw)
     if is_cheating:
-        reason = reason + " (시험 화면이 아닌 곳을 보는 것으로 감지되었습니다.)"
-
-    raw_score = 1.0 if is_cheating else 0.0
+        reason = f"{gaze_text} 부정행위 가능성이 높습니다. (확률 {prob:.2f})"
+    else:
+        reason = f"{gaze_text} 부정행위 징후가 낮습니다. (확률 {prob:.2f})"
 
     return CheatAnalysisResult(
         is_cheating=is_cheating,

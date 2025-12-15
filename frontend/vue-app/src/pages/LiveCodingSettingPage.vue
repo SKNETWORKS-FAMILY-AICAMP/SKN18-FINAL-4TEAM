@@ -407,8 +407,9 @@ const sendFrameForMediapipe = async () => {
   if (!video || video.readyState < 2) return;
 
   const canvas = document.createElement("canvas");
-  canvas.width = 320;
-  canvas.height = 180;
+  // 경량화를 위해 해상도 축소
+  canvas.width = 192;
+  canvas.height = 108;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -429,8 +430,9 @@ const sendFrameForMediapipe = async () => {
     formData.append("image", blob, "frame.jpg");
 
     try {
+      // 설정 페이지는 얼굴 존재만 확인하는 경량 엔드포인트 사용
       const resp = await fetch(
-        `${BACKEND_BASE}/mediapipe/analyze/?session_id=livecoding-setting`,
+        `${BACKEND_BASE}/mediapipe/presence/`,
         {
           method: "POST",
           body: formData,
@@ -448,11 +450,15 @@ const sendFrameForMediapipe = async () => {
       const hasFace = faceCount >= 1;
       detectionStatus.value = hasFace ? "success" : "fail";
       cameraPassed.value = hasFace;
+      // 한 번 성공하면 추가 요청을 중단해 부하를 줄입니다.
+      if (hasFace) {
+        stopFaceDetection();
+      }
     } catch (err) {
       detectionStatus.value = "fail";
       cameraPassed.value = false;
     }
-  }, "image/jpeg", 0.6);
+  }, "image/jpeg", 0.35);
 };
 
 const startCameraTest = async () => {
@@ -475,7 +481,7 @@ const startCameraTest = async () => {
       stopFaceDetection();
       mediapipeInterval = setInterval(() => {
         void sendFrameForMediapipe();
-      }, 1500);
+      }, 1000);
     }, 800);
   } catch (e) {
     cameraChecking.value = false;

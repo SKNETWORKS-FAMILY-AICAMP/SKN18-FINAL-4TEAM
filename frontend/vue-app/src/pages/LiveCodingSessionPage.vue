@@ -191,7 +191,7 @@ const {
 } = useAntiCheatStatus();
 
 /* -----------------------------
-   🎤 녹음 관련 상태
+   변수 선언
 ----------------------------- */
 let audioStream = null;
 let mediaRecorder = null;
@@ -201,10 +201,12 @@ const isRecording = ref(false);
 const isSttRunning = ref(false);
 const isTtsPlaying = ref(false);
 const isMicCooldown = ref(false);
+
 const answerCountdown = ref(null);
 let answerCountdownTimer = null;
 let micCooldownTimer = null;
 const ANSWER_COUNTDOWN_SECONDS = 30;
+
 const HINT_LIMIT = 3;
 const hintCount = ref(0);
 const isHintLoading = ref(false);
@@ -212,18 +214,18 @@ const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= 
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
-const hasPlayedIntroTts = ref(false);
 const INTRO_PLAYED_KEY = (sid) => `jobtory_intro_played_${sid}`;
 const INTRO_AUDIO_KEY = (sid) => `jobtory_intro_tts_audio_${sid}`;
-const INTRO_TEXT_KEY = (sid) => `jobtory_intro_tts_text_${sid}`;
-const STAGE_KEY = (sid) => `jobtory_stage_${sid}`;
 const LAST_PATH_KEY = "jobtory_last_path";
-const stage = ref("intro"); // intro | coding | end_session
+const sessionStage = ref("intro"); // 서버 stage/state를 반영하는 클라이언트 단계
+
 const introPlayBlocked = ref(false);
 const showReloadIntroModal = ref(false);
 const cameFromReload = ref(false);
 let introGestureHandler = null;
 const isIntroPreparing = ref(false);
+const countdownStarted = ref(false);
+const introSecondChanceUsed = ref(false);
 
 /* -----------------------------
    🔥 버튼 클릭 로직
@@ -692,7 +694,6 @@ const fetchIntroTtsAudio = async () => {
   if (!token || !sessionId || !problemData?.value) return null;
 
   const audioKey = INTRO_AUDIO_KEY(sessionId);
-  const textKey = INTRO_TEXT_KEY(sessionId);
 
   const cachedAudio = sessionStorage.getItem(audioKey);
   if (cachedAudio) {
@@ -725,21 +726,9 @@ const fetchIntroTtsAudio = async () => {
     const refreshed = normalizeTtsChunks(initData.tts_text || initData.tts_audio);
     if (refreshed.length) {
       sessionStorage.setItem(audioKey, JSON.stringify(refreshed));
-      const joined = refreshed
-        .map((c) => (c.text || "").trim())
-        .filter(Boolean)
-        .join(" ");
-      if (joined) {
-        sessionStorage.setItem(textKey, joined);
-      }
       return refreshed;
     }
 
-    const fallbackText =
-      typeof initData?.tts_text === "string" ? initData.tts_text.trim() : "";
-    if (fallbackText) {
-      sessionStorage.setItem(textKey, fallbackText);
-    }
     console.warn("intro TTS 오디오를 다시 준비하지 못했습니다.", initData);
   } catch (err) {
     console.error("intro TTS 오디오 재요청 실패:", err);
@@ -755,7 +744,7 @@ const setupIntroGestureResume = () => {
     window.removeEventListener("keydown", handler, true);
     window.removeEventListener("touchstart", handler, true);
     introPlayBlocked.value = false;
-    hasPlayedIntroTts.value = false;
+    // intro는 서버 stage 기준으로 항상 재생 시도하므로 로컬 재생 플래그는 사용하지 않음
     void playIntroTtsFromSession();
   };
   introGestureHandler = handler;
@@ -790,18 +779,18 @@ const isReloadNavigation = () => {
 const confirmReloadIntro = async () => {
   showReloadIntroModal.value = false;
   introPlayBlocked.value = false;
-  hasPlayedIntroTts.value = false;
+  // intro는 서버 stage 기준으로 항상 재생 시도하므로 로컬 재생 플래그는 사용하지 않음
   clearIntroGestureHandler();
   sessionStorage.setItem(LAST_PATH_KEY, window.location.pathname);
   await playIntroTtsFromSession();
 };
 
 const playIntroTtsFromSession = async () => {
-  if (isTtsPlaying.value || hasPlayedIntroTts.value) {
+  if (isTtsPlaying.value) {
     isIntroPreparing.value = false;
     return;
   }
-  if (stage.value !== "intro") {
+  if (sessionStage.value !== "intro") {
     isIntroPreparing.value = false;
     return;
   }
@@ -809,10 +798,7 @@ const playIntroTtsFromSession = async () => {
   isIntroPreparing.value = true;
 
   const sessionId = route.query.session_id;
-  // stage가 intro이면 이전 재생 플래그는 무시하고 항상 재생을 시도한다.
-  if (sessionId) {
-    sessionStorage.removeItem(INTRO_PLAYED_KEY(sessionId));
-  }
+  // stage가 intro이면 이전 재생 여부와 관계없이 항상 재생을 시도한다.
 
   const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
   const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
@@ -842,21 +828,15 @@ const playIntroTtsFromSession = async () => {
   introPlayBlocked.value = false;
   isTtsPlaying.value = true;
   isIntroPreparing.value = false;
+  startCountdownOnce(); // 로딩 오버레이가 사라지고 음성이 재생될 때 타이머 시작
   try {
     const completed = await playTtsChunks(chunks, { throwOnError: true });
-    if (completed && stage.value === "intro") {
+    if (completed && sessionStage.value === "intro") {
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-      if (sessionId) {
-        sessionStorage.setItem(INTRO_PLAYED_KEY(sessionId), "true");
-      }
-      hasPlayedIntroTts.value = true;
       showReloadIntroModal.value = false;
-    } else {
-      hasPlayedIntroTts.value = false;
     }
   } catch (err) {
     console.error("인트로 TTS 재생 오류:", err);
-    hasPlayedIntroTts.value = false;
     if (err && err.name === "NotAllowedError") {
       introPlayBlocked.value = true;
       if (cameFromReload.value) {
@@ -963,7 +943,7 @@ const stopCodingQuestionTimer = () => {
 };
 
 const requestAndPlayTts = async (problemPayload) => {
-  if (!problemPayload || isTtsPlaying.value || hasPlayedIntroTts.value) return;
+  if (!problemPayload || isTtsPlaying.value) return;
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
   if (!token) {
@@ -994,7 +974,6 @@ const requestAndPlayTts = async (problemPayload) => {
     if (!initResp.ok) {
       console.error("TTS 인트로 텍스트 요청 실패:", initData);
       // TTS 재생이 실패해도 카운트다운은 진행
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
@@ -1002,7 +981,6 @@ const requestAndPlayTts = async (problemPayload) => {
     const introText = (initData && initData.tts_text) || "";
     if (!introText) {
       // 인트로 텍스트가 없어도 타이머는 시작
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
@@ -1026,7 +1004,6 @@ const requestAndPlayTts = async (problemPayload) => {
     const ttsData = await ttsResp.json().catch(() => ({}));
     if (!ttsResp.ok) {
       console.error("TTS 오디오 생성 요청 실패:", ttsData);
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
@@ -1034,26 +1011,17 @@ const requestAndPlayTts = async (problemPayload) => {
     const chunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
     if (chunks.length) {
       await playTtsChunks(chunks);
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
     } else {
       // 오디오 청크가 없어도 타이머는 시작
-    hasPlayedIntroTts.value = true;
-    startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-  }
+      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
+    }
   } catch (err) {
     console.error("TTS 요청/재생 오류:", err);
   } finally {
     isTtsPlaying.value = false;
   }
 };
-
-const retryIntroPlayback = async () => {
-  introPlayBlocked.value = false;
-  hasPlayedIntroTts.value = false;
-  await playIntroTtsFromSession();
-};
-
 
 /* -----------------------------
   ✂ 이하 기존 코드 유지
@@ -1176,7 +1144,6 @@ const fetchRandomProblem = async () => {
     }
 
     problemData.value = data;
-    hasPlayedIntroTts.value = false;
     introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
@@ -1190,8 +1157,6 @@ const fetchRandomProblem = async () => {
       await endSessionDueToTimeout();
       return;
     }
-
-    startCountdown();
 
     // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
@@ -1208,9 +1173,8 @@ const fetchRandomProblem = async () => {
 
     // 새로 시작하기인 경우에만 문제 설명 인트로 TTS를 재생하고,
     // 이어하기(resume=1)로 들어온 경우에는 이미 들었던 인트로이므로 생략합니다.
-    const isResume = Boolean(route.query.resume);
-    if (!isResume) {
-      // 문제 안내 음성 자동 재생 (TTS 응답이 느려도 UI 로딩을 막지 않도록 fire-and-forget)
+    // stage가 intro이면 항상 인트로 음성 재생을 시도한다.
+    if (sessionStage.value === "intro") {
       void requestAndPlayTts(problemData.value);
     }
     // 코딩 단계 질문용 타이머 시작 (stage는 intro→coding 전환 시점에만 실제 동작)
@@ -1381,6 +1345,12 @@ const startCountdown = () => {
       void endSessionDueToTimeout();
     }
   }, 1000);
+};
+
+const startCountdownOnce = () => {
+  if (countdownStarted.value) return;
+  countdownStarted.value = true;
+  startCountdown();
 };
 
 const cmMode = computed(() => {
@@ -1683,16 +1653,11 @@ const loadSessionFromApi = async () => {
     }
 
     problemData.value = data;
-    
 
-    // 타이머 / 상태 초기화
-    const introFlag = sessionStorage.getItem(INTRO_PLAYED_KEY(sessionId));
-    const storedStage = sessionStorage.getItem(STAGE_KEY(sessionId)) || "intro";
-    stage.value = storedStage;
-    sessionStorage.setItem(STAGE_KEY(sessionId), storedStage);
-    // stage가 intro라면 항상 다시 재생 시도하기 위해 플래그를 리셋
-    hasPlayedIntroTts.value =
-      storedStage === "intro" ? false : introFlag === "true" || true;
+    // 서버 stage/state에 맞춰 단계 설정 (sessionStorage 단계 값은 사용하지 않음)
+    const serverStage = String(data.stage || data.state || "intro").toLowerCase();
+    sessionStage.value = serverStage;
+    introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
 
@@ -1701,6 +1666,12 @@ const loadSessionFromApi = async () => {
       data.remaining_seconds !== undefined && data.remaining_seconds !== null
         ? Number(data.remaining_seconds)
         : timeLimitSeconds.value;
+
+    // intro 단계에서는 안내 음성 재생 시점에 타이머를 시작하고,
+    // 그 외 단계(이어하기 등)는 바로 카운트다운을 시작한다.
+    if (sessionStage.value !== "intro") {
+      startCountdownOnce();
+    }
 
     // 언어 & starter code 세팅
     const mappedLang = mapProblemLanguage((data.language || "").toLowerCase());
@@ -1711,7 +1682,6 @@ const loadSessionFromApi = async () => {
       code.value = languageTemplates[mappedLang] || languageTemplates.python3;
     }
 
-    startCountdown();
     await loadSavedCodeIfExists(sessionId, token, mappedLang);
 
     return true;
@@ -1727,15 +1697,17 @@ const loadSessionFromApi = async () => {
 onMounted(async () => {
   const loaded = await loadSessionFromApi();
   if (loaded) {
-    isIntroPreparing.value = stage.value === "intro";
+    isIntroPreparing.value = sessionStage.value === "intro";
     const lastPath = sessionStorage.getItem(LAST_PATH_KEY) || "";
     const currentPath = window.location.pathname;
     const isReload = isReloadNavigation() && lastPath === currentPath;
-    cameFromReload.value = isReload && stage.value === "intro";
-    if (stage.value === "intro" && isReload) {
+    cameFromReload.value = isReload && sessionStage.value === "intro";
+    // 새로고침이라도 intro이면 재생 시도 (자동재생 차단 시 모달/gesture로 처리)
+    if (sessionStage.value === "intro" && isReload) {
       showReloadIntroModal.value = true;
       introPlayBlocked.value = true;
-    } else {
+    }
+    if (sessionStage.value === "intro") {
       playIntroTtsFromSession();
     }
     sessionStorage.setItem(LAST_PATH_KEY, currentPath);

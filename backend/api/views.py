@@ -467,6 +467,8 @@ class LiveCodingStartView(APIView):
     - 저장되는 키: livecoding:{session_id}:meta, 
       값: { state, problem_id, user_id, session_id }
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         user = getattr(request, "user", None)
@@ -509,7 +511,17 @@ class LiveCodingStartView(APIView):
         cache.set(f"livecoding:{session_id}:meta", meta, timeout=60*60)
         cache.set(f"livecoding:{session_id}:problem", problem_payload, timeout=60*60)
         cache.set(f"livecoding:user:{user.user_id}:current_session", session_id, timeout=60*60)
-        return Response({"session_id": session_id}, status=201)
+        return Response(
+            {
+                "session_id": session_id,
+                "state": meta["stage"],
+                "time_limit_seconds": meta["time_limit_seconds"],
+                "start_at": meta["start_at"],
+                "remaining_seconds": meta["time_limit_seconds"],
+                "problem_data": problem_payload,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class LiveCodingCodeSnapshotView(APIView):
     """
@@ -781,6 +793,9 @@ class LiveCodingSessionView(APIView):
     - query: ?session_id=<sid>
     - 응답: LiveCodingStartView와 동일한 형태의 문제/세션 정보
     """
+    # ✅ 추가: 명시적으로 인증 클래스 지정
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = getattr(request, "user", None)
@@ -808,7 +823,7 @@ class LiveCodingSessionView(APIView):
             )
 
         # 다른 사용자의 세션에 접근하지 못하도록 검증
-        if meta.get("user_id") != str(user.user_id):
+        if str(meta.get("user_id")) != str(user.user_id):
             return Response(
                 {"detail": "이 세션에 접근할 권한이 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -862,6 +877,8 @@ class LiveCodingActiveSessionView(APIView):
     - Authorization: Bearer <access_token>
     - 응답: 세션이 있으면 LiveCodingSessionView와 동일한 구조, 없으면 404
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = getattr(request, "user", None)
@@ -961,6 +978,8 @@ class LiveCodingEndSessionView(APIView):
     - Authorization: Bearer <access_token>
     - Redis에서 메타/매핑/STT 버퍼를 제거합니다.
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         user = getattr(request, "user", None)
@@ -1236,70 +1255,6 @@ class CodingQuestionView(APIView):
             },
             status=status.HTTP_200_OK,
         )
-
-class LiveCodingStartView(APIView):
-    """
-    라이브 코딩 세션을 시작하면서 세션 메타 정보를 저장하는 엔드포인트.
-    - Authorization: Bearer <access_token> (LoginView/GoogleAuthView에서 발급한 토큰)
-    - 요청 본문:
-        - problem_id (선택): 지정하면 해당 문제로 시작
-        - language (선택): 지정 안 하면 python
-    - 동작:
-        - problem_id 없으면 language 기준으로 랜덤 문제 선택
-    - 저장되는 키: livecoding:{session_id}:meta
-      값: { state, problem_id, user_id, session_id }
-    """
-
-    def post(self, request):
-        user = getattr(request, "user", None)
-        if not isinstance(user, User):
-            return Response(
-                {"detail": "라이브 코딩을 시작하려면 로그인이 필요합니다."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        problem_data = request.data.get("problem_data")
-        # 프런트가 preload에서 전달한 문제를 그대로 사용 (DB 재조회 없음)
-        if not problem_data:
-            return Response(
-                {"detail": "problem_data가 필요합니다. 설정 단계를 다시 진행해 주세요."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-
-        session_id = secrets.token_hex(16)
-        # Redis(캐시)에 저장할 세션 메타 정보
-        start_at = timezone.now()
-        meta = {
-            "state": "in_progress",
-            "user_id": user.user_id,
-            "session_id": session_id,
-            "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
-            "start_at": start_at.isoformat(),
-            "problem_id": problem_data.get("problem_id"),
-        }
-
-        # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
-        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60 * 60)
-        # 유저별 현재 진행 중인 세션 매핑
-        cache.set(
-            f"livecoding:user:{user.user_id}:current_session",
-            session_id,
-            timeout=60 * 60,
-        )
-
-        return Response(
-            {
-                "session_id": session_id,
-                "state": meta["state"],
-                "time_limit_seconds": meta["time_limit_seconds"],
-                "start_at": meta["start_at"],
-                "remaining_seconds": meta["time_limit_seconds"],
-                "problem_data": problem_data,
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
 
 class LiveCodingFinalEvalStartView(APIView):
     """

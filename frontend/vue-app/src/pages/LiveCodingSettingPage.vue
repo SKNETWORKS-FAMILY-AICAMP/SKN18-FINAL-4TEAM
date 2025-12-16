@@ -71,8 +71,8 @@
               :class="{
                 'target-success': detectionStatus === 'success',
                 'target-fail': detectionStatus === 'fail'
-              }"
-            ></div>
+              }">
+              </div>
             <div v-show="!cameraActive" class="preview-placeholder">
               <div class="placeholder-illustration-wrap">
                 <img :src="faceDetectImage" alt="카메라 안내" class="placeholder-illustration" />
@@ -297,8 +297,6 @@ const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
 };
 
-<<<<<<< Updated upstream
-=======
 /* -----------------------------------------
    LangGraph / 문제
 -------------------------------------------- */
@@ -386,7 +384,6 @@ const runInitialSetup = async () => {
   }
 };
 
->>>>>>> Stashed changes
 /* ----- 웹캠 체크 ----- */
 const videoRef = ref(null);
 const canvasRef = ref(null);
@@ -719,24 +716,18 @@ const startTest = async () => {
       window.alert(data.detail || "라이브 코딩 세션을 시작하지 못했습니다.");
       return;
     }
-<<<<<<< Updated upstream
-=======
 
     if (!data.problem_data) {
       window.alert("problem_data를 받지 못했습니다. 설정을 다시 진행해 주세요.");
       return;
     }
 
->>>>>>> Stashed changes
     if (!data.session_id) {
       window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
       return;
     }
-<<<<<<< Updated upstream
-=======
 
     problemData.value = data.problem_data;
->>>>>>> Stashed changes
     localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
 
     router.replace({
@@ -754,100 +745,6 @@ const startTest = async () => {
     isStarting.value = false;
   }
 };
-
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-/* -----------------------------------------
-   LangGraph / 문제
--------------------------------------------- */
-const problemData = ref(null);
-const hasInitRun = ref(false);
-const isWarmed = ref(false);
-const isPreloading = ref(false);
-const warmupLanggraph = async () => {
-  if (isWarmed.value) return true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (resp.ok && data?.status === "warmed") {
-      isWarmed.value = true;
-      return true;
-    }
-  } catch (err) {
-    console.warn("warmup failed", err);
-  }
-  return false;
-};
-
-const preloadProblem = async () => {
-  if (problemData.value) return true; // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
-  if (isPreloading.value) return !!problemData.value;
-  isPreloading.value = true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        language: DEFAULT_LANGUAGE,
-      }),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
-      return false;
-    }
-    if (!data?.problem_id) {
-      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
-      return false;
-    }
-    console.log("[livecoding][preload] problem loaded", {
-      problem_id: data.problem_id,
-    });
-    problemData.value = data;
-    return true;
-  } catch (err) {
-    console.error(err);
-    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
-    return false;
-  } finally {
-    isPreloading.value = false;
-  }
-};
-
-/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
-const runInitialSetup = async () => {
-  if (hasInitRun.value) return true;
-  try {
-    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
-    if (!warmOk || !preloaded) return false;
-
-    hasInitRun.value = true;
-    return true;
-  } catch (e) {
-    console.error("runInitialSetup 실패:", e);
-    return false;
-  }
-};
-
-/* ----- 컴포넌트 언마운트 시 정리 ----- */
-=======
->>>>>>> Stashed changes
-=======
->>>>>>> Stashed changes
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();

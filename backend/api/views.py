@@ -3,7 +3,7 @@ import json
 import secrets
 import string
 import time
-
+import threading
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -1400,4 +1400,190 @@ class LiveCodingStartView(APIView):
                 "problem_data": problem_data,
             },
             status=status.HTTP_201_CREATED,
+        )
+
+
+class LiveCodingFinalEvalStartView(APIView):
+    """
+    제출하기 버튼 트리거:
+    - POST /api/livecoding/final-eval/start/
+      body: {"session_id": "..."}
+    - 즉시 202 반환하고, 백그라운드 스레드에서 chapter3 graph 실행 시작
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = (request.data or {}).get("session_id")
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증 (중요)
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        # ✅ 백그라운드 실행
+        def _runner():
+            try:
+                graph = get_cached_graph("chapter3")
+                config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+
+                # 최소 상태로 시작(노드 없으면 그래도 저장되도록)
+                init_state = {
+                    "meta": {"session_id": session_id, "user_id": str(user.user_id)},
+                    "step": "init",
+                    "status": "running",
+                }
+
+                graph.invoke(init_state, config=config)
+
+                # 그래프가 정상 종료되면 마지막 상태를 'saved/done'으로 맞춰두는 걸 추천
+                # (노드에서 처리해도 되고, 여기서 한 번 더 저장해도 됨)
+                try:
+                    # 최신 상태를 읽어서 step/status만 보정
+                    snap = graph.get_state(config)
+                    values = dict(snap.values or {})
+                    values["step"] = values.get("step") or "saved"
+                    values["status"] = "done"
+                    # invoke가 체크포인터에 저장했겠지만, 보정 저장이 필요하면 노드에서 하거나
+                    # 그래프 마지막 노드에서 saved로 세팅해.
+                except Exception:
+                    pass
+
+            except Exception as e:
+                # 에러 상태를 체크포인터에 남기고 싶으면
+                try:
+                    graph = get_cached_graph("chapter3")
+                    config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+                    err_state = {
+                        "meta": {"session_id": session_id, "user_id": str(user.user_id)},
+                        "step": "error",
+                        "status": "error",
+                        "error": str(e),
+                    }
+                    # graph.invoke 대신 저장만 하고 싶으면 체크포인터 접근이 필요하지만
+                    # 여기서는 최소로 "에러 상태를 state로 남길 수 있게" graph에 error node를 두는 걸 추천.
+                    # (지금은 그냥 출력)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_runner, daemon=True).start()
+
+        return Response({"status": "started"}, status=status.HTTP_202_ACCEPTED)
+
+
+class LiveCodingFinalEvalStatusView(APIView):
+    """
+    rendering.vue 폴링용:
+    - GET /api/livecoding/final-eval/status/?session_id=...
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증(권장)
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if meta and str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        graph = get_cached_graph("chapter3")
+        config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+
+        try:
+            snap = graph.get_state(config)
+            values = snap.values or {}
+        except Exception:
+            values = {}
+
+        # 그래프가 아직 시작 안됐거나 저장된 게 없으면 init으로 응답
+        step = values.get("step") or "init"
+        st = values.get("status") or ("done" if step == "saved" else "running")
+
+        return Response(
+            {
+                "status": st,
+                "step": step,
+                **values,
+            },
+            status=status.HTTP_200_OK,
+        )
+class LiveCodingFinalEvalReportView(APIView):
+    """
+    showreport.vue 용:
+    - GET /api/livecoding/final-eval/report/?session_id=...
+    - done이면 report/score/grade 반환
+    - 아직 running이면 202로 반환
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        graph = get_cached_graph("chapter3")
+        config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+
+        try:
+            snap = graph.get_state(config)
+            values = dict(snap.values or {})
+        except Exception as e:
+            return Response(
+                {"detail": "final-eval state를 읽을 수 없습니다.", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        step = values.get("step") or "init"
+        st = values.get("status") or ("done" if step == "saved" else "running")
+
+        if st != "done" or step != "saved":
+            return Response(
+                {"status": st, "step": step},
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        report_md = values.get("final_report_markdown") or ""
+        return Response(
+            {
+                "status": "done",
+                "step": "saved",
+                "final_report_markdown": report_md,
+                "final_score": values.get("final_score"),
+                "final_grade": values.get("final_grade"),
+                "final_flags": values.get("final_flags", []),
+            },
+            status=status.HTTP_200_OK,
         )

@@ -59,3 +59,28 @@ class CodingState(TypedDict, total=False):
     hint_text: str                  # 생성된 힌트 내용
     conversation_log: List[Any]     # 대화 내역 (질문 에이전트와 공유)
     is_done: bool                   # 코딩 챕터 종료 여부
+
+    # chapter3
+class FinalEvalState(TypedDict, total=False):
+    meta: Dict[str, Any]
+
+    step: Literal[
+        "init",
+        "code_collab_eval",
+        "problem_eval",
+        "report_generate",
+        "saved",
+        "error",
+        ]
+
+    status: Literal["running", "done", "error"]
+    error: Optional[str]
+    # 결과 자리(추후)
+    final_report_markdown: Optional[str]
+    final_score: Optional[float]
+    final_grade: Optional[str]
+    code_collab_score: Optional[float]
+    code_collab_feedback: Optional[str]
+    problem_eval_score: Optional[float]
+    problem_eval_feedback: Optional[str]
+    final_flags: Optional[list]

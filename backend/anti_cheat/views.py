@@ -10,14 +10,14 @@ from rest_framework.parsers import FormParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .analyzer import analyze_frame
+from .analyzer import analyze_frame, _face_count_from_bytes
 
 
 class CheatAnalysisView(APIView):
     """
     mediapipe를 사용해 단일 이미지 프레임에서 부정행위 여부를 분석하는 엔드포인트.
     - 입력: multipart/form-data, field name: "image"
-    - 출력: { is_cheating, reason, face_count, raw_score }
+    - 출력: { is_cheating, reason}
     """
 
     permission_classes = [permissions.AllowAny]
@@ -48,50 +48,29 @@ class CheatAnalysisView(APIView):
 
         # 세션 ID가 있으면 간단한 부정행위 카운터를 Redis(캐시)에 기록합니다.
         if session_id:
-            try:
-                if data.get("is_cheating"):
-                    cache_key = f"anti:mediapipe:{session_id}:cheat_count"
-                    cache.incr(cache_key)
-                    cache.expire(cache_key, 60 * 60)
-                    # 최근 사유 로그를 남깁니다(최대 20건).
-                    reasons_key = f"anti:mediapipe:{session_id}:reasons"
-                    cache.lpush(
-                        reasons_key,
-                        json.dumps(
-                            {
-                                "ts": time.time(),
-                                "reason": data.get("reason"),
-                                "raw_score": data.get("raw_score"),
-                            }
-                        ),
-                    )
-                    cache.ltrim(reasons_key, 0, 19)
-                    cache.expire(reasons_key, 60 * 60)
-            except Exception:
-                # 모니터링 용도이므로 카운터 기록 실패는 전체 요청 실패로 만들지 않습니다.
-                pass
+            base_key = f"livecoding:{session_id}:anti-cheat"
+
+            if data.get("is_cheating"):
+                # base_key 하나에 dict 형태로 누적 저장
+                cache_data = cache.get(base_key) or {}
+                cheat_count = int(cache_data.get("cheat_count", 0)) + 1
+                reasons = cache_data.get("reasons", [])
+                if not isinstance(reasons, list):
+                    reasons = []
+                reasons.append(
+                    {
+                        "ts": time.time(),
+                        "cheat_reason": data.get("detail_reason"),
+                    }
+                )
+                cache.set(
+                    base_key,
+                    {"cheat_count": cheat_count, "reasons": reasons},
+                    timeout=60 * 60,
+                )
+   
 
         return Response(data, status=status.HTTP_200_OK)
-
-
-def _face_count_from_bytes(image_bytes: bytes) -> int:
-    """
-    빠른 얼굴 존재 확인용 헬퍼: mediapipe FaceDetection으로 face_count만 계산.
-    """
-    nparr = np.frombuffer(image_bytes, np.uint8)
-    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
-    if img is None:
-        raise ValueError("이미지를 디코딩할 수 없습니다.")
-
-    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-    with mp.solutions.face_detection.FaceDetection(
-        model_selection=0, min_detection_confidence=0.5
-    ) as detector:
-        result = detector.process(img_rgb)
-    if not result.detections:
-        return 0
-    return len(result.detections)
-
 
 class FacePresenceView(APIView):
     """

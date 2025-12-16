@@ -1,9 +1,12 @@
 import os
+from pathlib import Path
+
 import pandas as pd
 
-BASE_DIR = os.path.join("data", "csv")
-NORMAL_DIR = os.path.join(BASE_DIR, "normal")
-CHEATING_DIR = os.path.join(BASE_DIR, "cheating")
+HERE = Path(__file__).resolve().parent
+BASE_DIR = HERE / "data" / "csv"  # 파일 기준 상대 경로로 고정
+NORMAL_DIR = BASE_DIR / "normal"
+CHEATING_DIR = BASE_DIR / "cheat"
 
 merged = []
 
@@ -18,7 +21,7 @@ def load_and_label(path: str, label: int, video_id: str) -> pd.DataFrame:
 for fname in sorted(os.listdir(NORMAL_DIR)):
     if not fname.endswith(".csv"):
         continue
-    fpath = os.path.join(NORMAL_DIR, fname)
+    fpath = NORMAL_DIR / fname
     
     # ex: out_1.csv → normal_1
     num = fname.replace("out_", "").replace(".csv", "")
@@ -31,7 +34,7 @@ for fname in sorted(os.listdir(NORMAL_DIR)):
 for fname in sorted(os.listdir(CHEATING_DIR)):
     if not fname.endswith(".csv"):
         continue
-    fpath = os.path.join(CHEATING_DIR, fname)
+    fpath = CHEATING_DIR / fname
     
     # ex: out_1.csv → cheating_1
     num = fname.replace("out_", "").replace(".csv", "")
@@ -46,7 +49,7 @@ dataset = pd.concat(merged, ignore_index=True)
 dataset = dataset[(dataset["face_count"] > 0) & (dataset["face_visible"] == 1)]
 
 # 4) 저장
-out_path = os.path.join(BASE_DIR, "dataset.csv")
+out_path = BASE_DIR / "dataset2.csv"
 dataset.to_csv(out_path, index=False)
 
 

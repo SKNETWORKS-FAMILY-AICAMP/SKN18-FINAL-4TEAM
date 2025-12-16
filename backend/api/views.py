@@ -489,8 +489,6 @@ class LiveCodingStartView(APIView):
             "stage": "intro",
             "user_id": user.user_id,
             "session_id": session_id,
-            "problem_id": problem_data.get("problem_id"),
-            "language": problem_data.get("language"),
             "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
         }

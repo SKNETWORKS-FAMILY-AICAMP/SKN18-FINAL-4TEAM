@@ -12,26 +12,62 @@ import numpy as np
 import pandas as pd
 
 
-mp_face_mesh = mp.solutions.face_mesh
+_mp_face_mesh  = mp.solutions.face_mesh
+
+# 5초 샷이더라도 "객체 재사용"은 이득 큼
+_FACE_MESH = _mp_face_mesh.FaceMesh(
+    static_image_mode=True,     # 스냅샷 처리
+    max_num_faces=1,
+    refine_landmarks=True,      # iris 필요하면 True
+    min_detection_confidence=0.5,
+)
+
+# -----------------------------
+# ML / feature 정의
+# -----------------------------
 FEATURE_ORDER = [
     "pitch",
     "yaw",
     "roll",
-    "gaze_lr",
-    "gaze_ud",
-    "final_lr",
-    "final_ud",
     "face_count",
     "face_visible",
+    "gaze_lr_ratio",
+    "gaze_ud_ratio",
 ]
 
 ML_THRESHOLD = 0.8
 
+# -----------------------------
+# Head pose 모델/랜드마크
+# ----------------------------
+_FACE_3D_MODEL = np.array(
+    [
+        [0.0, 0.0, 0.0],  # nose tip
+        [0.0, -63.0, -12.0],  # chin
+        [-43.0, 32.0, -26.0],  # left eye corner
+        [43.0, 32.0, -26.0],  # right eye corner
+        [-28.0, -28.0, -24.0],  # left mouth corner
+        [28.0, -28.0, -24.0],  # right mouth corner
+    ],
+    dtype=np.float64,
+)
+
+_HEAD_LANDMARK_IDX = [1, 152, 33, 263, 61, 291]  # MediaPipe FaceMesh index
+
+
+# 홍채 랜드마크 (refine_landmarks=True 필수)
+LEFT_IRIS  = [474, 475, 476, 477]
+RIGHT_IRIS = [469, 470, 471, 472]
+
+# 눈 좌우 코너
+LEFT_EYE_CORNERS  = (33, 133)     # outer, inner
+RIGHT_EYE_CORNERS = (362, 263)    # outer, inner
 
 @dataclass
 class CheatAnalysisResult:
     is_cheating: bool # 부정행위 여부
-    reason: str # 부정행위인 이유
+    reason: str # 부정행위 알림용 문구
+    detail_reason: str # 부정행위 세부 사유
     face_count: int # 감지된 얼굴 수
     raw_score: float # 점수 
     # 머리의 회전 각도
@@ -63,19 +99,6 @@ def _decode_image(image_bytes: bytes) -> np.ndarray:
         raise ValueError("이미지를 디코딩할 수 없습니다.")
     return img
 
-_FACE_3D_MODEL = np.array(
-    [
-        [0.0, 0.0, 0.0],  # nose tip
-        [0.0, -63.0, -12.0],  # chin
-        [-43.0, 32.0, -26.0],  # left eye corner
-        [43.0, 32.0, -26.0],  # right eye corner
-        [-28.0, -28.0, -24.0],  # left mouth corner
-        [28.0, -28.0, -24.0],  # right mouth corner
-    ],
-    dtype=np.float64,
-)
-
-_HEAD_LANDMARK_IDX = [1, 152, 33, 263, 61, 291]  # MediaPipe FaceMesh index
 
 
 def _get_head_pose(lm, width: int, height: int) -> Tuple[float, float, float]:
@@ -104,10 +127,11 @@ def _get_head_pose(lm, width: int, height: int) -> Tuple[float, float, float]:
             [focal_length, 0, width / 2],
             [0, focal_length, height / 2],
             [0, 0, 1],
-        ]
+        ],
+        dtype=np.float64
     )
 
-    dist_coeffs = np.zeros((4, 1))
+    dist_coeffs = np.zeros((4, 1), dtype=np.float64)
     
     success, rot_vec, trans_vec = cv2.solvePnP( 
         _FACE_3D_MODEL,
@@ -126,111 +150,85 @@ def _get_head_pose(lm, width: int, height: int) -> Tuple[float, float, float]:
     pitch, yaw, roll = euler.flatten()[:3]
     return float(pitch), float(yaw), float(roll)
 
+import numpy as np
 
-def _get_eye_gaze(lm) -> Tuple[str, str]:
+LEFT_IRIS  = [474, 475, 476, 477]
+RIGHT_IRIS = [469, 470, 471, 472]
+
+LEFT_EYE_CORNERS  = (33, 133)     # outer, inner
+RIGHT_EYE_CORNERS = (362, 263)    # outer, inner
+LEFT_EYE_TOP, LEFT_EYE_BOTTOM = 159, 145
+RIGHT_EYE_TOP, RIGHT_EYE_BOTTOM = 386, 374
+
+def _gaze_lr_ratio_per_eye(lm) -> tuple[float, float, float]:
     """
-    param
-        lm: FaceMesh 랜드마크 리스트
-    양쪽 눈, 위/아래, 동공 랜드마크 이용하여 이동 비율에 따라 아웃풋 추출
+    좌/우 시선 비율 (각 눈 + 평균)
 
-    output
-        (lr, ud): 좌우/상하 방향 라벨
-    """
-    # Left eye
-    L_left, L_right = lm[33], lm[133]
-    L_top, L_bottom = lm[159], lm[145]
-    L_iris = lm[473]
+    return:
+        left_ratio  : 왼쪽 눈 기준 (0~1)
+        right_ratio : 오른쪽 눈 기준 (0~1)
+        avg_ratio   : 두 눈 평균 (0~1)
 
-    # Right eye
-    R_left, R_right = lm[362], lm[263]
-    R_top, R_bottom = lm[386], lm[374]
-    R_iris = lm[468]
-
-    # LEFT / RIGHT
-    lh = (L_iris.x - L_left.x) / (L_right.x - L_left.x)
-    rh = (R_iris.x - R_left.x) / (R_right.x - R_left.x)
-    horiz = (lh + rh) / 2
-
-    if horiz < 0.33:
-        lr = "LEFT"
-    elif horiz > 0.66:
-        lr = "RIGHT"
-    else:
-        lr = "CENTER"
-
-    # UP / DOWN
-    lv = (L_iris.y - L_top.y) / (L_bottom.y - L_top.y)
-    rv = (R_iris.y - R_top.y) / (R_bottom.y - R_top.y)
-    vert = (lv + rv) / 2
-
-    if vert < 0.33:
-        ud = "UP"
-    elif vert > 0.66:
-        ud = "DOWN"
-    else:
-        ud = "CENTER"
-
-    return lr, ud
-
-def _final_direction(yaw: float, gaze_lr: str, gaze_ud: str) -> Tuple[str, str]:
-    """
-    머리 각도와 눈동자 기준을 합쳐서 최종 좌우 방향을 결정
-    yam이 20도 이상 -> 고개를 오른쪽을 돌린것으로 판단
-    yam이 20도 이하 -> 고개를 왼쪽으로 돌린것ㅇ로 판단
-
-    상하방향은 눈동자 기준으로 사용
-    output
-        (final_lr, final_ud): 머리+눈동자 조합기준 좌/우, 상/하 방향
+    0   : 왼쪽
+    0.5 : 정면
+    1   : 오른쪽
     """
 
-    if yaw > 20:
-        final_lr = "RIGHT"
-    elif yaw < -20:
-        final_lr = "LEFT"
-    else:
-        final_lr = gaze_lr
+    # --- 홍채 중심 (4점 평균) ---
+    l_iris_x = np.mean([lm[i].x for i in LEFT_IRIS])
+    r_iris_x = np.mean([lm[i].x for i in RIGHT_IRIS])
 
-    final_ud = gaze_ud
-    return final_lr, final_ud
+    # --- 눈 좌우 코너 ---
+    l_outer, l_inner = lm[LEFT_EYE_CORNERS[0]].x, lm[LEFT_EYE_CORNERS[1]].x
+    r_outer, r_inner = lm[RIGHT_EYE_CORNERS[0]].x, lm[RIGHT_EYE_CORNERS[1]].x
 
+    # --- 각 눈 ratio ---
+    left_ratio = (l_iris_x - l_outer) / max((l_inner - l_outer), 1e-6)
+    right_ratio = (r_iris_x - r_outer) / max((r_inner - r_outer), 1e-6)
 
-def _describe_gaze(final_lr: str, final_ud: str, yaw: Optional[float]) -> str:
+    # --- clamp ---
+    left_ratio = float(np.clip(left_ratio, 0.0, 1.0))
+    right_ratio = float(np.clip(right_ratio, 0.0, 1.0))
+
+    # --- 평균 ---
+    avg_ratio = float((left_ratio + right_ratio) / 2.0)
+
+    return left_ratio, right_ratio, avg_ratio
+
+def _gaze_ud_ratio_per_eye(lm) -> tuple[float, float, float]:
     """
-    파라미터로 들어온 값을 기준으로 텍스트 문장 생성
+    상/하 시선 비율 (각 눈 + 평균)
+
+    return:
+        left_ratio  : 왼쪽 눈 기준 (0~1)
+        right_ratio : 오른쪽 눈 기준 (0~1)
+        avg_ratio   : 두 눈 평균 (0~1)
+
+    0   : 위
+    0.5 : 정면
+    1   : 아래
     """
-    if final_lr == "LEFT":
-        lr_text = "왼쪽 방향을 응시하고 있습니다."
-    elif final_lr == "RIGHT":
-        lr_text = "오른쪽 방향을 응시하고 있습니다."
-    else:  # CENTER
-        lr_text = "정면을 응시하고 있습니다."
 
-    # 위/아래 방향 문구
-    if final_ud == "UP":
-        ud_text = "시선이 위쪽을 향하고 있습니다."
-    elif final_ud == "DOWN":
-        ud_text = "시선이 아래쪽을 향하고 있습니다."
-    else:  # CENTER
-        ud_text = ""
+    # --- 홍채 중심 (4점 평균) ---
+    l_iris_y = np.mean([lm[i].y for i in LEFT_IRIS])
+    r_iris_y = np.mean([lm[i].y for i in RIGHT_IRIS])
 
-    # yaw 보조 문구
-    if yaw is not None:
-        if yaw > 20:
-            direction = "얼굴이 오른쪽으로 향해 있으며 "
-        elif yaw < -20:
-            direction = "얼굴이 왼쪽으로 향해 있으며 "
-        else:
-            direction = "얼굴이 정면을 향해 있으며 "
-    else:
-        direction = ""
+    # --- 눈 위/아래 코너 ---
+    l_top, l_bottom = lm[LEFT_EYE_TOP].y, lm[LEFT_EYE_BOTTOM].y
+    r_top, r_bottom = lm[RIGHT_EYE_TOP].y, lm[RIGHT_EYE_BOTTOM].y
 
-    # 최종 문장 조합
-    if ud_text == "":
-        final_text = f"{direction}{lr_text}"
-    else:
-        final_text = f"{direction}{lr_text} 또한 {ud_text}"
+    # --- 각 눈 ratio ---
+    left_ratio = (l_iris_y - l_top) / max((l_bottom - l_top), 1e-6)
+    right_ratio = (r_iris_y - r_top) / max((r_bottom - r_top), 1e-6)
 
-    return final_text
+    # --- clamp ---
+    left_ratio = float(np.clip(left_ratio, 0.0, 1.0))
+    right_ratio = float(np.clip(right_ratio, 0.0, 1.0))
+
+    # --- 평균 ---
+    avg_ratio = float((left_ratio + right_ratio) / 2.0)
+
+    return left_ratio, right_ratio, avg_ratio
 
 
 @lru_cache(maxsize=1)
@@ -252,53 +250,28 @@ def _load_model():
     raise FileNotFoundError(f"ML 모델 파일을 찾을 수 없습니다. 확인 경로: {tried}")
 
 
-def _encode_row(feats: Dict[str, Any]) -> pd.DataFrame:
-    """
-    scikit-learn 입력 형식으로 단일 샘플을 변환합니다.
-    - 모델이 학습 시 사용한 feature_names_in_을 기준으로 원-핫 컬럼을 채웁니다.
-    - 대응하는 컬럼이 없으면 0으로 둡니다.
-    """
-    model = _load_model()
-    names_raw = getattr(model, "feature_names_in_", None)
-    feature_names = list(names_raw.tolist() if hasattr(names_raw, "tolist") else (names_raw or []))
-
-    # 기본값 0으로 초기화
-    row: Dict[str, float] = {name: 0.0 for name in feature_names}
-
-    # 연속형 컬럼 채우기
-    for num_key in ["pitch", "yaw", "roll", "face_count", "face_visible"]:
-        if num_key in row and num_key in feats:
-            try:
-                row[num_key] = float(feats[num_key])
-            except Exception:
-                row[num_key] = 0.0
-
-    # 카테고리 원-핫 컬럼 채우기 (모델에 존재할 때만 1로 설정)
-    for cat_key in ["gaze_lr", "gaze_ud", "final_lr", "final_ud"]:
-        val = str(feats.get(cat_key, "NONE"))
-        col_name = f"{cat_key}_{val}"
-        if col_name in row:
-            row[col_name] = 1.0
-
-    # feature_names_in_이 없는 경우(레거시) 대비: 기존 FEATURE_ORDER 사용
-    if not feature_names:
-        for key in FEATURE_ORDER:
-            val = feats.get(key)
-            try:
-                row[key] = float(val)
-            except Exception:
-                row[key] = 0.0
-        feature_names = FEATURE_ORDER
-
-    return pd.DataFrame([row], columns=feature_names)
-
-
 def _predict_with_model(feats: Dict[str, Any]) -> Tuple[bool, float]:
     """
     ML 모델로 부정행위 여부와 확률을 반환합니다.
     """
     model = _load_model()
-    X = _encode_row(feats)
+    names_raw = getattr(model, "feature_names_in_", None)
+    feature_names = list(names_raw.tolist() if hasattr(names_raw, "tolist") else (names_raw or []))
+
+    if feature_names:
+        # 모델이 기대하는 컬럼 순서/이름에 맞춰 채운다. 누락은 0.
+        row: Dict[str, float] = {name: 0.0 for name in feature_names}
+        for name in feature_names:
+            if name in feats:
+                try:
+                    row[name] = float(feats[name])
+                except Exception:
+                    row[name] = 0.0
+        X = pd.DataFrame([row], columns=feature_names)
+    else:
+        # feature_names_in_이 없으면 전달된 dict 그대로 사용
+        X = pd.DataFrame([feats])
+
     prob = float(model.predict_proba(X)[0][1])  # 클래스 1을 부정행위로 가정
     return prob >= ML_THRESHOLD, prob
 
@@ -317,41 +290,40 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
     img_bgr = _decode_image(image_bytes)
     img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
     height, width, _ = img_bgr.shape
-
-    with mp_face_mesh.FaceMesh(
-        max_num_faces=1, # 동시에 최대 몇명을 잡을지
-        refine_landmarks=True, # 눈동자/세부 랜드마크까지 정밀하게 할지여부
-        min_detection_confidence=0.5, # 처음 얼굴로 인정하는 기준선
-        min_tracking_confidence=0.5, # 그 얼굴을 계속 따라갈때의 기준선
-    ) as face_mesh:
-        result = face_mesh.process(img_rgb)
+    result = _FACE_MESH.process(img_rgb)
 
     if not result.multi_face_landmarks:
         # 얼굴/눈 랜드마크를 아예 잡지 못하면 자리 이탈로 간주
         return CheatAnalysisResult(
             is_cheating=True,
             reason="얼굴과 눈동자 랜드마크를 인식할 수 없습니다.",
-            face_count=0,
-            raw_score=1.0,
         )
-
+    
     face_count = len(result.multi_face_landmarks)
-
     # 두 명 이상 감지되면 동반자 존재 가능성으로 바로 부정행위 처리
     if face_count > 1:
         return CheatAnalysisResult(
             is_cheating=True,
             reason="카메라 화면에 두 명 이상이 동시에 감지되었습니다.",
-            face_count=face_count,
-            raw_score=1.0,
         )
 
     lm = result.multi_face_landmarks[0].landmark
 
     try:
         pitch, yaw, roll = _get_head_pose(lm, width, height)
-        gaze_lr, gaze_ud = _get_eye_gaze(lm)
-        final_lr, final_ud = _final_direction(yaw, gaze_lr, gaze_ud)
+        l_lr, r_lr, lr_avg = _gaze_lr_ratio_per_eye(lm)
+        l_ud, r_ud, ud_avg = _gaze_ud_ratio_per_eye(lm)
+        gaze_lr_diff = abs(l_lr - r_lr)
+        gaze_ud_diff = abs(l_ud - r_ud)
+        gaze_lr_from_center = abs(lr_avg - 0.5)
+        abs_yaw = abs(yaw)
+        abs_pitch = abs(pitch)
+        yaw_bin = 1 if abs_yaw > 20 else 0
+        pitch_extreme = 1 if abs_pitch > 120 else 0
+        ud_unstable = 1 if gaze_ud_diff > 0.6 else 0
+        off_center = 1 if (abs_yaw > 20 or gaze_lr_from_center > 0.2) else 0
+        # 실시간 단일 프레임에서는 누적값을 갖고 있지 않으므로 off_center를 그대로 사용
+        off_center_streak = off_center
     except Exception:
         # 계산 실패 시 보수적으로 부정행위로 간주
         return CheatAnalysisResult(
@@ -362,36 +334,76 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
         )
 
     features = {
-        "pitch": pitch,
-        "yaw": yaw,
-        "roll": roll,
-        "gaze_lr": gaze_lr,
-        "gaze_ud": gaze_ud,
-        "final_lr": final_lr,
-        "final_ud": final_ud,
-        "face_count": face_count,
-        "face_visible": 1,
+        "gaze_lr_diff": gaze_lr_diff,
+        "gaze_ud_diff": gaze_ud_diff,
+        "gaze_lr_from_center": gaze_lr_from_center,
+        "abs_yaw": abs_yaw,
+        "yaw_bin": yaw_bin,
+        "abs_pitch": abs_pitch,
+        "pitch_extreme": pitch_extreme,
+        "ud_unstable": ud_unstable,
+        "off_center": off_center,
+        "off_center_streak": off_center_streak,
     }
 
     is_cheating, prob = _predict_with_model(features)
     raw_score = prob
-    # 사용자 알림용으로 간단한 서술형 사유를 구성
-    gaze_text = _describe_gaze(final_lr, final_ud, yaw)
+    detail_reason = ""
     if is_cheating:
-        reason = f"{gaze_text} 부정행위 가능성이 높습니다. (확률 {prob:.2f})"
+        reason = f"부정행위 가능성이 감지되었습니다. 정면을 주시해 주시기 바랍니다."
+        detail_reason = _describe_reason(abs_yaw, yaw, gaze_lr_from_center, lr_avg, ud_unstable)
     else:
-        reason = f"{gaze_text} 부정행위 징후가 낮습니다. (확률 {prob:.2f})"
+        reason = f"부정행위 징후가 낮습니다."
 
     return CheatAnalysisResult(
         is_cheating=is_cheating,
         reason=reason,
+        detail_reason=detail_reason,
         face_count=1,
         raw_score=raw_score,
         yaw=yaw,
         pitch=pitch,
         roll=roll,
-        gaze_lr=gaze_lr,
-        gaze_ud=gaze_ud,
-        final_lr=final_lr,
-        final_ud=final_ud,
     )
+
+def _face_count_from_bytes(image_bytes: bytes) -> int:
+    """
+    빠른 얼굴 존재 확인용 헬퍼: mediapipe FaceDetection으로 face_count만 계산.
+    """
+    nparr = np.frombuffer(image_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        raise ValueError("이미지를 디코딩할 수 없습니다.")
+
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    with mp.solutions.face_detection.FaceDetection(
+        model_selection=0, min_detection_confidence=0.5
+    ) as detector:
+        result = detector.process(img_rgb)
+    if not result.detections:
+        return 0
+    return len(result.detections)
+
+def _describe_reason(abs_yaw, yaw, gaze_lr_from_center, lr_avg, ud_unstable) -> str:
+    clauses = []
+
+    if abs_yaw > 20:
+        yaw_dir = "오른쪽" if yaw > 0 else "왼쪽"
+        clauses.append(f"얼굴이 화면 정면이 아닌 {yaw_dir} 방향으로 주로 향해 있습니다")
+
+    if gaze_lr_from_center > 0.2:
+        if lr_avg < 0.5:
+            clauses.append("시선이 화면 중심에서 벗어나 왼쪽을 향하고 있습니다")
+        else:
+            clauses.append("시선이 화면 중심에서 벗어나 오른쪽을 향하고 있습니다")
+
+    if ud_unstable:
+        clauses.append("눈동자의 상하 움직임이 불안정하게 감지됩니다")
+
+    if not clauses:
+        return "시선 및 얼굴 움직임에서 이상 패턴이 감지되어 부정행위로 판단하였습니다."
+
+    if len(clauses) == 1:
+        return clauses[0] + "."
+
+    return ", ".join(clauses[:-1]) + " 그리고 " + clauses[-1] + "."

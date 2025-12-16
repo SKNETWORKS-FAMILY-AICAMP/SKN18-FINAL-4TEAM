@@ -24,9 +24,11 @@
       <!-- 인트로 준비 오버레이 -->
       <div v-if="isIntroPreparing" class="intro-loading-overlay">
         <div class="intro-loading-card">
-          <div class="intro-spinner"></div>
-          <p class="intro-loading-text">라이브 코딩 환경을 준비하고 있어요...</p>
-          <p class="intro-loading-sub">문제와 평가 에이전트를 초기화하는 중입니다.</p>
+          <div class="intro-spinner" aria-hidden="true">
+            <span v-for="bar in 12" :key="bar" :style="{ '--i': bar }"></span>
+          </div>
+          <p class="intro-loading-text">면접을 진행할 면접관을 배정 중입니다.</p>
+          <p class="intro-loading-sub">잠시만 기다려주세요.</p>
         </div>
       </div>
 
@@ -193,6 +195,7 @@ const {
 /* -----------------------------
    변수 선언
 ----------------------------- */
+const INTRO_AUDIO_KEY = (sessionId) => `jobtory_intro_audio_${sessionId}`;
 let audioStream = null;
 let mediaRecorder = null;
 let audioChunks = [];
@@ -214,8 +217,6 @@ const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= 
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
-const INTRO_PLAYED_KEY = (sid) => `jobtory_intro_played_${sid}`;
-const INTRO_AUDIO_KEY = (sid) => `jobtory_intro_tts_audio_${sid}`;
 const LAST_PATH_KEY = "jobtory_last_path";
 const sessionStage = ref("intro"); // 서버 stage/state를 반영하는 클라이언트 단계
 
@@ -525,7 +526,11 @@ const runSttClient = async () => {
             ? ttsData.tts_text
             : [];
           if (chunks.length) {
-            await playTtsChunks(chunks);
+            await playTtsChunks(chunks, {
+              onStart: () => {
+                isSttRunning.value = false;
+              },
+            });
           }
         }
       } catch (err) {
@@ -540,7 +545,11 @@ const runSttClient = async () => {
       try {
         // 이미 오디오 청크가 내려온 경우 그대로 재생
         if (replyChunks.length > 0) {
-          await playTtsChunks(replyChunks);
+          await playTtsChunks(replyChunks, {
+            onStart: () => {
+              isSttRunning.value = false;
+            },
+          });
         } else if (replyText) {
           // 텍스트만 온 경우에만 TTS API를 호출
           const ttsResp = await fetch(
@@ -566,7 +575,11 @@ const runSttClient = async () => {
             ? ttsData.tts_text
             : [];
           if (chunks.length) {
-            await playTtsChunks(chunks);
+            await playTtsChunks(chunks, {
+              onStart: () => {
+                isSttRunning.value = false;
+              },
+            });
           }
         }
       } catch (err) {
@@ -586,11 +599,16 @@ const runSttClient = async () => {
 /* -----------------------------
   🔊 TTS
 ------------------------------ */
-const playTtsChunks = async (chunks = [], opts = { throwOnError: false }) => {
+const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart: null }) => {
+  let started = false;
   for (const chunk of chunks) {
     if (!chunk?.audio) continue;
     const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
     try {
+      if (!started && typeof opts.onStart === "function") {
+        started = true;
+        opts.onStart();
+      }
       await audio.play();
     } catch (err) {
       console.error("TTS 재생 실패:", err);
@@ -1401,6 +1419,7 @@ let lastCameraStatus = "ok";
 const offscreenCount = ref(0);
 const isForceEnding = ref(false);
 let lastOffscreenAlert = 0;
+const isAntiCheatReady = computed(() => !isIntroPreparing.value);
 
 const KEY_WINDOW_MS = 2000;
 const KEY_THRESHOLD = 12;
@@ -1417,6 +1436,7 @@ const clearAntiCheatTimer = () => {
 };
 
 const showAntiCheat = (stateKey, detail) => {
+  if (!isAntiCheatReady.value) return;
   clearAntiCheatTimer();
   setAntiCheatState(stateKey, { detail, timestamp: Date.now() });
   antiCheatTimer = setTimeout(() => {
@@ -1426,6 +1446,7 @@ const showAntiCheat = (stateKey, detail) => {
 };
 
 const registerOffscreenInfraction = (stateKey, baseDetail) => {
+  if (!isAntiCheatReady.value) return;
   const now = Date.now();
   if (now - lastOffscreenAlert < OFFSCREEN_COOLDOWN_MS) {
     return;
@@ -1466,20 +1487,24 @@ const forceEndSession = async (reason = "") => {
 };
 
 const handleVisibilityChange = () => {
+  if (!isAntiCheatReady.value) return;
   if (document.visibilityState === "hidden") {
     registerOffscreenInfraction("tabSwitch", "시험 화면을 벗어났습니다.");
   }
 };
 
 const handleWindowBlur = () => {
+  if (!isAntiCheatReady.value) return;
   registerOffscreenInfraction("windowBlur", "다른 창으로 이동이 감지되었습니다.");
 };
 
 const handlePaste = () => {
+  if (!isAntiCheatReady.value) return;
   showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 차단되었습니다.");
 };
 
 const handleCopy = () => {
+  if (!isAntiCheatReady.value) return;
   const now = Date.now();
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
@@ -1487,6 +1512,7 @@ const handleCopy = () => {
 };
 
 const sendFrameForMediapipe = async () => {
+  if (!isAntiCheatReady.value) return;
   const video = videoRef.value;
   if (!video || video.readyState < 2) return;
 
@@ -1576,6 +1602,7 @@ const startWebcamMonitor = () => {
     webcamMonitor = null;
   }
   webcamMonitor = setInterval(() => {
+    if (!isAntiCheatReady.value) return;
     const hasLiveTrack =
       mediaStream &&
       mediaStream.getVideoTracks().some((track) => track.readyState === "live");
@@ -1769,7 +1796,7 @@ onBeforeUnmount(() => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 
 .session-page {
   min-height: 100vh;
@@ -1777,7 +1804,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   background: #111827;
   color: #e5e7eb;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .session-header {
@@ -2178,47 +2205,69 @@ onBeforeUnmount(() => {
 }
 
 .intro-loading-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.9);
-  z-index: 1002;
-  backdrop-filter: blur(4px);
+  background: #0b1220;
+  z-index: 1200;
   pointer-events: all;
 }
 
 .intro-loading-card {
   background: #0b1220;
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 20px 24px;
-  min-width: 260px;
+  border: none;
+  border-radius: 14px;
+  padding: 24px 28px;
+  min-width: 280px;
   text-align: center;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
 }
 
 .intro-spinner {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  border: 5px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #38bdf8;
-  animation: spin 0.85s linear infinite;
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 18px;
 }
+
+.intro-spinner span {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  --count: 12;
+  --deg-step: calc(360deg / var(--count));
+  --delay-step: calc(1s / var(--count));
+  transform: rotate(calc((var(--i) - 1) * var(--deg-step)));
+}
+
+.intro-spinner span::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 9px;
+  height: 36px;
+  margin-left: -4.5px;
+  border-radius: 10px;
+  background: #e5e7eb;
+  opacity: 0.18;
+  animation: intro-spinner-fade 1s linear infinite;
+  animation-delay: calc(-1s + var(--i) * var(--delay-step));
+}
+
 
 .intro-loading-text {
   margin: 0 0 6px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 17px;
   color: #f9fafb;
 }
 
 .intro-loading-sub {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: #9ca3af;
 }
 
@@ -2298,6 +2347,15 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 13px;
   color: #9ca3af;
+}
+
+@keyframes intro-spinner-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes spin {

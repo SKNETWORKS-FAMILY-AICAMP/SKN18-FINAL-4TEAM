@@ -684,12 +684,7 @@ class LiveCodingHintView(APIView):
 
         language = (data.get("language") or meta.get("language") or "").lower() or None
         code = data.get("code") or ""
-        user_algorithm_category = (
-            data.get("problem_algorithm_category")
-            or data.get("user_algorithm_category")
-            or ""
-        )
-        real_algorithm_category = data.get("real_algorithm_category") or ""
+        real_algorithm_category = data.get("problem_algorithm_category") or ""
         problem_description = data.get("problem_description") or ""
         hint_trigger = data.get("hint_trigger") or "manual"
         conversation_log = data.get("conversation_log") if isinstance(data.get("conversation_log"), list) else None
@@ -731,22 +726,12 @@ class LiveCodingHintView(APIView):
                     for tc in (problem_obj.test_cases.all() if hasattr(problem_obj, "test_cases") else [])
                 ]
 
-        test_cases_str = ""
-        if isinstance(test_cases_payload, str):
-            test_cases_str = test_cases_payload
-        elif test_cases_payload is not None:
-            try:
-                test_cases_str = json.dumps(test_cases_payload, ensure_ascii=False)
-            except Exception:
-                test_cases_str = str(test_cases_payload)
 
         state = {
             "meta": {"session_id": session_id, "user_id": str(user.user_id)},
             "current_user_code": code,
             "problem_description": problem_description,
-            "user_algorithm_category": user_algorithm_category,
             "real_algorithm_category": real_algorithm_category,
-            "test_cases": test_cases_str,
             "hint_trigger": hint_trigger,
             "hint_count": hint_count,
         }
@@ -1213,9 +1198,7 @@ class CodingQuestionView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        question_text = (
-            (result.get("question") or "") or (result.get("tts_text") or "")
-        ).strip()
+        question_text = (result.get("tts_text") or "").strip()
         if not question_text:
             return Response(
                 {

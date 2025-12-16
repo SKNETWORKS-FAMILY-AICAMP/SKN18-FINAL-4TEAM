@@ -11,9 +11,7 @@ def hint_agent(state: CodingState) -> CodingState:
         사용하는 state 필드:
             - current_user_code: 현재 사용자의 코드 (str)
             - problem_description: 문제 설명 텍스트 (str)
-            - user_algorithm_category: 사용자가 예상한 알고리즘 카테고리 (str)
             - real_algorithm_category: 실제 정답 알고리즘 카테고리 (str)
-            - test_cases: 테스트 케이스 정보 (str or JSON string)
             - hint_count: 지금까지 사용한 힌트 횟수 (int)
             - conversation_log: 힌트/대화 로그 리스트 (list)
 
@@ -28,9 +26,7 @@ def hint_agent(state: CodingState) -> CodingState:
 # 1. Redis 상태에서 데이터 로드
     current_user_code = state.get("current_user_code", "")
     problem_description = state.get("problem_description", "")
-    user_algorithm_category = state.get("user_algorithm_category", "")
     real_algorithm_category = state.get("real_algorithm_category", "")
-    test_cases = state.get("test_cases", "제공되지 않음")
     hint_count = state.get("hint_count", 0)
     conversation_log = state.get("conversation_log", [])
 
@@ -39,12 +35,6 @@ def hint_agent(state: CodingState) -> CodingState:
     # [NEW] 코드가 비어있는지 확인 (공백 제거 후 길이 체크)
     is_empty_code = not current_user_code or len(current_user_code.strip()) == 0
 
-    # 전략 불일치 감지
-    is_strategy_mismatch = (
-        user_algorithm_category != "" 
-        and real_algorithm_category != ""
-        and user_algorithm_category != real_algorithm_category
-    )
 
     # 3. 프롬프트 구성
 
@@ -66,17 +56,6 @@ def hint_agent(state: CodingState) -> CodingState:
             "구현이 막힌 부분이 어디인지 파악하고 뚫어줄 수 있는 질문을 던지세요."
         )
 
-    # [전략 불일치 시 추가 지시사항] (기존 로직 유지하되, 빈 코드일 때도 카테고리는 선택했을 수 있으므로 적용)
-    strategy_instruction = ""
-    if is_strategy_mismatch:
-        strategy_instruction = (
-            f"""
-            [중요 감지!] 사용자는 '{user_algorithm_category}' 방식을 선택했으나, 정답은 '{real_algorithm_category}'입니다.
-            구현 시작 전에 이 접근 방식이 맞는지 다시 한 번 고민하게 만드세요.
-            예: "이 문제의 입력 크기를 고려했을 때, 선택하신 알고리즘이 효율적일까요?"
-            """
-        )
-
     # [힌트 깊이 조절]
     depth_instruction = (
         f"현재 힌트 사용 횟수는 {hint_count}회입니다. 횟수가 많을수록 더 구체적으로 조언하세요."
@@ -87,13 +66,11 @@ def hint_agent(state: CodingState) -> CodingState:
         "절대로 정답을 직접 알려주지 말고, 소크라테스식 문답법을 사용하세요.\n\n"
         "[문제 정보]\n"
         f"- 문제 내용: {problem_description}\n"
-        f"- 사용자 예상 카테고리: {user_algorithm_category}\n"
         f"- 실제 정답 카테고리: {real_algorithm_category}\n\n"
         "[생성 지침]\n"
         f"1. **현재 상황**: {situation_instruction}\n"
-        f"2. {strategy_instruction}\n"
-        f"3. {depth_instruction}\n"
-        "4. **출력 형식**: 마크다운 없이 줄바꿈으로 구분된 2~3문장의 텍스트. (한국어 구어체, 정중한 존댓말)\n"
+        f"2. {depth_instruction}\n"
+        "3. **출력 형식**: 마크다운 없이 줄바꿈으로 구분된 2~3문장의 텍스트. (한국어 구어체, 정중한 존댓말)\n"
     )
 
     # [Human Prompt 분기 처리]

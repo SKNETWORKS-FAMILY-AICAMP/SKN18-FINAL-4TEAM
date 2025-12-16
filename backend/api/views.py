@@ -97,14 +97,8 @@ class TTSView(APIView):
             or request.headers.get("X-Session-Id")
             or (request.data.get("session_id") if hasattr(request, "data") else None)
         )
-        session_id = (
-            request.query_params.get("session_id")
-            or request.headers.get("X-Session-Id")
-            or (request.data.get("session_id") if hasattr(request, "data") else None)
-        )
 
         try:
-            sentences_payload = _generate_tts_payload(text, session_id, max_sentences)
             sentences_payload = _generate_tts_payload(text, session_id, max_sentences)
         except Exception as exc:  # noqa: BLE001
             return Response(
@@ -468,11 +462,9 @@ class GoogleAuthView(APIView):
 
 class LiveCodingStartView(APIView):
     """
-    라이브 코딩 세션을 시작하면서 세션 메타 정보를 저장하는 엔드포인트.
+    라이브 코딩 세션을 시작하면서 세션 정보를 저장하는 엔드포인트.
     - Authorization: Bearer <access_token> (LoginView/GoogleAuthView에서 발급한 토큰)
-    - 요청 본문(optional): {"language": "python"} 등
-    - 요청 본문(optional): {"language": "python"} 등
-    - 저장되는 키: livecoding:{session_id}:meta
+    - 저장되는 키: livecoding:{session_id}:meta, 
       값: { state, problem_id, user_id, session_id }
     """
 
@@ -484,82 +476,40 @@ class LiveCodingStartView(APIView):
                 status=status.HTTP_401_UNAUTHORIZED,
             )
 
-        language = (request.data.get("language") or "python").lower()
-        problem_lang = (
-            CodingProblemLanguage.objects.select_related("problem")
-            .prefetch_related("problem__test_cases")
-            .filter(language__iexact=language)
-            .order_by("?")
-            .first()
-        )
-
-
-        if not problem_lang:
-            return Response(
-                {"detail": f"요청한 언어({language})의 문제를 찾을 수 없습니다."},
-                status=status.HTTP_404_NOT_FOUND,
-            )
-
-        problem = problem_lang.problem
+        problem_data = request.data.get("problem_data")
+        if not isinstance(problem_data, dict):
+            return Response({"detail": "problem_data가 필요합니다."}, status=400)
+        required = ["problem_id", "problem", "difficulty", "category", "language", "function_name", "starter_code", "test_cases"]
+        missing = [k for k in required if k not in problem_data]
+        if missing:
+            return Response({"detail": f"problem_data 필드 누락: {', '.join(missing)}"}, status=400)
         session_id = secrets.token_hex(16)
-        test_cases = [
-            {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-            for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
-        ]
-
-        # Redis(캐시)에 저장할 세션 메타 정보
-        start_at = timezone.now()
+        start_at = timezone.now() # Redis(캐시)에 저장할 세션 메타 정보
         meta = {
-            "state": "in_progress",
-            "problem_id": problem.problem_id,
-            "problem_id": problem.problem_id,
+            "stage": "intro",
             "user_id": user.user_id,
             "session_id": session_id,
-            "language": problem_lang.language,
-            # starter_code를 메타에도 보관해 두어, 이후 코드 진행 여부 판단에 사용
-            "starter_code": problem_lang.starter_code,
-            "time_limit_seconds": 40 * 60,
+            "problem_id": problem_data.get("problem_id"),
+            "language": problem_data.get("language"),
+            "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
         }
+        problem_payload  = {
+                "problem_id": problem_data["problem_id"],
+                "problem": problem_data['problem'],
+                "difficulty": problem_data['difficulty'],
+                "category": problem_data['category'],
+                "language": problem_data['language'],
+                "function_name":  problem_data['function_name'],
+                "starter_code": problem_data['starter_code'],
+                "test_cases":  problem_data['test_cases'],
+            
+        }
 
-        # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
-        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60 * 60)
-        # 유저별 현재 진행 중인 세션 매핑
-        cache.set(
-            f"livecoding:user:{user.user_id}:current_session",
-            session_id,
-            timeout=60 * 60,
-        )
-
-        return Response(
-            {
-                "session_id": session_id,
-                "state": meta["state"],
-                "user_id": meta["user_id"],
-                "problem_id": meta["problem_id"],
-                "problem": problem.problem,
-                "difficulty": problem.difficulty,
-                "category": problem.category,
-                "language": problem_lang.language,
-                "function_name": problem_lang.function_name,
-                "starter_code": problem_lang.starter_code,
-                "test_cases": test_cases,
-                "user_id": meta["user_id"],
-                "problem_id": meta["problem_id"],
-                "problem": problem.problem,
-                "difficulty": problem.difficulty,
-                "category": problem.category,
-                "language": problem_lang.language,
-                "function_name": problem_lang.function_name,
-                "starter_code": problem_lang.starter_code,
-                "test_cases": test_cases,
-                "time_limit_seconds": meta["time_limit_seconds"],
-                "start_at": meta["start_at"],
-                "remaining_seconds": meta["time_limit_seconds"],
-            },
-            status=status.HTTP_201_CREATED,
-        )
-
+        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60*60)
+        cache.set(f"livecoding:{session_id}:problem", problem_payload, timeout=60*60)
+        cache.set(f"livecoding:user:{user.user_id}:current_session", session_id, timeout=60*60)
+        return Response({"session_id": session_id}, status=201)
 
 class LiveCodingCodeSnapshotView(APIView):
     """
@@ -734,12 +684,7 @@ class LiveCodingHintView(APIView):
 
         language = (data.get("language") or meta.get("language") or "").lower() or None
         code = data.get("code") or ""
-        user_algorithm_category = (
-            data.get("problem_algorithm_category")
-            or data.get("user_algorithm_category")
-            or ""
-        )
-        real_algorithm_category = data.get("real_algorithm_category") or ""
+        real_algorithm_category = data.get("problem_algorithm_category") or ""
         problem_description = data.get("problem_description") or ""
         hint_trigger = data.get("hint_trigger") or "manual"
         conversation_log = data.get("conversation_log") if isinstance(data.get("conversation_log"), list) else None
@@ -781,22 +726,12 @@ class LiveCodingHintView(APIView):
                     for tc in (problem_obj.test_cases.all() if hasattr(problem_obj, "test_cases") else [])
                 ]
 
-        test_cases_str = ""
-        if isinstance(test_cases_payload, str):
-            test_cases_str = test_cases_payload
-        elif test_cases_payload is not None:
-            try:
-                test_cases_str = json.dumps(test_cases_payload, ensure_ascii=False)
-            except Exception:
-                test_cases_str = str(test_cases_payload)
 
         state = {
             "meta": {"session_id": session_id, "user_id": str(user.user_id)},
             "current_user_code": code,
             "problem_description": problem_description,
-            "user_algorithm_category": user_algorithm_category,
             "real_algorithm_category": real_algorithm_category,
-            "test_cases": test_cases_str,
             "hint_trigger": hint_trigger,
             "hint_count": hint_count,
         }
@@ -863,6 +798,7 @@ class LiveCodingSessionView(APIView):
             )
 
         meta_key = f"livecoding:{session_id}:meta"
+        problem_key = f"livecoding:{session_id}:problem"
 
         meta = cache.get(meta_key)
         if not meta:
@@ -878,48 +814,12 @@ class LiveCodingSessionView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        # 세션 생성 시 저장한 문제 데이터를 우선 사용 (langgraph와 프런트 일관성 보장)
-        meta_problem = meta.get("problem_data") or {}
-        problem_id = meta_problem.get("problem_id") or meta.get("problem_id")
-        language = meta_problem.get("language") or meta.get("language")
-
-        problem_lang = None
-        problem = None
-        test_cases = []
-
-        # 메타에 problem_data가 있으면 그대로 사용 (problem 텍스트가 없어도 일관성 위해 DB 조회 생략)
-        if meta_problem:
-            problem = type("obj", (), {})()
-            problem.problem = meta_problem.get("problem")
-            problem.difficulty = meta_problem.get("difficulty")
-            problem.category = meta_problem.get("category")
-            test_cases = meta_problem.get("test_cases") or []
-            # language/function_name/starter_code는 아래 응답에서 meta_problem 사용
-            problem_lang = type("obj", (), {})()
-            problem_lang.language = meta_problem.get("language")
-            problem_lang.function_name = meta_problem.get("function_name")
-            problem_lang.starter_code = meta_problem.get("starter_code")
-        else:
-            qs = (
-                CodingProblemLanguage.objects.select_related("problem")
-                .prefetch_related("problem__test_cases")
-                .filter(problem__problem_id=problem_id)
+        problem = cache.get(problem_key) or {}
+        if not problem:
+            return Response(
+                {"detail": "세션의 문제 정보를 찾을 수 없습니다."},
+                status=status.HTTP_404_NOT_FOUND,
             )
-            if language:
-                qs = qs.filter(language__iexact=language)
-
-            problem_lang = qs.first()
-            if not problem_lang:
-                return Response(
-                    {"detail": "세션의 문제 정보를 찾을 수 없습니다."},
-                    status=status.HTTP_404_NOT_FOUND,
-                )
-
-            problem = problem_lang.problem
-            test_cases = [
-                {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
-                for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
-            ]
 
         start_at_str = meta.get("start_at")
         time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
@@ -938,16 +838,16 @@ class LiveCodingSessionView(APIView):
         return Response(
             {
                 "session_id": session_id,
-                "state": meta.get("state"),
+                "stage": meta.get("stage"),
                 "user_id": meta.get("user_id"),
-                "problem_id": meta_problem.get("problem_id") or meta.get("problem_id"),
-                "problem": getattr(problem, "problem", None),
-                "difficulty": getattr(problem, "difficulty", None),
-                "category": getattr(problem, "category", None),
-                "language": meta_problem.get("language") or getattr(problem_lang, "language", None),
-                "function_name": meta_problem.get("function_name") or getattr(problem_lang, "function_name", None),
-                "starter_code": meta_problem.get("starter_code") or getattr(problem_lang, "starter_code", None),
-                "test_cases": test_cases,
+                "problem_id": problem.get("problem_id") or meta.get("problem_id"),
+                "problem": problem.get("problem"),
+                "difficulty": problem.get("difficulty"),
+                "category": problem.get("category"),
+                "language": problem.get("language") or meta.get("language"),
+                "function_name": problem.get("function_name"),
+                "starter_code": problem.get("starter_code"),
+                "test_cases": problem.get("test_cases") or [],
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": start_at_str,
                 "remaining_seconds": remaining_seconds,
@@ -1298,9 +1198,7 @@ class CodingQuestionView(APIView):
                 status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
 
-        question_text = (
-            (result.get("question") or "") or (result.get("tts_text") or "")
-        ).strip()
+        question_text = (result.get("tts_text") or "").strip()
         if not question_text:
             return Response(
                 {
@@ -1337,67 +1235,4 @@ class CodingQuestionView(APIView):
                 "state": result,
             },
             status=status.HTTP_200_OK,
-        )
-
-class LiveCodingStartView(APIView):
-    """
-    라이브 코딩 세션을 시작하면서 세션 메타 정보를 저장하는 엔드포인트.
-    - Authorization: Bearer <access_token> (LoginView/GoogleAuthView에서 발급한 토큰)
-    - 요청 본문:
-        - problem_id (선택): 지정하면 해당 문제로 시작
-        - language (선택): 지정 안 하면 python
-    - 동작:
-        - problem_id 없으면 language 기준으로 랜덤 문제 선택
-    - 저장되는 키: livecoding:{session_id}:meta
-      값: { state, problem_id, user_id, session_id }
-    """
-
-    def post(self, request):
-        user = getattr(request, "user", None)
-        if not isinstance(user, User):
-            return Response(
-                {"detail": "라이브 코딩을 시작하려면 로그인이 필요합니다."},
-                status=status.HTTP_401_UNAUTHORIZED,
-            )
-
-        problem_data = request.data.get("problem_data")
-        # 프런트가 preload에서 전달한 문제를 그대로 사용 (DB 재조회 없음)
-        if not problem_data:
-            return Response(
-                {"detail": "problem_data가 필요합니다. 설정 단계를 다시 진행해 주세요."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-
-        session_id = secrets.token_hex(16)
-        # Redis(캐시)에 저장할 세션 메타 정보
-        start_at = timezone.now()
-        meta = {
-            "state": "in_progress",
-            "user_id": user.user_id,
-            "session_id": session_id,
-            "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
-            "start_at": start_at.isoformat(),
-            "problem_id": problem_data.get("problem_id"),
-        }
-
-        # 기본 TTL: 1시간 (필요 시 환경변수로 조정 가능)
-        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60 * 60)
-        # 유저별 현재 진행 중인 세션 매핑
-        cache.set(
-            f"livecoding:user:{user.user_id}:current_session",
-            session_id,
-            timeout=60 * 60,
-        )
-
-        return Response(
-            {
-                "session_id": session_id,
-                "state": meta["state"],
-                "time_limit_seconds": meta["time_limit_seconds"],
-                "start_at": meta["start_at"],
-                "remaining_seconds": meta["time_limit_seconds"],
-                "problem_data": problem_data,
-            },
-            status=status.HTTP_201_CREATED,
         )

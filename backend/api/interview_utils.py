@@ -79,14 +79,4 @@ def _generate_tts_payload(text: str, session_id: str | None = None, max_sentence
             continue
         sentences_payload.append({"text": chunk.get("text", ""), "audio": audio_b64})
 
-    # 생성된 TTS 텍스트를 공용 대화 버퍼에도 기록
-    if session_id and text:
-        append_conversation_event(
-            session_id,
-            role="system",
-            channel="tts",
-            text=text,
-            stage=None,
-            meta={"source": "tts"},
-        )
     return sentences_payload

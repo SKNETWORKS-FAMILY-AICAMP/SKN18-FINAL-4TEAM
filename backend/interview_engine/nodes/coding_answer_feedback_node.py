@@ -19,6 +19,14 @@ def coding_answer_feedback_agent(state: CodingState) -> CodingState:
     - 출력: state.tts_text 에 리액션 멘트를 설정
     """
     message = random.choice(ANSWER_FEEDBACK_MESSAGES)
+    user_answers = state.get("user_answers") or []
+    if not isinstance(user_answers, list):
+        user_answers = [str(user_answers)] if str(user_answers) else []
+
+    answer_text = state.get("stt_text")
+    if answer_text:
+        user_answers.append(answer_text)
+
+    state["user_answers"] = user_answers
     state["tts_text"] = message
     return state
-

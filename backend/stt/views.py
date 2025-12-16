@@ -43,21 +43,6 @@ def transcribe_only(request):
             if isinstance(ln, dict)
         ).strip()
 
-        # STT 텍스트를 공용 대화 버퍼에 기록 (가능한 경우)
-        session_id = request.GET.get("session_id") or request.headers.get("X-Session-Id")
-        if session_id and text:
-            meta_key = f"livecoding:{session_id}:meta"
-            meta = cache.get(meta_key) or {}
-            stage = (meta.get("stage") or "").strip() or None
-            append_conversation_event(
-                session_id,
-                role="user",
-                channel="stt",
-                text=text,
-                stage=stage,
-                meta={"source": "stt.transcribe_only"},
-            )
-
         return JsonResponse(
             {
                 "lines": lines,

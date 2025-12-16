@@ -112,7 +112,10 @@ def question_generation_agent(state: CodingState) -> CodingState:
     question_cnt = int(state.get("question_cnt") or 0)
     last_question_text = (state.get("last_question_text") or "").strip()
     language = (state.get("language") or "python").strip() or "python"
-
+    existing_questions = state.get("question") or []
+    if not isinstance(existing_questions, list):
+        existing_questions = [str(existing_questions)] if str(existing_questions) else []
+            
     norm_current = _normalize_code_for_compare(current_code)
     norm_prev = _normalize_code_for_compare(prev_code)
     norm_starter = _normalize_code_for_compare(starter_code)
@@ -140,7 +143,6 @@ def question_generation_agent(state: CodingState) -> CodingState:
     print("no_progress", no_progress)
 
     if no_progress or is_starter_only:
-        state["question"] = ""
         state["tts_text"] = ""
         return state
 
@@ -180,6 +182,11 @@ def question_generation_agent(state: CodingState) -> CodingState:
     model = init_chat_model("gpt-5-nano")
     messages = [SystemMessage(content=system_prompt), HumanMessage(content=human_prompt)]
 
+    existing_questions = state.get("question") or []
+    if not isinstance(existing_questions, list):
+        existing_questions = [str(existing_questions)] if str(existing_questions) else []
+    state["question"] = existing_questions
+
     try:
         response = model.invoke(messages)
         raw_content = (getattr(response, "content", "") or "").strip()
@@ -206,17 +213,19 @@ def question_generation_agent(state: CodingState) -> CodingState:
 
         if not question_text:
             # JSON 파싱이 되지 않거나 question 필드가 비어 있으면 스킵 처리
-            state["question"] = ""
+            state["question"] = existing_questions
             state["tts_text"] = ""
             state["question_skip_reason"] = "llm_invalid_or_empty_json"
             return state
 
-        state["question"] = question_text
+
+        existing_questions.append(question_text)
+        state["question"] = existing_questions
         state["tts_text"] = question_text
 
     except Exception:
         # 에러 시에는 질문을 생성하지 않고 스킵 처리
-        state["question"] = ""
+        state["question"] = existing_questions
         state["tts_text"] = ""
         state["question_skip_reason"] = "llm_error"
 

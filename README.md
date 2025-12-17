@@ -8,14 +8,11 @@ AI 면접관과 함께 라이브 코딩 테스트를 진행하는 웹 서비스�
 
 ## 👥 팀 소개
 
-| 이름 | 역할 | GitHub |
-| --- | --- | --- |
-| <img src="images/judy.jpg" width="100"><br>김규리 | PM | [@GyuriKimm](https://github.com/GyuriKimm) |
-| <img src="images/Nick.jpg" width="100"><br>김준규 | APM | [@JungyuOO](https://github.com/JungyuOO) |
-| <img src="images/Clawhauser.png" width="100"><br>김민주 | 팀원 | [@kmjj0801](https://github.com/kmjj0801) |
-| <img src="images/Brian.jpg" width="100"><br>손주영 | 팀원 | [@sonjuyeong-00](https://github.com/sonjuyeong-00) |
-| <img src="images/gazelle.jpg" width="100"><br>정동석 | 팀원 | [@dsj-1004](https://github.com/dsj-1004) |
-| <img src="images/Flash.jpg" width="100"><br>채린 | 팀원 | [@cofls99](https://github.com/cofls99) |
+|      | 김규리 | 김준규 | 김민주 | 손주영 | 정동석 | 채린 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 프로필 | <img src="images/judy.jpg" width="100"> | <img src="images/Nick.jpg" width="100"> | <img src="images/Clawhauser.png" width="100"> | <img src="images/Brian.jpg" width="100"> | <img src="images/gazelle.jpg" width="100"> | <img src="images/Flash.jpg" width="100"> |
+| 역할 | PM | APM | 팀원 | 팀원 | 팀원 | 팀원 |
+| GitHub | [@GyuriKimm](https://github.com/GyuriKimm) | [@JungyuOO](https://github.com/JungyuOO) | [@kmjj0801](https://github.com/kmjj0801) | [@sonjuyeong-00](https://github.com/sonjuyeong-00) | [@dsj-1004](https://github.com/dsj-1004) | [@cofls99](https://github.com/cofls99) |
 
 ---
 
@@ -217,4 +214,3 @@ npm run dev
 
 이후 브라우저에서 `http://localhost:5174/` 로 접속해  
 환경 설정 페이지 → 라이브 코딩 페이지로 진입하면 JobTory 라이브 코딩 인터뷰를 테스트할 수 있습니다.
-

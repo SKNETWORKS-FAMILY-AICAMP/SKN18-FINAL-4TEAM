@@ -1,7 +1,7 @@
 # backend/interview_engine/nodes/code_collabo_eval_node.py
 
 from __future__ import annotations
-
+from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from typing import Any, Dict, List, Tuple
 import re
 
@@ -119,6 +119,66 @@ def _collab_signal_from_meta(meta: Dict[str, Any]) -> Tuple[float, List[str]]:
 
 
 def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
+    state["step"] = "code_collab_eval"
+    state["status"] = "running"
+    state["error"] = None
+
+    meta = state.get("meta") or {}
+    session_id = _safe_str(meta.get("session_id"))
+    ...
+    # cache
+    meta_key = f"livecoding:{session_id}:meta"
+    code_key = f"livecoding:{session_id}:code"
+    cached_meta = cache.get(meta_key) or {}
+    code_data = cache.get(code_key) or {}
+    latest = (code_data.get("latest") or {})
+    cache_code = _safe_str(latest.get("code") or "")
+
+    # ✅ checkpoint (chapter2 / chapter2_hint)
+    chap2 = load_chapter_channel_values(session_id, "chapter2")
+    hint = load_chapter_channel_values(session_id, "chapter2_hint")
+
+    # ✅ meta 병합 우선순위: checkpoint -> cache (cache가 최신 행동로그일 수 있어서)
+    merged_meta = {**(chap2.get("meta") or {}), **cached_meta}
+
+    # question/hint 카운트는 checkpoint에 있으면 우선 채택
+    if "question_cnt" in chap2:
+        merged_meta["question_cnt"] = chap2.get("question_cnt")
+    if "hint_count" in hint:
+        merged_meta["hint_count"] = hint.get("hint_count")
+
+    # ✅ code는 cache가 비었으면 chapter2.code로 대체
+    ckpt_code = _safe_str(chap2.get("code") or "")
+    code = cache_code.strip() or ckpt_code.strip()
+
+    # 1) 품질
+    style_score, style_fb = _basic_style_checks(code)
+
+    # 2) 협업/커뮤니케이션 (meta 기반)
+    collab_score, collab_fb = _collab_signal_from_meta(merged_meta)
+
+    score = _clamp01(0.65 * style_score + 0.35 * collab_score)
+
+    state["code_collab_score"] = round(score, 4)
+    state["code_collab_feedback"] = "\n".join([
+        "### 품질 신호",
+        *(style_fb or ["- (피드백 없음)"]),
+        "",
+        "### 협업/커뮤니케이션 신호",
+        *(collab_fb or ["- (피드백 없음)"]),
+    ]).strip()
+
+    # ✅ 근거(리포트에서 카드로 쓰기 좋은 재료)도 state에 같이 싣기
+    state["code_collab_evidence"] = {
+        "source": {"cache": bool(cache_code.strip()), "checkpoint_chapter2": bool(chap2)},
+        "question_cnt": merged_meta.get("question_cnt"),
+        "hint_count": merged_meta.get("hint_count"),
+        "last_question_text": chap2.get("last_question_text"),
+        "hint_text": hint.get("hint_text"),
+        "conversation_log": hint.get("conversation_log") or [],
+    }
+    state["status"] = "done"
+    return state
     """
     step3 - 코드 품질/협업 평가 노드
     입력: state.meta.session_id 기반으로 cache에서 코드/메타 조회

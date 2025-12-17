@@ -491,8 +491,6 @@ class LiveCodingStartView(APIView):
             "stage": "intro",
             "user_id": user.user_id,
             "session_id": session_id,
-            "problem_id": problem_data.get("problem_id"),
-            "language": problem_data.get("language"),
             "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
         }
@@ -898,9 +896,10 @@ class LiveCodingActiveSessionView(APIView):
             )
 
         meta_key = f"livecoding:{session_id}:meta"
-
+        problem_key =  f"livecoding:{session_id}:problem"
         meta = cache.get(meta_key)
-        if not meta:
+        problem = cache.get(problem_key)
+        if not meta and problem:
             return Response(
                 {"available": False},
                 status=status.HTTP_200_OK,
@@ -912,9 +911,9 @@ class LiveCodingActiveSessionView(APIView):
                 {"detail": "이 세션에 접근할 권한이 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        problem_id = meta.get("problem_id")
-        language = meta.get("language")
+        
+        problem_id = problem.get("problem_id")
+        language = problem.get("language")
 
         qs = (
             CodingProblemLanguage.objects.select_related("problem")
@@ -1130,8 +1129,12 @@ class CodingQuestionView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        # 1) 세션 메타 / 코드 스냅샷 로드
+        # 1) 세션 메타 / 문제 정보 / 코드 스냅샷 로드
         meta_key = f"livecoding:{session_id}:meta"
+        problem_key = f"livecoding:{session_id}:problem"
+        code_key = f"livecoding:{session_id}:code"
+        code_data = cache.get(code_key) or {}
+
         meta = cache.get(meta_key) or {}
         if not meta:
             return Response(
@@ -1144,7 +1147,12 @@ class CodingQuestionView(APIView):
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        question_cnt = int(meta.get("question_cnt") or 0)
+        # 문제 정보는 별도 키(livecoding:{session_id}:problem)에 저장된다.
+        # starter_code, 실제 문제 언어 등은 여기에서 가져오고,
+        # meta에는 세션 진행 상태(state, stage, question_cnt 등만 둔다.
+        problem = cache.get(problem_key) or {}
+
+        question_cnt = int(code_data.get("question_cnt") or 0)
         # 최대 3회까지만 질문
         if question_cnt >= 3:
             return Response(
@@ -1157,8 +1165,7 @@ class CodingQuestionView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        code_key = f"livecoding:{session_id}:code"
-        code_data = cache.get(code_key) or {}
+       
         history = code_data.get("history") or []
         latest = code_data.get("latest") or {}
 
@@ -1174,21 +1181,31 @@ class CodingQuestionView(APIView):
             )
 
         latest_code = latest.get("code") or ""
-        language = (latest.get("language") or meta.get("language") or "python").lower()
-        last_snapshot_index = int(meta.get("last_question_snapshot_index") or 0)
-        snapshot_index = len(history) or 1
+        # 언어는 코드 스냅샷에 없으면 문제/메타 순으로 fallback
+        language = (
+            problem.get("language")
+        ).lower()
 
-        last_question_text = (meta.get("last_question_text") or "").strip()
+        last_question_text = (code_data.get("last_question_text") or "").strip()
 
-        # 이전에 질문을 했던 스냅샷 기준 코드 (없으면 빈 문자열)
+        # 질문용 코드 스냅샷 히스토리:
+        # 사용자가 타이핑할 때마다 저장되는 history 전체가 아니라,
+        # "질문이 실제로 생성되었던 시점"의 코드만 따로 모아 둔다.
+        question_history = code_data.get("question_history") or []
+
+        # 이전 질문이 있었다면 그 시점의 코드 스냅샷을 prev_code로 사용
         prev_code = ""
-        if last_snapshot_index and 0 < last_snapshot_index <= len(history):
+        if question_history:
             try:
-                prev_code = history[last_snapshot_index - 1].get("code") or ""
+                prev_code = question_history[-1].get("code") or ""
             except Exception:
                 prev_code = ""
 
-        starter_code = (meta.get("starter_code") or "").strip()
+        # starter_code는 문제 payload에만 존재하므로, 먼저 problem에서 찾고
+        # 과거 메타에 저장된 값이 있다면 보조적으로만 사용한다.
+        starter_code = (
+            (problem.get("starter_code") or "")
+        ).strip()
 
         # 2) LangGraph(chapter2) 호출
         graph = get_cached_graph(name="chapter2")
@@ -1229,11 +1246,19 @@ class CodingQuestionView(APIView):
                 status=status.HTTP_200_OK,
             )
 
-        # 3) 질문 횟수/스냅샷 인덱스 메타에 반영
-        meta["question_cnt"] = question_cnt + 1
-        meta["last_question_snapshot_index"] = snapshot_index
-        meta["last_question_text"] = question_text
+        # 3) 질문 횟수/질문 기준 코드 스냅샷 메타에 반영
+        code_data["question_cnt"] = question_cnt + 1
+        code_data["last_question_text"] = question_text
         cache.set(meta_key, meta, timeout=60 * 60)
+
+        # 이번 질문 생성에 실제로 사용한 코드 스냅샷을 별도로 보관해
+        # 다음 질문에서 prev_code로 사용한다.
+        question_history.append(latest)
+        # 메모리 보호를 위해 최근 50개까지만 유지
+        if len(question_history) > 50:
+            question_history = question_history[-50:]
+        code_data["question_history"] = question_history
+        cache.set(code_key, code_data, timeout=60 * 60)
 
         # 4) 질문 텍스트를 TTS로 변환해 프론트로 내려줌
         try:

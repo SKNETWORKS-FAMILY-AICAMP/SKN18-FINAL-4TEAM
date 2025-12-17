@@ -1,19 +1,19 @@
-import logging
 import os
 from dotenv import load_dotenv
-from langgraph.checkpoint.memory import MemorySaver
 from langgraph.checkpoint.redis import RedisSaver
-
 from tts_client import generate_interview_audio_batch
-from interview_engine import llm
+from dotenv import load_dotenv
 from interview_engine.graph import (
     create_chapter1_graph_flow,
+    create_chapter2_graph_flow,
+    create_chapter2_hint_graph
 
 )
-
+from interview_engine import llm
+from langgraph.checkpoint.redis import RedisSaver
+from .stt_buffer import append_conversation_event
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
-logger = logging.getLogger(__name__)
 
 # 모듈 전역
 _checkpointer = None
@@ -22,13 +22,6 @@ _llm_instance = None
 
 
 def get_checkpointer():
-    """RedisSaver를 우선 사용하되, 실패 시 인메모리로 폴백.
-
-    - cp.setup()을 호출해 애플리케이션 시작 시점에 연결 풀을 미리 올려
-      첫 호출 지연을 줄인다.
-    - Redis 설정이 없거나 실패하면 MemorySaver로 전환해 가용성을 보장한다.
-    """
-
     global _checkpointer
     if _checkpointer is not None:
         return _checkpointer
@@ -40,21 +33,22 @@ def get_checkpointer():
             _checkpointer = cp
             return _checkpointer
         except Exception as exc:  # noqa: BLE001
-            logger.warning("RedisSaver 초기화 실패, MemorySaver로 폴백합니다: %s", exc)
+            pass
 
-    # 폴백: 인메모리 체크포인터 (프로세스 내에서만 유지됨)
-    _checkpointer = MemorySaver()
     return _checkpointer
 
-def get_cached_graph(name: str, session_id=None):
+def get_cached_graph(name: str):
     if name not in _graph_cache:
         cp = get_checkpointer()
         if name == "chapter1":
             _graph_cache[name] = create_chapter1_graph_flow(checkpointer=cp)
+        elif name == "chapter2":
+            _graph_cache[name] = create_chapter2_graph_flow(checkpointer=cp)
+        elif name == "chapter2_hint":
+            _graph_cache[name] = create_chapter2_hint_graph(checkpointer=cp)
         else:
             raise ValueError(f"unknown graph {name}")
     return _graph_cache[name]
-
 
 def get_cached_llm():
     """interview_engine.llm.LLM 인스턴스를 캐싱해 재사용."""
@@ -64,14 +58,14 @@ def get_cached_llm():
         _llm_instance = getattr(llm, "LLM", None)
     return _llm_instance
 
-def generate_tts_payload(text: str, thread_id: str | None = None, max_sentences=None):
+def _generate_tts_payload(text: str, session_id: str | None = None, max_sentences=None):
     """
     LangGraph thread_id와 문장 수 제한을 반영해 배치 TTS를 수행하고
     프론트로 내려줄 청크 페이로드를 생성합니다.
     """
     config = {"configurable": {}}
-    if thread_id:
-        config["configurable"]["thread_id"] = thread_id
+    if session_id:
+        config["configurable"]["thread_id"] = session_id
     if isinstance(max_sentences, int) and max_sentences > 0:
         config["configurable"]["max_sentences"] = max_sentences
     if not config["configurable"]:
@@ -84,4 +78,5 @@ def generate_tts_payload(text: str, thread_id: str | None = None, max_sentences=
         if not audio_b64:
             continue
         sentences_payload.append({"text": chunk.get("text", ""), "audio": audio_b64})
+
     return sentences_payload

@@ -46,7 +46,7 @@ def problem_intro_agent(state: IntroState) -> IntroState:
 
     human_prompt = (
         f"다음은 문제입니다:\n{problem}\n"
-        "지원자에게 읽어줄 문제 소개 멘트를 3~5문장으로 작성하세요. "
+        "지원자에게 읽어줄 문제 소개 멘트를 3문장으로 작성하세요. "
         "간단한 인사 후 문제의 핵심 요구사항만 설명하세요."
     )
 
@@ -60,8 +60,7 @@ def problem_intro_agent(state: IntroState) -> IntroState:
         raw = (getattr(response, "content", "") or "").strip()
 
         strategy_question = (
-            "코드를 작성하시기 전에, 이 문제를 어떤 방식으로 해결할지 풀이 방향을 설명해 주세요. "
-            "사용하실 알고리즘과 예상되는 시간 복잡도까지 함께 말씀해 주시면 됩니다."
+            "코드를 작성하기 전에 풀이 접근 방식과 사용할 알고리즘, 그리고 예상 시간 복잡도를 간단히 설명해 주세요."
         )
         intro_text = raw + "\n" + strategy_question
         state["intro_text"] = intro_text

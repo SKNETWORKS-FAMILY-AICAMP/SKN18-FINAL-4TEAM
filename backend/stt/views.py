@@ -3,6 +3,9 @@ import os
 import logging
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
+from django.core.cache import cache
+
+from api.stt_buffer import append_conversation_event
 from .stt_client import STTClient
 
 logger = logging.getLogger(__name__)
@@ -39,6 +42,7 @@ def transcribe_only(request):
             for ln in (lines or [])
             if isinstance(ln, dict)
         ).strip()
+
         return JsonResponse(
             {
                 "lines": lines,

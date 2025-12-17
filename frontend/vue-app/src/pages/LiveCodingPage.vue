@@ -81,7 +81,6 @@ const resetLivecodingCaches = () => {
   sessionStorage.removeItem("jobtory_intro_tts_audio");
   sessionStorage.removeItem("jobtory_livecoding_problem_data");
   localStorage.removeItem("jobtory_livecoding_session_id");
-  localStorage.removeItem("jobtory_langgraph_id");
 };
 
 const loadActiveSession = async (token) => {
@@ -159,7 +158,11 @@ const handleResumeSession = () => {
     return;
   }
   showSessionChoice.value = false;
-  router.push({ name: "coding-session", query: { session_id: activeSessionId.value } });
+  // 이어하기 진입임을 명시하기 위해 resume 플래그를 함께 전달
+  router.push({
+    name: "coding-session",
+    query: { session_id: activeSessionId.value, resume: "1" },
+  });
 };
 
 const handleStartNewSession = async () => {
@@ -180,11 +183,8 @@ const handleStartNewSession = async () => {
         }
       }).catch(() => {});
       activeSessionId.value = null;
-      resetLivecodingCaches();
+      localStorage.removeItem("jobtory_livecoding_session_id");
     }
-
-    // 혹시 남아 있는 캐시를 정리하고 완전 새로 시작
-    resetLivecodingCaches();
 
     router.push({ name: "coding-settings" });
   } catch (err) {

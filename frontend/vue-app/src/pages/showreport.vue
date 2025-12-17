@@ -58,6 +58,21 @@
           <article class="report" v-html="reportHtml"></article>
         </div>
 
+        <!-- raw redis data: problem + latest code -->
+        <section class="raw-block" v-if="problemText || latestCode">
+          <h3>원본 문제/최종 코드 (Redis)</h3>
+          <div class="raw-grid">
+            <div>
+              <div class="raw-label">문제 본문</div>
+              <pre class="pre raw-pre">{{ problemText || "-" }}</pre>
+            </div>
+            <div>
+              <div class="raw-label">최종 제출 코드</div>
+              <pre class="pre raw-pre">{{ latestCode || "-" }}</pre>
+            </div>
+          </div>
+        </section>
+
         <!-- ✅ LangGraph 최종 output 전체 출력 -->
         <details class="debug" open>
           <summary>LangGraph 최종 Output (graph_output)</summary>
@@ -93,6 +108,8 @@ const step = ref("");
 const reportMarkdown = ref("");
 const finalScore = ref(null);
 const finalGrade = ref(null);
+const problemText = ref("");
+const latestCode = ref("");
 
 // ✅ LangGraph 최종 output 전체 저장
 const graphOutput = ref({});
@@ -167,6 +184,9 @@ const fetchReport = async () => {
     reportMarkdown.value = data.final_report_markdown || "";
     finalScore.value = data.final_score ?? null;
     finalGrade.value = data.final_grade ?? null;
+
+    problemText.value = data.problem_text || "";
+    latestCode.value = (data.latest_code && (data.latest_code.code || data.latest_code.value)) || "";
 
     // ✅ 최종 output 전체
     graphOutput.value = data.graph_output || {};
@@ -384,5 +404,26 @@ onMounted(() => {
   max-height: 320px;
   overflow: auto;
   opacity: 0.92;
+}
+.raw-block {
+  margin-top: 16px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(0,0,0,0.22);
+}
+.raw-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.raw-label {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-bottom: 6px;
+}
+.raw-pre {
+  max-height: 220px;
+  white-space: pre-wrap;
 }
 </style>

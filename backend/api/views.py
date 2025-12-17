@@ -489,6 +489,9 @@ class LiveCodingStartView(APIView):
             "stage": "intro",
             "user_id": user.user_id,
             "session_id": session_id,
+            "problem_id": problem_data["problem_id"],
+            "language": problem_data.get("language"),
+            "function_name": problem_data.get("function_name"),
             "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
         }
@@ -879,9 +882,10 @@ class LiveCodingActiveSessionView(APIView):
             )
 
         meta_key = f"livecoding:{session_id}:meta"
-
+        problem_key =  f"livecoding:{session_id}:problem"
         meta = cache.get(meta_key)
-        if not meta:
+        problem = cache.get(problem_key)
+        if not meta and problem:
             return Response(
                 {"available": False},
                 status=status.HTTP_200_OK,
@@ -893,9 +897,9 @@ class LiveCodingActiveSessionView(APIView):
                 {"detail": "이 세션에 접근할 권한이 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        problem_id = meta.get("problem_id")
-        language = meta.get("language")
+        
+        problem_id = problem.get("problem_id")
+        language = problem.get("language")
 
         qs = (
             CodingProblemLanguage.objects.select_related("problem")

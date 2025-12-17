@@ -296,7 +296,10 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
         # 얼굴/눈 랜드마크를 아예 잡지 못하면 자리 이탈로 간주
         return CheatAnalysisResult(
             is_cheating=True,
-            reason="얼굴과 눈동자 랜드마크를 인식할 수 없습니다.",
+            reason="현재 얼굴 인식이 되지 않습니다. 화면 중앙에 얼굴을 맞춰 주세요.",
+            detail_reason="얼굴을 인식할 수 없습니다.",
+            face_count=0,
+            raw_score=1.0,
         )
     
     face_count = len(result.multi_face_landmarks)
@@ -305,6 +308,9 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
         return CheatAnalysisResult(
             is_cheating=True,
             reason="카메라 화면에 두 명 이상이 동시에 감지되었습니다.",
+            detail_reason=" 두 명 이상이 동시에 감지되었습니다.",
+            face_count=face_count,
+            raw_score=1.0,
         )
 
     lm = result.multi_face_landmarks[0].landmark
@@ -329,6 +335,7 @@ def analyze_frame(image_bytes: bytes) -> CheatAnalysisResult:
         return CheatAnalysisResult(
             is_cheating=True,
             reason="머리 방향/시선을 계산할 수 없습니다.",
+            detail_reason="pose_calc_failed",
             face_count=1,
             raw_score=1.0,
         )

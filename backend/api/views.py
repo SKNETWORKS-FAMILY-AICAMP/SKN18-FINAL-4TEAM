@@ -15,6 +15,8 @@ import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from .email_utils import send_verification_code, verify_code
 from .throttling import (
@@ -1454,6 +1456,70 @@ class LiveCodingFinalEvalReportView(APIView):
             )
 
         report_md = values.get("final_report_markdown") or ""
+        
+        graph_output = values.get("graph_output") or {}
+
+        # graph_output에 problem_text가 없으면 여러 소스에서 최대한 찾아 채움
+        if not graph_output.get("problem_text"):
+            try:
+                problem_text = None
+
+                # 0) (혹시 로컬 meta에 이미 들어있으면)
+                if isinstance(meta, dict):
+                    problem_text = (
+                        meta.get("problem_text")
+                        or meta.get("problem_description")
+                        or meta.get("problem")
+                    )
+
+                # 1) 세션 meta 캐시에서 (livecoding:{session_id}:meta)
+                if not problem_text:
+                    meta_key = f"livecoding:{session_id}:meta"
+                    cached_meta = cache.get(meta_key) or {}
+                    if isinstance(cached_meta, dict):
+                        problem_text = (
+                            cached_meta.get("problem_text")
+                            or cached_meta.get("problem_description")
+                            or cached_meta.get("problem")
+                        )
+                        # problem_payload / problem_data 형태로 들어있을 수도 있음
+                        if not problem_text:
+                            pd = cached_meta.get("problem_payload") or cached_meta.get("problem_data") or {}
+                            if isinstance(pd, dict):
+                                problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
+
+                # 2) 별도 problem 캐시 키가 있다면 (프로젝트마다 다르게 저장하는 경우 대비)
+                if not problem_text:
+                    for k in (f"livecoding:{session_id}:problem", f"livecoding:{session_id}:problem_data"):
+                        pd = cache.get(k) or {}
+                        if isinstance(pd, dict):
+                            problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
+                            if problem_text:
+                                break
+
+                # 3) code 캐시에서
+                if not problem_text:
+                    code_key = f"livecoding:{session_id}:code"
+                    code_data = cache.get(code_key) or {}
+                    if isinstance(code_data, dict):
+                        problem_text = (
+                            code_data.get("problem_text")
+                            or code_data.get("problem_description")
+                            or code_data.get("problem")
+                        )
+
+                if problem_text:
+                    graph_output["problem_text"] = problem_text
+                    values["graph_output"] = graph_output  # ✅ 중요: values에 다시 박아줘야 return에서도 유지됨
+                    print(f"[✓ 리포트 API] 문제 텍스트 추가: {len(problem_text)}자", flush=True)
+                else:
+                    values["graph_output"] = graph_output
+                    print("[✗ 리포트 API] problem_text를 어디에서도 찾지 못했습니다.", flush=True)
+
+            except Exception as e:
+                values["graph_output"] = graph_output
+                print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
+
         return Response(
             {
                 "status": "done",
@@ -1462,7 +1528,46 @@ class LiveCodingFinalEvalReportView(APIView):
                 "final_score": values.get("final_score"),
                 "final_grade": values.get("final_grade"),
                 "final_flags": values.get("final_flags", []),
-                "graph_output": values.get("graph_output"),
+                "graph_output": values.get("graph_output"),  # 위에서 values에 다시 저장했기 때문에 안전
             },
             status=status.HTTP_200_OK,
+        )
+
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def save_strategy_answer(request):
+    """chapter1 전략 답변을 명시적으로 저장"""
+    session_id = request.data.get("session_id")
+    strategy_answer = request.data.get("strategy_answer")
+    
+    if not session_id or not strategy_answer:
+        return Response(
+            {"error": "session_id and strategy_answer required"}, 
+            status=400
+        )
+    
+    try:
+        # Redis cache에 저장
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key) or {}
+        meta["strategy_answer"] = strategy_answer
+        cache.set(meta_key, meta, 3600)
+        
+        print(f"[save_strategy] 저장 완료: {strategy_answer[:50]}...", flush=True)
+        
+        return Response({
+            "success": True,
+            "message": "Strategy answer saved",
+            "length": len(strategy_answer),
+        })
+        
+    except Exception as e:
+        print(f"[save_strategy] 오류: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)}, 
+            status=500
         )

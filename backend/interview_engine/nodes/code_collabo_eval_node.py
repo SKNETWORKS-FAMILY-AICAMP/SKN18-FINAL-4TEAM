@@ -31,47 +31,43 @@ def _count_lines(code: str) -> int:
 
 
 def _basic_style_checks(code: str) -> Tuple[float, List[str]]:
-    """
-    Ruff 같은 정적 분석이 없더라도 '최소한'의 품질 신호를 뽑는 휴리스틱.
-    반환: (score01, feedback_lines)
-    """
     if not code.strip():
         return 0.0, ["- 코드가 비어 있습니다."]
 
     lines = code.splitlines()
-    long_lines = [ln for ln in lines if len(ln) > 120]
-    has_docstring = bool(re.search(r'^\s*"""', code, re.M))
-    has_type_hints = bool(re.search(r"def\s+\w+\(.*\)\s*->\s*\w+", code))
-    has_todo = "TODO" in code or "FIXME" in code
-    print_count = len(re.findall(r"\bprint\(", code))
-
-    score = 0.5  # 기본
+    
+    # ✅ 기본 점수를 70%로 상향
+    score = 0.70
     fb: List[str] = []
 
+    # 긴 줄 (덜 엄격하게)
+    long_lines = [ln for ln in lines if len(ln) > 120]
     if long_lines:
-        score -= min(0.15, 0.02 * len(long_lines))
-        fb.append(f"- 120자 초과 라인이 {len(long_lines)}개 있습니다. (가독성 저하)")
+        score -= min(0.10, 0.02 * len(long_lines))  # 10% → 5%로 감소
+        fb.append(f"- 120자 초과 라인이 {len(long_lines)}개 있습니다.")
 
-    if not has_docstring:
-        score -= 0.05
-        fb.append("- 함수/모듈 docstring이 없어 의도를 파악하기 어렵습니다.")
-
+    # docstring (가산점으로 변경)
+    has_docstring = bool(re.search(r'^\s*"""', code, re.M))
+    if has_docstring:
+        score += 0.05  # +5%
+        fb.append("- docstring이 잘 작성되어 있습니다.")
+    
+    # type hints (가산점)
+    has_type_hints = bool(re.search(r"def\s+\w+\(.*\)\s*->\s*\w+", code))
     if has_type_hints:
         score += 0.05
-        fb.append("- 타입 힌트가 일부 사용되어 가독성과 협업성이 좋습니다.")
+        fb.append("- 타입 힌트가 사용되어 가독성이 좋습니다.")
 
-    if has_todo:
-        score -= 0.03
-        fb.append("- TODO/FIXME가 남아 있어 제출 전 정리가 필요합니다.")
+    # TODO/FIXME는 경고만 (감점 최소화)
+    if "TODO" in code or "FIXME" in code:
+        score -= 0.02
+        fb.append("- TODO/FIXME가 있습니다.")
 
+    # print 문 (경고만)
+    print_count = len(re.findall(r"\bprint\(", code))
     if print_count > 0:
-        score -= min(0.10, 0.02 * print_count)
-        fb.append(f"- 디버그 print가 {print_count}개 포함되어 있습니다. (제출 전 제거 권장)")
-
-    # 너무 짧으면(거의 미작성) 감점
-    if _count_lines(code) < 5:
-        score -= 0.25
-        fb.append("- 코드가 매우 짧아(미완성 가능성) 구조/품질을 평가하기 어렵습니다.")
+        score -= min(0.05, 0.01 * print_count)
+        fb.append(f"- 디버그 print가 {print_count}개 포함되어 있습니다.")
 
     return _clamp01(score), fb
 

@@ -26,6 +26,7 @@ from .views import (
     LiveCodingFinalEvalStartView, 
     LiveCodingFinalEvalStatusView,
     LiveCodingFinalEvalReportView,
+    save_strategy_answer,
 )
 
 from .chap1_views import (
@@ -99,5 +100,6 @@ urlpatterns = [
     path("livecoding/final-eval/start/", views.LiveCodingFinalEvalStartView.as_view()),
     path("livecoding/final-eval/status/", views.LiveCodingFinalEvalStatusView.as_view()),
     path("livecoding/final-eval/report/", views.LiveCodingFinalEvalReportView.as_view()),
+    path("livecoding/session/strategy/", views.save_strategy_answer, name="save-strategy"),
     
 ]

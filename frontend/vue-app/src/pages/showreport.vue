@@ -64,7 +64,7 @@
               <div class="feedback-icon">👍</div>
               <div class="feedback-content">
                 <div class="feedback-title">강점</div>
-                <div class="feedback-text">{{ strengthText }}</div>
+                <div class="feedback-text" v-html="strengthTextHtml2"></div>
               </div>
             </div>
 
@@ -73,7 +73,7 @@
               <div class="feedback-icon">💡</div>
               <div class="feedback-content">
                 <div class="feedback-title">개선점</div>
-                <div class="feedback-text">{{ improvementText }}</div>
+                <div class="feedback-text" v-html="improvementTextHtml2"></div>
               </div>
             </div>
 
@@ -93,9 +93,15 @@
             <div class="evaluation-text">{{ comprehensiveEvaluationText }}</div>
           </div>
 
-          <!-- ✅ 새로운 섹션: 문제 해결 능력 평가 -->
           <div class="problem-solving-evaluation">
             <h2 class="section-title">문제 해결 능력 평가</h2>
+
+            <div class="problem-description-box">
+              <h3>📋 문제 설명</h3>
+              <div class="problem-text">
+                {{ extractProblemDescription(graphOutput.problem_text || '문제 정보를 불러오는 중입니다.') }}
+              </div>
+            </div>
             
             <!-- 초기 전략 답변 -->
             <div class="ps-section">
@@ -239,6 +245,39 @@ const collaborationScore = ref(null);
 // ✅ 피드백 내용
 const strengthText = ref("");
 const improvementText = ref("");
+
+// ✅ '-' 기준 줄바꿈(HTML) 적용된 표시용 텍스트
+const strengthTextHtml = computed(() => {
+  const s = (strengthText.value || "").trim();
+  if (!s) return "";
+  // "- "로 시작하는 항목들을 줄바꿈으로 분리 (문장 중간 하이픈 오인 최소화)
+  return s.replace(/(^|\n)\s*-\s*/g, "$1- ").replace(/\n/g, "<br>");
+});
+
+const improvementTextHtml = computed(() => {
+  const s = (improvementText.value || "").trim();
+  if (!s) return "";
+  return s.replace(/(^|\n)\s*-\s*/g, "$1- ").replace(/\n/g, "<br>");
+});
+
+// 만약 한 줄로 쭉 들어오고 "- ... - ..." 형태라면, 항목마다 줄바꿈
+const strengthTextHtml2 = computed(() => {
+  const s = (strengthText.value || "").trim();
+  if (!s) return "";
+  // " - " 패턴을 "<br>- "로 (첫 항목 앞에는 br 안 붙이기)
+  return s
+    .replace(/\s+\-\s+/g, "<br>- ")
+    .replace(/^<br>/, "");
+});
+
+const improvementTextHtml2 = computed(() => {
+  const s = (improvementText.value || "").trim();
+  if (!s) return "";
+  return s
+    .replace(/\s+\-\s+/g, "<br>- ")
+    .replace(/^<br>/, "");
+});
+
 const cheatingWarningText = ref("");
 const comprehensiveEvaluationText = ref("");
 const annotatedCode = ref("");
@@ -415,20 +454,54 @@ const pdfTarget = ref(null);
 const downloadPdf = async () => {
   if (!pdfTarget.value) return;
 
+  // ✅ PDF 생성 시점에만 다크모드 강제
+  const el = pdfTarget.value;
+  el.classList.add("pdf-dark");
+
+  // ✅ html2canvas가 배경을 투명으로 두면 PDF 기본 흰색이 비치므로,
+  //    다크 배경을 제대로 굳히려면 backgroundColor를 명시하는 게 안전함.
   const opt = {
     margin: 10,
     filename: `JobTory_Report_${sessionId}.pdf`,
     image: { type: "jpeg", quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
+    html2canvas: {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: "#0b0f14", // ✅ 다크 배경 강제
+    },
     jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
   };
 
-  await html2pdf().set(opt).from(pdfTarget.value).save();
+  try {
+    await html2pdf().set(opt).from(el).save();
+  } finally {
+    // ✅ 끝나면 원복
+    el.classList.remove("pdf-dark");
+  }
 };
+
 
 onMounted(() => {
   fetchReport();
 });
+
+const extractProblemDescription = (fullText) => {
+  if (!fullText) return '';
+  
+  // "제한사항" 이전까지만 추출
+  const constraints = fullText.indexOf('제한사항');
+  const testCases = fullText.indexOf('입출력 예');
+  const examples = fullText.indexOf('예제');
+  
+  let endIndex = fullText.length;
+  
+  if (constraints > 0) endIndex = Math.min(endIndex, constraints);
+  if (testCases > 0) endIndex = Math.min(endIndex, testCases);
+  if (examples > 0) endIndex = Math.min(endIndex, examples);
+  
+  return fullText.substring(0, endIndex).trim();
+};
+
 </script>
 
 <style scoped>
@@ -666,6 +739,36 @@ onMounted(() => {
   font-size: 14px;
   line-height: 1.6;
   opacity: 0.9;
+}
+
+/* 문제 설명 박스 */
+.problem-description-box {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 12px;
+  padding: 24px;
+  margin-bottom: 20px;
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.problem-description-box h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.problem-text {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  padding: 16px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+  font-size: 15px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 /* 종합 평가 섹션 */
@@ -944,5 +1047,46 @@ onMounted(() => {
 .raw-pre {
   max-height: 220px;
   white-space: pre-wrap;
+}
+
+/* ✅ PDF 캡처용 다크모드 강제 */
+.pdf-dark {
+  background: #0b0f14 !important;
+  color: #e6edf3 !important;
+}
+
+.pdf-dark .report-page,
+.pdf-dark .container,
+.pdf-dark .content,
+.pdf-dark .report-container {
+  background: #0b0f14 !important;
+  color: #e6edf3 !important;
+}
+
+.pdf-dark .card,
+.pdf-dark .panel,
+.pdf-dark .section,
+.pdf-dark .feedback-box,
+.pdf-dark .score-box,
+.pdf-dark .block,
+.pdf-dark .box {
+  background: #111827 !important;
+  border-color: rgba(255, 255, 255, 0.08) !important;
+  color: #e6edf3 !important;
+}
+
+.pdf-dark .feedback-title,
+.pdf-dark .title,
+.pdf-dark h1,
+.pdf-dark h2,
+.pdf-dark h3 {
+  color: #f8fafc !important;
+}
+
+.pdf-dark .muted,
+.pdf-dark .sub,
+.pdf-dark .desc,
+.pdf-dark .label {
+  color: rgba(230, 237, 243, 0.75) !important;
 }
 </style>

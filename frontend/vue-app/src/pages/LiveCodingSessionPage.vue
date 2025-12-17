@@ -500,6 +500,31 @@ const runSttClient = async () => {
       showAntiCheat("sttError", eventData?.detail || "응답을 생성하지 못했습니다.");
       return;
     }
+    // ✅ strategy로 분류되었고 STT 텍스트가 있다면 저장
+    if (eventData.user_answer_class === "strategy" && sttText) {
+      try {
+        // 1. localStorage에 백업 저장
+        const strategyKey = `strategy_answer_${sessionId}`;
+        localStorage.setItem(strategyKey, sttText);
+        console.log("✅ localStorage 백업:", strategyKey, sttText.substring(0, 30));
+        // 백엔드에 명시적으로 전략 답변 저장 요청
+        await fetch(`${BACKEND_BASE}/api/livecoding/session/strategy/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            strategy_answer: sttText,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+        console.log("✅ 전략 답변 저장 완료:", sttText.substring(0, 30));
+      } catch (e) {
+        console.error("❌ 전략 답변 저장 실패:", e);
+      }
+    }
 
     // 백엔드가 tts_text를 문자열(텍스트)로 줄 수도 있고,
     // 이미 TTS가 적용된 오디오 청크 배열로 줄 수도 있으므로 둘 다 처리한다.

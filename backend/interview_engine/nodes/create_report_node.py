@@ -6,6 +6,7 @@ from datetime import datetime, timezone
 from interview_engine.llm import LLM
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from langchain_core.messages import SystemMessage, HumanMessage
+from django.core.cache import cache
 
 
 def _now_iso() -> str:
@@ -345,23 +346,68 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         
         if session_id:
             try:
-                # chapter1에서 초기 전략 답변 가져오기
-                chap1 = load_chapter_channel_values(session_id, "chapter1")
-                initial_strategy = chap1.get("user_strategy_answer") or ""
-                
+                try:
+                    # 1. checkpoint에서 시도
+                    chap1 = load_chapter_channel_values(session_id, "chapter1")
+                    initial_strategy = chap1.get("user_strategy_answer") or ""
+                    
+                    # 2. checkpoint에 없으면 Redis cache에서 시도
+                    if not initial_strategy:
+                        meta_key = f"livecoding:{session_id}:meta"
+                        cached_meta = cache.get(meta_key) or {}
+                        initial_strategy = cached_meta.get("strategy_answer") or ""
+                        print(f"[Fallback] Redis cache에서 전략 답변: {initial_strategy[:50] if initial_strategy else 'None'}")
+                    
+                except Exception as e:
+                    print(f"전략 답변 로드 실패: {e}")
+        
                 # chapter2에서 질문/응답 로그 가져오기
                 chap2 = load_chapter_channel_values(session_id, "chapter2")
+                print(f"[DEBUG] chap2 keys: {chap2.keys() if chap2 else 'None'}", flush=True)
+        
                 questions = chap2.get("question") or []
                 answers = chap2.get("user_answers") or []
+                print(f"[DEBUG] questions: {len(questions)}, answers: {len(answers)}", flush=True)
+
+                # 첫 번째 답변이 전략 답변일 가능성
+                if not initial_strategy and answers:
+                    initial_strategy = answers[0]
+                    print(f"[Fallback] chapter2 첫 답변 사용: {initial_strategy[:50]}")
                 
-                # QA 히스토리 구성
-                for q, a in zip(questions, answers):
-                    if q and a:  # 둘 다 있을 때만 추가
-                        qa_history.append({"question": q, "answer": a})
-                        
-                print(f"[create_report_node] 전략답변: {len(initial_strategy)}자, QA: {len(qa_history)}개", flush=True)
+                # ✅ Redis code 데이터에서 확인 (가장 확실한 방법)
+                if not initial_strategy:
+                    code_key = f"livecoding:{session_id}:code"
+                    code_data = cache.get(code_key) or {}
+                    
+                    # question_history에 있을 수 있음
+                    question_history = code_data.get("question_history") or []
+                    if question_history:
+                        # 첫 질문의 답변이 전략일 수 있음
+                        for item in question_history:
+                            if isinstance(item, dict):
+                                answer = item.get("answer") or item.get("stt_text")
+                                if answer:
+                                    initial_strategy = answer
+                                    print(f"[Fallback] question_history 사용: {initial_strategy[:50]}")
+                                    break
+                
+                # ✅ 최후의 수단: 프론트엔드 localStorage
+                # (프론트엔드에서 보낸 경우)
+                if not initial_strategy:
+                    # API를 통해 받았다면
+                    initial_strategy = state.get("initial_strategy") or ""
+                    
             except Exception as e:
-                print(f"[create_report_node] checkpoint 데이터 로드 실패: {e}", flush=True)
+                print(f"[Data Load Error] {e}", flush=True)
+                
+            #     # QA 히스토리 구성
+            #     for q, a in zip(questions, answers):
+            #         if q and a:  # 둘 다 있을 때만 추가
+            #             qa_history.append({"question": q, "answer": a})
+                        
+            #     print(f"[create_report_node] 전략답변: {len(initial_strategy)}자, QA: {len(qa_history)}개", flush=True)
+            # except Exception as e:
+            #     print(f"[create_report_node] checkpoint 데이터 로드 실패: {e}", flush=True)
         
         # ✅ LLM을 사용한 상세 피드백 생성
         print("[create_report_node] LLM 피드백 생성 시작...", flush=True)
@@ -450,6 +496,10 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 "consistency_feedback": ps_evaluation["consistency_feedback"],
                 "qa_history": qa_history,
             },
+            
+            # ✅ 문제 텍스트 추가
+            "problem_text": problem_text,
+            "submitted_code": code,
             
             # 추가 정보
             "flags": flags,

@@ -1462,6 +1462,7 @@ class LiveCodingFinalEvalReportView(APIView):
                 "final_score": values.get("final_score"),
                 "final_grade": values.get("final_grade"),
                 "final_flags": values.get("final_flags", []),
+                "graph_output": values.get("graph_output"),
             },
             status=status.HTTP_200_OK,
         )

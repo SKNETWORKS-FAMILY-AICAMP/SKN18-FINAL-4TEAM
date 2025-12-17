@@ -27,35 +27,156 @@
       </section>
 
       <section v-else class="content">
-        <div class="summary">
-          <div class="badge" :data-grade="gradeSafe">
-            <div class="badge-grade">{{ gradeSafe }}</div>
-            <div class="badge-label">GRADE</div>
-          </div>
-
-          <div class="metrics">
-            <div class="metric">
-              <div class="k">점수</div>
-              <div class="v">{{ scoreText }}</div>
-            </div>
-            <div class="metric">
-              <div class="k">세션</div>
-              <div class="v mono">{{ sessionId }}</div>
-            </div>
-            <div class="metric">
-              <div class="k">상태</div>
-              <div class="v">{{ statusText }}</div>
-            </div>
-            <div class="metric">
-              <div class="k">단계</div>
-              <div class="v">{{ stepText }}</div>
-            </div>
-          </div>
-        </div>
-
         <!-- ✅ PDF로 뽑을 영역 -->
         <div ref="pdfTarget" class="report-wrap">
-          <article class="report" v-html="reportHtml"></article>
+          <!-- 평가 요약 섹션 -->
+          <div class="evaluation-summary">
+            <h2 class="section-title">평가 요약</h2>
+            
+            <div class="grade-section">
+              <div class="grade-badge" :data-grade="gradeSafe">
+                <div class="grade-letter">{{ gradeSafe }}</div>
+              </div>
+              <div class="session-id-small">세션 ID: {{ sessionId }}</div>
+            </div>
+
+            <div class="score-grid">
+              <div class="score-item">
+                <div class="score-label">프로 점수</div>
+                <div class="score-value">{{ promptScoreText }}점</div>
+              </div>
+              <div class="score-item">
+                <div class="score-label">문제 해결 능력</div>
+                <div class="score-value">{{ problemSolvingScoreText }}점</div>
+              </div>
+              <div class="score-item">
+                <div class="score-label">협업 능력</div>
+                <div class="score-value">{{ collaborationScoreText }}점</div>
+              </div>
+              <div class="score-item highlight">
+                <div class="score-label">최종 점수</div>
+                <div class="score-value">{{ finalScoreText }}점</div>
+              </div>
+            </div>
+
+            <!-- 강점 -->
+            <div class="feedback-box strength">
+              <div class="feedback-icon">👍</div>
+              <div class="feedback-content">
+                <div class="feedback-title">강점</div>
+                <div class="feedback-text">{{ strengthText }}</div>
+              </div>
+            </div>
+
+            <!-- 개선점 -->
+            <div class="feedback-box improvement">
+              <div class="feedback-icon">💡</div>
+              <div class="feedback-content">
+                <div class="feedback-title">개선점</div>
+                <div class="feedback-text">{{ improvementText }}</div>
+              </div>
+            </div>
+
+            <!-- 부정행위 경고 -->
+            <div v-if="hasCheatingWarning" class="feedback-box warning">
+              <div class="feedback-icon">🔍</div>
+              <div class="feedback-content">
+                <div class="feedback-title">부정행위 경고</div>
+                <div class="feedback-text">{{ cheatingWarningText }}</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 종합 평가 섹션 -->
+          <div class="comprehensive-evaluation">
+            <h2 class="section-title">종합 평가</h2>
+            <div class="evaluation-text">{{ comprehensiveEvaluationText }}</div>
+          </div>
+
+          <!-- ✅ 새로운 섹션: 문제 해결 능력 평가 -->
+          <div class="problem-solving-evaluation">
+            <h2 class="section-title">문제 해결 능력 평가</h2>
+            
+            <!-- 초기 전략 답변 -->
+            <div class="ps-section">
+              <div class="ps-header">
+                <span class="ps-icon">💭</span>
+                <h3 class="ps-subtitle">초기 접근 방법</h3>
+              </div>
+              <div class="ps-content">
+                <div class="ps-label">응시자의 전략 답변</div>
+                <div class="strategy-answer">{{ initialStrategyAnswer }}</div>
+              </div>
+            </div>
+
+            <!-- 문제 이해도 평가 -->
+            <div class="ps-section">
+              <div class="ps-header">
+                <span class="ps-icon">🎯</span>
+                <h3 class="ps-subtitle">문제 이해도</h3>
+              </div>
+              <div class="ps-content">
+                <div class="understanding-grid">
+                  <div class="understanding-item">
+                    <div class="understanding-label">문제 이해</div>
+                    <div class="understanding-value" :class="problemUnderstandingClass">
+                      {{ problemUnderstandingText }}
+                    </div>
+                  </div>
+                  <div class="understanding-item">
+                    <div class="understanding-label">접근 방법 적절성</div>
+                    <div class="understanding-value" :class="approachValidityClass">
+                      {{ approachValidityText }}
+                    </div>
+                  </div>
+                </div>
+                <div class="ps-feedback">{{ problemUnderstandingFeedback }}</div>
+              </div>
+            </div>
+
+            <!-- 실행 일관성 평가 -->
+            <div class="ps-section">
+              <div class="ps-header">
+                <span class="ps-icon">⚙️</span>
+                <h3 class="ps-subtitle">전략 실행 일관성</h3>
+              </div>
+              <div class="ps-content">
+                <div class="consistency-status" :class="consistencyClass">
+                  <span class="consistency-badge">{{ consistencyBadge }}</span>
+                  <span class="consistency-text">{{ consistencyText }}</span>
+                </div>
+                <div class="ps-feedback">{{ consistencyFeedback }}</div>
+              </div>
+            </div>
+
+            <!-- 질문/응답 로그 -->
+            <div v-if="qaHistory && qaHistory.length > 0" class="ps-section">
+              <div class="ps-header">
+                <span class="ps-icon">💬</span>
+                <h3 class="ps-subtitle">면접 중 질문/응답 내역</h3>
+              </div>
+              <div class="ps-content">
+                <div class="qa-list">
+                  <div v-for="(qa, idx) in qaHistory" :key="idx" class="qa-item">
+                    <div class="qa-number">Q{{ idx + 1 }}</div>
+                    <div class="qa-content">
+                      <div class="qa-question">{{ qa.question }}</div>
+                      <div class="qa-answer">{{ qa.answer }}</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 코드 평가 근거 섹션 -->
+          <div class="code-evaluation">
+            <h2 class="section-title">코드 평가 근거</h2>
+            <div class="code-header">
+              <span class="code-meta"># 제출 코드에 대한 상세 평가</span>
+            </div>
+            <pre class="code-with-comments"><code>{{ annotatedCode }}</code></pre>
+          </div>
         </div>
 
         <!-- raw redis data: problem + latest code -->
@@ -86,7 +207,6 @@
 <script setup>
 import { computed, onMounted, ref } from "vue";
 import { useRoute, useRouter } from "vue-router";
-import MarkdownIt from "markdown-it";
 import html2pdf from "html2pdf.js";
 
 const BACKEND_BASE =
@@ -111,32 +231,96 @@ const finalGrade = ref(null);
 const problemText = ref("");
 const latestCode = ref("");
 
+// ✅ 세부 점수들
+const promptScore = ref(null);
+const problemSolvingScore = ref(null);
+const collaborationScore = ref(null);
+
+// ✅ 피드백 내용
+const strengthText = ref("");
+const improvementText = ref("");
+const cheatingWarningText = ref("");
+const comprehensiveEvaluationText = ref("");
+const annotatedCode = ref("");
+
+// ✅ 문제 해결 능력 평가 관련
+const initialStrategyAnswer = ref("");
+const problemUnderstandingText = ref("");
+const problemUnderstandingFeedback = ref("");
+const approachValidityText = ref("");
+const consistencyText = ref("");
+const consistencyFeedback = ref("");
+const qaHistory = ref([]);
+
 // ✅ LangGraph 최종 output 전체 저장
 const graphOutput = ref({});
 
-const md = new MarkdownIt({
-  html: false,
-  linkify: true,
-  breaks: true,
-});
-
 const gradeSafe = computed(() => String(finalGrade.value || "-"));
-const scoreText = computed(() => {
+
+const finalScoreText = computed(() => {
   if (finalScore.value === null || finalScore.value === undefined) return "-";
   const n = Number(finalScore.value);
   if (Number.isNaN(n)) return String(finalScore.value);
-  return n.toFixed(2);
+  return n.toFixed(0);
 });
 
-const statusText = computed(() => status.value || "-");
-const stepText = computed(() => step.value || "-");
+const promptScoreText = computed(() => {
+  if (promptScore.value === null || promptScore.value === undefined) return "-";
+  const n = Number(promptScore.value);
+  if (Number.isNaN(n)) return String(promptScore.value);
+  return n.toFixed(0);
+});
 
-const reportHtml = computed(() => {
-  const src = reportMarkdown.value || "";
-  if (!src.trim()) {
-    return `<p style="opacity:.75">리포트 본문이 비어있습니다.</p>`;
-  }
-  return md.render(src);
+const problemSolvingScoreText = computed(() => {
+  if (problemSolvingScore.value === null || problemSolvingScore.value === undefined) return "-";
+  const n = Number(problemSolvingScore.value);
+  if (Number.isNaN(n)) return String(problemSolvingScore.value);
+  return n.toFixed(0);
+});
+
+const collaborationScoreText = computed(() => {
+  if (collaborationScore.value === null || collaborationScore.value === undefined) return "-";
+  const n = Number(collaborationScore.value);
+  if (Number.isNaN(n)) return String(collaborationScore.value);
+  return n.toFixed(0);
+});
+
+const hasCheatingWarning = computed(() => {
+  return cheatingWarningText.value && cheatingWarningText.value.trim().length > 0;
+});
+
+// 문제 이해도 클래스
+const problemUnderstandingClass = computed(() => {
+  const text = problemUnderstandingText.value.toLowerCase();
+  if (text.includes("우수") || text.includes("정확")) return "status-excellent";
+  if (text.includes("양호") || text.includes("적절")) return "status-good";
+  if (text.includes("부족") || text.includes("미흡")) return "status-poor";
+  return "";
+});
+
+const approachValidityClass = computed(() => {
+  const text = approachValidityText.value.toLowerCase();
+  if (text.includes("우수") || text.includes("적절")) return "status-excellent";
+  if (text.includes("양호") || text.includes("보통")) return "status-good";
+  if (text.includes("부적절") || text.includes("부족")) return "status-poor";
+  return "";
+});
+
+// 일관성 상태
+const consistencyClass = computed(() => {
+  const text = consistencyText.value.toLowerCase();
+  if (text.includes("일치") || text.includes("동일")) return "consistency-match";
+  if (text.includes("개선") || text.includes("발전")) return "consistency-improved";
+  if (text.includes("불일치") || text.includes("변경")) return "consistency-mismatch";
+  return "";
+});
+
+const consistencyBadge = computed(() => {
+  const text = consistencyText.value.toLowerCase();
+  if (text.includes("일치") || text.includes("동일")) return "✓ 일치";
+  if (text.includes("개선") || text.includes("발전")) return "↑ 개선";
+  if (text.includes("불일치") || text.includes("변경")) return "≠ 불일치";
+  return "?";
 });
 
 const prettyGraphOutput = computed(() => {
@@ -188,10 +372,37 @@ const fetchReport = async () => {
     problemText.value = data.problem_text || "";
     latestCode.value = (data.latest_code && (data.latest_code.code || data.latest_code.value)) || "";
 
-    // ✅ 최종 output 전체
+    // ✅ 최종 output에서 세부 정보 추출
     graphOutput.value = data.graph_output || {};
+    
+    // LangGraph output에서 상세 점수와 피드백 추출
+    const output = data.graph_output || {};
+    
+    // 점수 추출
+    promptScore.value = output.prompt_score ?? null;
+    problemSolvingScore.value = output.problem_solving_score ?? null;
+    collaborationScore.value = output.collaboration_score ?? null;
+    
+    // 피드백 추출
+    strengthText.value = output.strength || "데이터를 불러오는 중 문제가 발생했습니다.";
+    improvementText.value = output.improvement || "데이터를 불러오는 중 문제가 발생했습니다.";
+    cheatingWarningText.value = output.cheating_warning || "";
+    comprehensiveEvaluationText.value = output.comprehensive_evaluation || "종합 평가 데이터를 불러오는 중입니다.";
+    annotatedCode.value = output.annotated_code || latestCode.value || "# 코드를 불러올 수 없습니다.";
+    
+    // ✅ 문제 해결 능력 평가 데이터 추출
+    const psEval = output.problem_solving_evaluation || {};
+    initialStrategyAnswer.value = psEval.initial_strategy || "초기 전략 답변이 기록되지 않았습니다.";
+    problemUnderstandingText.value = psEval.problem_understanding || "평가 중";
+    problemUnderstandingFeedback.value = psEval.understanding_feedback || "";
+    approachValidityText.value = psEval.approach_validity || "평가 중";
+    consistencyText.value = psEval.consistency_status || "분석 중";
+    consistencyFeedback.value = psEval.consistency_feedback || "";
+    qaHistory.value = psEval.qa_history || [];
+    
   } catch (e) {
     error.value = "서버와 통신 중 오류가 발생했습니다.";
+    console.error(e);
   } finally {
     loading.value = false;
   }
@@ -307,80 +518,388 @@ onMounted(() => {
 .content {
   padding: 18px 20px 24px;
 }
-.summary {
-  display: grid;
-  grid-template-columns: 130px 1fr;
-  gap: 14px;
-  align-items: center;
-  margin-bottom: 14px;
-}
-.badge {
+
+.report-wrap {
   border-radius: 16px;
-  border: 1px solid rgba(255,255,255,0.10);
-  background: rgba(255,255,255,0.05);
-  padding: 14px 12px;
-  text-align: center;
+  border: 1px solid rgba(255,255,255,0.08);
+  background: rgba(255, 255, 255, 0.02);
+  overflow: hidden;
 }
-.badge-grade {
-  font-size: 36px;
+
+/* 평가 요약 섹션 */
+.evaluation-summary {
+  padding: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.section-title {
+  font-size: 18px;
+  font-weight: 700;
+  margin: 0 0 20px 0;
+  color: #e9e9ea;
+}
+
+.grade-section {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.grade-badge {
+  width: 80px;
+  height: 80px;
+  border-radius: 16px;
+  display: grid;
+  place-items: center;
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(34, 197, 94, 0.15));
+  border: 2px solid rgba(74, 222, 128, 0.3);
+}
+
+.grade-badge[data-grade="A+"],
+.grade-badge[data-grade="A"] {
+  background: linear-gradient(135deg, rgba(74, 222, 128, 0.15), rgba(34, 197, 94, 0.15));
+  border-color: rgba(74, 222, 128, 0.3);
+}
+
+.grade-badge[data-grade="B+"],
+.grade-badge[data-grade="B"] {
+  background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(59, 130, 246, 0.15));
+  border-color: rgba(96, 165, 250, 0.3);
+}
+
+.grade-badge[data-grade="C+"],
+.grade-badge[data-grade="C"] {
+  background: linear-gradient(135deg, rgba(251, 191, 36, 0.15), rgba(245, 158, 11, 0.15));
+  border-color: rgba(251, 191, 36, 0.3);
+}
+
+.grade-badge[data-grade="D"],
+.grade-badge[data-grade="F"] {
+  background: linear-gradient(135deg, rgba(248, 113, 113, 0.15), rgba(239, 68, 68, 0.15));
+  border-color: rgba(248, 113, 113, 0.3);
+}
+
+.grade-letter {
+  font-size: 42px;
   font-weight: 900;
   line-height: 1;
 }
-.badge-label {
-  margin-top: 6px;
+
+.session-id-small {
   font-size: 12px;
-  opacity: 0.7;
-  letter-spacing: 0.12em;
+  opacity: 0.6;
+  font-family: ui-monospace, monospace;
 }
-.metrics {
+
+.score-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
 }
-.metric {
-  border: 1px solid rgba(255,255,255,0.06);
+
+.score-item {
   background: rgba(255,255,255,0.03);
-  border-radius: 14px;
-  padding: 10px 12px;
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  text-align: center;
 }
-.metric .k {
+
+.score-item.highlight {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(255,255,255,0.12);
+}
+
+.score-label {
   font-size: 12px;
   opacity: 0.7;
+  margin-bottom: 6px;
 }
-.metric .v {
-  margin-top: 4px;
-  font-size: 14px;
+
+.score-value {
+  font-size: 20px;
   font-weight: 700;
 }
-.mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; }
 
-.report-wrap {
-  margin-top: 12px;
-  border-radius: 16px;
+.feedback-box {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 12px;
+  margin-bottom: 12px;
   border: 1px solid rgba(255,255,255,0.08);
-  background: rgba(0,0,0,0.20);
-  overflow: hidden;
 }
-.report {
-  padding: 18px 18px;
-  line-height: 1.7;
+
+.feedback-box.strength {
+  background: rgba(74, 222, 128, 0.05);
+  border-color: rgba(74, 222, 128, 0.2);
+}
+
+.feedback-box.improvement {
+  background: rgba(251, 191, 36, 0.05);
+  border-color: rgba(251, 191, 36, 0.2);
+}
+
+.feedback-box.warning {
+  background: rgba(248, 113, 113, 0.05);
+  border-color: rgba(248, 113, 113, 0.2);
+}
+
+.feedback-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.feedback-content {
+  flex: 1;
+}
+
+.feedback-title {
   font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 6px;
 }
-.report :deep(h1) { font-size: 22px; margin: 0 0 10px; }
-.report :deep(h2) { font-size: 18px; margin: 18px 0 8px; }
-.report :deep(h3) { font-size: 16px; margin: 14px 0 8px; }
-.report :deep(code) {
-  background: rgba(255,255,255,0.08);
-  padding: 2px 6px;
+
+.feedback-text {
+  font-size: 14px;
+  line-height: 1.6;
+  opacity: 0.9;
+}
+
+/* 종합 평가 섹션 */
+.comprehensive-evaluation {
+  padding: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.evaluation-text {
+  font-size: 14px;
+  line-height: 1.8;
+  opacity: 0.9;
+  white-space: pre-wrap;
+}
+
+/* ✅ 문제 해결 능력 평가 섹션 */
+.problem-solving-evaluation {
+  padding: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+  background: rgba(139, 92, 246, 0.02);
+}
+
+.ps-section {
+  margin-bottom: 20px;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 12px;
+}
+
+.ps-section:last-child {
+  margin-bottom: 0;
+}
+
+.ps-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.ps-icon {
+  font-size: 20px;
+}
+
+.ps-subtitle {
+  font-size: 15px;
+  font-weight: 600;
+  margin: 0;
+  color: #e9e9ea;
+}
+
+.ps-content {
+  padding-left: 30px;
+}
+
+.ps-label {
+  font-size: 12px;
+  opacity: 0.65;
+  margin-bottom: 8px;
+}
+
+.strategy-answer {
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-left: 3px solid rgba(139, 92, 246, 0.5);
+  border-radius: 6px;
+  opacity: 0.9;
+}
+
+.understanding-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.understanding-item {
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  text-align: center;
+}
+
+.understanding-label {
+  font-size: 11px;
+  opacity: 0.65;
+  margin-bottom: 6px;
+}
+
+.understanding-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.understanding-value.status-excellent {
+  color: #4ade80;
+}
+
+.understanding-value.status-good {
+  color: #60a5fa;
+}
+
+.understanding-value.status-poor {
+  color: #f87171;
+}
+
+.ps-feedback {
+  font-size: 13px;
+  line-height: 1.6;
+  padding: 10px;
+  background: rgba(255,255,255,0.02);
+  border-radius: 6px;
+  opacity: 0.85;
+}
+
+.consistency-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  margin-bottom: 12px;
+}
+
+.consistency-badge {
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255,255,255,0.1);
+}
+
+.consistency-status.consistency-match .consistency-badge {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+}
+
+.consistency-status.consistency-improved .consistency-badge {
+  background: rgba(96, 165, 250, 0.2);
+  color: #60a5fa;
+}
+
+.consistency-status.consistency-mismatch .consistency-badge {
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+}
+
+.consistency-text {
+  font-size: 13px;
+  flex: 1;
+}
+
+.qa-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.qa-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.05);
   border-radius: 8px;
 }
-.report :deep(pre) {
-  background: rgba(0,0,0,0.35);
-  padding: 12px;
-  border-radius: 14px;
-  overflow: auto;
+
+.qa-number {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  background: rgba(139, 92, 246, 0.15);
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #c4b5fd;
 }
-.report :deep(a) { color: inherit; opacity: .95; text-decoration: underline; }
+
+.qa-content {
+  flex: 1;
+}
+
+.qa-question {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+  color: #c4b5fd;
+}
+
+.qa-answer {
+  font-size: 13px;
+  line-height: 1.5;
+  opacity: 0.85;
+}
+
+/* 코드 평가 근거 섹션 */
+.code-evaluation {
+  padding: 24px;
+}
+
+.code-header {
+  margin-bottom: 12px;
+}
+
+.code-meta {
+  font-size: 13px;
+  opacity: 0.7;
+  font-family: ui-monospace, monospace;
+}
+
+.code-with-comments {
+  background: rgba(0,0,0,0.4);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-x: auto;
+  margin: 0;
+}
+
+.code-with-comments code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  color: #e9e9ea;
+  white-space: pre;
+}
 
 .debug {
   margin-top: 14px;

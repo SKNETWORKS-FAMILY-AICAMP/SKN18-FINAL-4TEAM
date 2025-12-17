@@ -1,6 +1,6 @@
 # backend/interview_engine/nodes/problem_solving_eval_node.py
 from __future__ import annotations
-
+from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from typing import Any, Dict, List, Tuple
 import re
 
@@ -124,8 +124,8 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         state["status"] = "error"
         state["step"] = "error"
         state["error"] = "meta.session_id가 없습니다."
-        state["problem_score"] = 0.0
-        state["problem_feedback"] = "- session_id 누락"
+        state["problem_eval_score"] = 0.0
+        state["problem_eval_feedback"] = "- session_id 누락"
         return state
 
     meta_key = f"livecoding:{session_id}:meta"
@@ -134,15 +134,33 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     cached_meta = cache.get(meta_key) or {}
     code_data = cache.get(code_key) or {}
     latest = (code_data.get("latest") or {})
-    code = _safe_str(latest.get("code") or "")
+    cache_code = _safe_str(latest.get("code") or "")
 
-    starter_code = _safe_str(cached_meta.get("starter_code") or "")
+    chap1 = load_chapter_channel_values(session_id, "chapter1")
+    chap2 = load_chapter_channel_values(session_id, "chapter2")
+    hint = load_chapter_channel_values(session_id, "chapter2_hint")
+
+    problem_text = _safe_str(chap1.get("problem_data") or hint.get("problem_description") or "")
+    ckpt_code = _safe_str(chap2.get("code") or hint.get("current_user_code") or "")
+
+    code = cache_code.strip() or ckpt_code.strip()
+
+    starter_code = _safe_str(cached_meta.get("starter_code") or chap2.get("starter_code") or"")
     test_results = state.get("test_results")  # 너네 채점결과를 여기에 넣으면 자동 반영됨
 
     score, fb = _heuristic_problem_score(code=code, starter_code=starter_code, test_results=test_results)
 
-    state["problem_score"] = round(_clamp01(score), 4)
-    state["problem_feedback"] = "\n".join([f"- {x.lstrip('- ').strip()}" for x in (fb or [])]).strip()
-
-    state["status"] = "running"
+    state["problem_eval_score"] = round(_clamp01(score), 4)
+    state["problem_eval_feedback"] = "\n".join([f"- {x.lstrip('- ').strip()}" for x in (fb or [])]).strip()
+    state["problem_evidence"] = {
+        "problem_text": problem_text,
+        "submitted_code": code,
+        "starter_code": starter_code,
+        "test_results": test_results,
+        "strategy_answer": chap1.get("user_strategy_answer"),
+        "chapter2_questions": chap2.get("question") or [],
+        "hint_conversation_log": hint.get("conversation_log") or [],
+    }
+    
+    state["status"] = "done"
     return state

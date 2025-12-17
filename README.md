@@ -8,14 +8,11 @@ AI 면접관과 함께 라이브 코딩 테스트를 진행하는 웹 서비스�
 
 ## 👥 팀 소개
 
-| 이름 | 역할 | GitHub |
-| --- | --- | --- |
-| <img src="images/judy.jpg" width="100"><br>김규리 | PM | [@GyuriKimm](https://github.com/GyuriKimm) |
-| <img src="images/Nick.jpg" width="100"><br>김준규 | APM | [@JungyuOO](https://github.com/JungyuOO) |
-| <img src="images/Clawhauser.png" width="100"><br>김민주 | 팀원 | [@kmjj0801](https://github.com/kmjj0801) |
-| <img src="images/Brian.jpg" width="100"><br>손주영 | 팀원 | [@sonjuyeong-00](https://github.com/sonjuyeong-00) |
-| <img src="images/gazelle.jpg" width="100"><br>정동석 | 팀원 | [@dsj-1004](https://github.com/dsj-1004) |
-| <img src="images/Flash.jpg" width="100"><br>채린 | 팀원 | [@cofls99](https://github.com/cofls99) |
+|      | 김규리 | 김준규 | 김민주 | 손주영 | 정동석 | 채린 |
+| --- | --- | --- | --- | --- | --- | --- |
+| 프로필 | <img src="images/judy.jpg" width="100"> | <img src="images/Nick.jpg" width="100"> | <img src="images/Clawhauser.png" width="100"> | <img src="images/Brian.jpg" width="100"> | <img src="images/gazelle.jpg" width="100"> | <img src="images/Flash.jpg" width="100"> |
+| 역할 | PM | APM | 팀원 | 팀원 | 팀원 | 팀원 |
+| GitHub | [@GyuriKimm](https://github.com/GyuriKimm) | [@JungyuOO](https://github.com/JungyuOO) | [@kmjj0801](https://github.com/kmjj0801) | [@sonjuyeong-00](https://github.com/sonjuyeong-00) | [@dsj-1004](https://github.com/dsj-1004) | [@cofls99](https://github.com/cofls99) |
 
 ---
 
@@ -136,8 +133,8 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
 - 체크포인트: `langgraph.checkpoint.redis.RedisSaver`
 - thread_id: 기본적으로 `session_id` (chapter2는 `f"{session_id}:chapter2"` 등으로 분리 가능)
 - Redis에는
-  - 그래프 상태(`meta.stage`, `question_cnt`, `last_question_text` 등)
-  - 코드 정보(`latest`, `history`, `question_history`)
+  - 그래프/세션 상태(`meta.stage`, `last_question_text` 등)
+  - 코드 정보(`latest`, `history`, `question_history`, `question_cnt`)
   - STT/TTS 로그(`conv:{session_id}`)
   가 저장되어, 새로고침·이어하기 시에도 상태를 복원합니다.
 
@@ -162,9 +159,9 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
 
 | 키 패턴 | 설명 | 주요 필드 |
 |--------|------|----------|
-| `livecoding:{session_id}:meta` | 세션 메타 정보 | `stage`, `intro_flow_done`, `question_cnt`, `language`, `user_id` 등 |
+| `livecoding:{session_id}:meta` | 세션 메타 정보 | `stage`, `intro_flow_done`, `language`, `user_id` 등 |
 | `livecoding:{session_id}:problem` | 코딩 문제 정보 | `title`, `problem`, `starter_code`, `test_cases`, `time_limit_seconds` 등 |
-| `livecoding:{session_id}:code` | 코드 스냅샷 | `latest`, `history[]`, `question_history[]` |
+| `livecoding:{session_id}:code` | 코드 스냅샷 | `latest`, `history[]`, `question_history[]`, `question_cnt` |
 | `conv:{session_id}` | STT/TTS 대화 로그 | 질문/답변 텍스트, 타임스탬프, 발화 타입 등 |
 | LangGraph checkpoint | 그래프 상태 | LangGraph에서 내부적으로 사용하는 키 |
 
@@ -217,4 +214,3 @@ npm run dev
 
 이후 브라우저에서 `http://localhost:5174/` 로 접속해  
 환경 설정 페이지 → 라이브 코딩 페이지로 진입하면 JobTory 라이브 코딩 인터뷰를 테스트할 수 있습니다.
-

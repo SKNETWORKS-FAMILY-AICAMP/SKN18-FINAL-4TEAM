@@ -177,7 +177,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
@@ -599,12 +599,42 @@ const runSttClient = async () => {
 /* -----------------------------
   🔊 TTS
 ------------------------------ */
+// 현재 재생 중인 TTS 오디오들을 추적해서 화면을 떠날 때 모두 중단할 수 있도록 한다.
+const activeTtsAudios = new Set();
+
+const stopAllTts = () => {
+  // 브라우저 Audio 요소로 재생 중인 TTS 정지
+  try {
+    activeTtsAudios.forEach((audio) => {
+      try {
+        audio.pause();
+        audio.src = "";
+      } catch {
+        // ignore
+      }
+    });
+    activeTtsAudios.clear();
+  } catch {
+    // ignore
+  }
+
+  // Web Speech API로 재생 중인 inline TTS도 정지
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // ignore
+    }
+  }
+};
+
 const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart: null }) => {
   let started = false;
   for (const chunk of chunks) {
     if (!chunk?.audio) continue;
     const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
     try {
+      activeTtsAudios.add(audio);
       if (!started && typeof opts.onStart === "function") {
         started = true;
         opts.onStart();
@@ -620,6 +650,7 @@ const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart:
       const cleanup = () => {
         audio.onended = null;
         audio.onerror = null;
+        activeTtsAudios.delete(audio);
       };
       audio.onended = () => {
         cleanup();
@@ -1684,6 +1715,9 @@ const loadSessionFromApi = async () => {
     // 서버 stage/state에 맞춰 단계 설정 (sessionStorage 단계 값은 사용하지 않음)
     const serverStage = String(data.stage || data.state || "intro").toLowerCase();
     sessionStage.value = serverStage;
+    // 이어하기 진입 시에도 코딩 스테이지 질문 타이머와 상태가 정상 동작하도록
+    // LangGraph 기반 현재 단계(currentStage)도 서버 단계와 동기화한다.
+    currentStage.value = serverStage;
     introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
@@ -1695,9 +1729,12 @@ const loadSessionFromApi = async () => {
         : timeLimitSeconds.value;
 
     // intro 단계에서는 안내 음성 재생 시점에 타이머를 시작하고,
-    // 그 외 단계(이어하기 등)는 바로 카운트다운을 시작한다.
+    // 그 외 단계(이어하기 등)는 바로 카운트다운과 코딩 질문 타이머를 시작한다.
     if (sessionStage.value !== "intro") {
       startCountdownOnce();
+      if (sessionStage.value === "coding") {
+        startCodingQuestionTimer();
+      }
     }
 
     // 언어 & starter code 세팅
@@ -1792,6 +1829,12 @@ onBeforeUnmount(() => {
   }
   clearAnswerCountdown();
   stopCodingQuestionTimer();
+});
+
+// 라우트 전환(뒤로가기 / 다른 페이지 이동) 시
+// 재생 중인 모든 TTS를 정리해 화면을 떠난 뒤에는 음성이 남지 않도록 한다.
+onBeforeRouteLeave(() => {
+  stopAllTts();
 });
 </script>
 

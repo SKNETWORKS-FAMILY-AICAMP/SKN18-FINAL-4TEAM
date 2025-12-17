@@ -76,7 +76,7 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
 
 ## 🧩 시스템 아키텍처 & 주요 플로우
 
-> 추후 `images/system_architecture.png` 등에 실제 다이어그램을 추가해 활용할 수 있습니다.
+> 산출물 링크 추가예정
 
 ### 전체 흐름 요약
 
@@ -124,9 +124,16 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
   - `hint_node`:
     - 힌트 버튼 클릭 시 현재 코드/문제 상황을 기반으로 힌트 생성 (TTS 포함)
 
-- **Chapter 3 – 종합 평가(Stage 3, 향후 확장)**
-  - 코드 최종 버전 + 코드 히스토리 + 질문/답변 로그를 기반으로
-  - “코드 품질 / 협업 능력 / 커뮤니케이션”에 대한 요약 리포트 생성 예정
+- **Chapter 3 – 종합 평가(Stage 3)**
+  - 제출하기 버튼 클릭 시 `POST /api/livecoding/final-eval/start/` 로 `chapter3` 그래프 실행 시작
+  - `code_collabo_eval_node`:
+    - Redis(`livecoding:{session_id}:meta`, `livecoding:{session_id}:code`)에서 코드/메타 정보 조회
+    - Ruff 기반 정적 분석 + 질문/힌트/코드 히스토리를 합쳐 **코드 품질·협업/커뮤니케이션 점수**와 피드백 생성
+  - `problem_solving_eval_node`:
+    - 최종 제출 코드 + starter code + (선택) 채점 결과를 기반으로 **문제 해결 능력 점수**와 피드백 생성
+  - 위 두 노드 결과를 종합해 `final_score`, `final_grade`, `final_report_markdown` 등을 만들고
+    - `GET /api/livecoding/final-eval/status/` 로 진행 상태 폴링(`rendering.vue`)
+    - `GET /api/livecoding/final-eval/report/` 로 최종 리포트/점수/등급을 조회(`showreport.vue`)
 
 ### LangGraph & Redis 연동
 

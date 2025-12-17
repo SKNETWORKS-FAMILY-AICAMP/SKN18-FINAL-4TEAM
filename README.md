@@ -133,8 +133,8 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
 - 체크포인트: `langgraph.checkpoint.redis.RedisSaver`
 - thread_id: 기본적으로 `session_id` (chapter2는 `f"{session_id}:chapter2"` 등으로 분리 가능)
 - Redis에는
-  - 그래프 상태(`meta.stage`, `question_cnt`, `last_question_text` 등)
-  - 코드 정보(`latest`, `history`, `question_history`)
+  - 그래프/세션 상태(`meta.stage`, `last_question_text` 등)
+  - 코드 정보(`latest`, `history`, `question_history`, `question_cnt`)
   - STT/TTS 로그(`conv:{session_id}`)
   가 저장되어, 새로고침·이어하기 시에도 상태를 복원합니다.
 
@@ -159,9 +159,9 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
 
 | 키 패턴 | 설명 | 주요 필드 |
 |--------|------|----------|
-| `livecoding:{session_id}:meta` | 세션 메타 정보 | `stage`, `intro_flow_done`, `question_cnt`, `language`, `user_id` 등 |
+| `livecoding:{session_id}:meta` | 세션 메타 정보 | `stage`, `intro_flow_done`, `language`, `user_id` 등 |
 | `livecoding:{session_id}:problem` | 코딩 문제 정보 | `title`, `problem`, `starter_code`, `test_cases`, `time_limit_seconds` 등 |
-| `livecoding:{session_id}:code` | 코드 스냅샷 | `latest`, `history[]`, `question_history[]` |
+| `livecoding:{session_id}:code` | 코드 스냅샷 | `latest`, `history[]`, `question_history[]`, `question_cnt` |
 | `conv:{session_id}` | STT/TTS 대화 로그 | 질문/답변 텍스트, 타임스탬프, 발화 타입 등 |
 | LangGraph checkpoint | 그래프 상태 | LangGraph에서 내부적으로 사용하는 키 |
 

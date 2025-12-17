@@ -118,6 +118,12 @@ const maxIntervalMs = 8000;
 const intervalMs = ref(baseIntervalMs);
 
 const mapStepToIndex = (step) => {
+    const alias = {
+    create_report: "report_generate",
+    create_report_node: "report_generate",
+    report: "report_generate",
+  };
+  const normalized = alias[step] || step;
   const idx = steps.findIndex((s) => s.key === step);
   return idx === -1 ? 0 : idx;
 };
@@ -226,7 +232,7 @@ const pollStatus = async () => {
     }
 
     // ===== 종료 조건 =====
-    if (st === "done" || step === "saved") {
+    if (step === "saved" && (data.final_report_markdown || data.final_score != null)) {
       currentStepIndex.value = steps.length - 1;
       stopPolling();
       return goToReport();

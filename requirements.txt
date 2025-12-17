@@ -24,3 +24,7 @@ langchain-community==0.4.1
 langchain-openai==1.1.0
 langgraph==1.0.4
 langgraph-checkpoint-redis==0.2.1
+
+
+# deepagent
+deepagents==0.3.0

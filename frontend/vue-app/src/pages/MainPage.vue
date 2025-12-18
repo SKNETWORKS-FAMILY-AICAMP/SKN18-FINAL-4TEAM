@@ -12,11 +12,11 @@
           <span class="chevron">&#9662;</span>
         </button>
         <div class="dropdown-menu" v-show="isMenuOpen">
-          <RouterLink to="/interview" class="dropdown-link" @click="isMenuOpen = false">
-            인터뷰
+          <RouterLink to="/interview" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+            ABOUT US
           </RouterLink>
-          <RouterLink to="/coding-test" class="dropdown-link" @click="isMenuOpen = false">
-            라이브코딩
+          <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+            LIVE CODING
           </RouterLink>
         </div>
       </div>
@@ -305,19 +305,23 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   flex-direction: column;
   min-width: 160px;
   padding: 8px 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  background: #0b0b0e;
+  border: none;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.3);
 }
 
 .dropdown-link {
   padding: 10px 14px;
-  color: #111827;
+  color: #f9fafb;
   font-size: 16px;
   font-weight: 800;
   text-decoration: none;
   border-radius: 8px;
+}
+
+.dropdown-link--menu {
+  font-family: "SF Pro", sans-serif;
 }
 
 .dropdown-button {
@@ -335,7 +339,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .dropdown-link:hover {
-  background: #f3f4f6;
+  background: rgba(255, 255, 255, 0.08);
 }
 
 .dropdown-button:disabled {

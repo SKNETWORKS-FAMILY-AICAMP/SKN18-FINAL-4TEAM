@@ -12,19 +12,11 @@
           >
             <div class="step-index">{{ item.id }}</div>
             <div class="step-label">{{ item.label }}</div>
-
-            <!-- ✅ 2단계: 카메라 통과 or 스킵 뱃지 -->
-            <span
-              v-if="item.id === 2 && (cameraPassed || cameraSkipped)"
-              class="pass-badge"
+            <span v-if="item.id === 2 && cameraPassed" class="pass-badge">통과</span>
+            <!-- ✅ 마이크 + 스피커 둘 다 통과해야 3번에 뱃지 표시 -->
+            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge"
+              >통과</span
             >
-              {{ cameraSkipped ? "건너뜀" : "통과" }}
-            </span>
-
-            <!-- ✅ 3단계: 마이크 + 스피커 둘 다 통과해야 뱃지 표시 -->
-            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge">
-              통과
-            </span>
           </li>
         </ol>
       </aside>
@@ -71,8 +63,8 @@
               :class="{
                 'target-success': detectionStatus === 'success',
                 'target-fail': detectionStatus === 'fail'
-              }">
-              </div>
+              }"
+            ></div>
             <div v-show="!cameraActive" class="preview-placeholder">
               <div class="placeholder-illustration-wrap">
                 <img :src="faceDetectImage" alt="카메라 안내" class="placeholder-illustration" />
@@ -88,23 +80,12 @@
 
           <div class="panel-footer">
             <button class="secondary-btn" @click="goPrev">이전</button>
-
             <button class="primary-btn" @click="startCameraTest" v-if="!cameraActive">
               {{ cameraPassedOnce ? "웹캠 테스트 재시작" : "웹캠 테스트 시작" }}
             </button>
-
-            <!-- ✅ 카메라 테스트 건너뛰기 -->
-            <button
-              type="button"
-              class="secondary-btn"
-              @click="skipCamera"
-            >
-              카메라 테스트 건너뛰기
-            </button>
-
             <button
               class="primary-btn"
-              :disabled="!cameraPassed && !cameraSkipped"
+              :disabled="!cameraPassed"
               @click="goNext"
             >
               다음
@@ -210,7 +191,7 @@
             <button class="secondary-btn" @click="goPrev">이전</button>
             <button
               class="primary-btn"
-              :disabled="(!cameraPassed && !cameraSkipped) || !micPassed || !speakerPassed || isStarting"
+              :disabled="!cameraPassed || !micPassed || !speakerPassed || isStarting"
               @click="startTest"
             >
               {{ isStarting ? "시작 중..." : "시작" }}
@@ -219,13 +200,14 @@
         </div>
       </section>
     </div>
+
   </div>
 </template>
 
 <script setup>
 import { ref, onBeforeUnmount, nextTick, computed } from "vue";
 import { useRouter } from "vue-router";
-import { onMounted } from "vue";
+import { onMounted } from "vue"
 
 const router = useRouter();
 const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;
@@ -251,6 +233,7 @@ const ensureLoggedIn = () => {
 };
 
 /* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
+// rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
 const RMS_THRESHOLD = 3;
 
 // UI용 퍼센트 기준선 (micLevel 계산 방식과 동일 스케일)
@@ -292,96 +275,8 @@ const goPrev = () => {
     cameraPassed.value = false;
     detectionStatus.value = "idle";
     cameraPassedOnce.value = false;
-    cameraSkipped.value = false; // [카메라 스킵] 뒤로 가면 스킵도 초기화
   }
   if (currentStep.value > 1) currentStep.value -= 1;
-};
-
-/* -----------------------------------------
-   LangGraph / 문제
--------------------------------------------- */
-const problemData = ref(null);
-const hasInitRun = ref(false);
-const isWarmed = ref(false);
-const isPreloading = ref(false);
-
-const warmupLanggraph = async () => {
-  if (isWarmed.value) return true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (resp.ok && data?.status === "warmed") {
-      isWarmed.value = true;
-      return true;
-    }
-  } catch (err) {
-    console.warn("warmup failed", err);
-  }
-  return false;
-};
-
-const preloadProblem = async () => {
-  if (problemData.value) return true;
-  if (isPreloading.value) return !!problemData.value;
-  isPreloading.value = true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        language: DEFAULT_LANGUAGE,
-      }),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
-      return false;
-    }
-    if (!data?.problem_id) {
-      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
-      return false;
-    }
-    console.log("[livecoding][preload] problem loaded", {
-      problem_id: data.problem_id,
-      language: data.language,
-    });
-    problemData.value = data;
-    return true;
-  } catch (err) {
-    console.error(err);
-    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
-    return false;
-  } finally {
-    isPreloading.value = false;
-  }
-};
-
-const runInitialSetup = async () => {
-  if (hasInitRun.value) return true;
-  try {
-    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
-    if (!warmOk || !preloaded) return false;
-
-    hasInitRun.value = true;
-    return true;
-  } catch (e) {
-    console.error("runInitialSetup 실패:", e);
-    return false;
-  }
 };
 
 /* ----- 웹캠 체크 ----- */
@@ -390,7 +285,6 @@ const canvasRef = ref(null);
 const cameraActive = ref(false);
 const cameraPassed = ref(false);
 const cameraPassedOnce = ref(false);
-const cameraSkipped = ref(false); // [카메라 스킵] 카메라 스킵 여부
 const cameraChecking = ref(false);
 let cameraStream = null;
 let mediapipeInterval = null;
@@ -410,11 +304,6 @@ const cameraStatusText = computed(() => {
     if (detectionStatus.value === "fail") return "얼굴이 인식되지 않았습니다.";
     return "얼굴 감지 중...";
   }
-
-  if (cameraSkipped.value) {
-    return "카메라 테스트를 건너뛰었습니다.";
-  }
-
   return cameraPassed.value ? "얼굴 인식 성공! ✅" : "테스트 필요 ❗";
 });
 
@@ -486,7 +375,6 @@ const sendFrameForMediapipe = async () => {
 
 const startCameraTest = async () => {
   cameraPassed.value = false;
-  cameraSkipped.value = false; // [카메라 스킵] 테스트 시작하면 스킵 false
   cameraChecking.value = true;
   detectionStatus.value = "idle";
 
@@ -536,6 +424,7 @@ const checkCameraBrightness = () => {
     for (let i = 0; i < data.length; i += 4) {
       total += (data[i] + data[i + 1] + data[i + 2]) / 3;
     }
+    // 밝기 값은 참고용으로만 사용 (통과/실패 판정은 서버 Mediapipe 결과에 따름)
   } catch (e) {
     cameraPassed.value = false;
   } finally {
@@ -550,24 +439,6 @@ const stopCamera = () => {
     cameraStream = null;
   }
   cameraActive.value = false;
-};
-
-/* [카메라 스킵] 카메라 테스트 건너뛰기 */
-const skipCamera = () => {
-  const ok = window.confirm(
-    "카메라 테스트를 건너뛰면 일부 감독/부정행위 감지 기능이 제한될 수 있습니다.\n그래도 계속 진행하시겠습니까?"
-  );
-  if (!ok) return;
-
-  cameraSkipped.value = true;
-  cameraPassed.value = false;
-  detectionStatus.value = "idle";
-
-  stopCamera();
-
-  if (currentStep.value === 2) {
-    goNext();
-  }
 };
 
 /* ----- 마이크 체크 (기준선 넘는 순간 통과) ----- */
@@ -613,13 +484,15 @@ const startMicTest = async () => {
 
       maxVolume = Math.max(maxVolume, rms);
 
+      // UI용 퍼센트 레벨
       micLevel.value = Math.min(100, Math.round((rms / 60) * 100));
 
+      // ✅ 기준선 넘는 순간 통과 처리
       if (rms >= RMS_THRESHOLD) {
         console.log("Mic passed with rms:", rms);
         micPassed.value = true;
         micChecking.value = false;
-        stopMic(false);
+        stopMic(false); // 스트림/타이머 정리 (레벨은 유지)
         return;
       }
 
@@ -628,6 +501,7 @@ const startMicTest = async () => {
 
     updateLevel();
 
+    // 최대 5초까지만 기다리고, 그 안에 통과 못 하면 실패
     micCheckTimeout = setTimeout(() => {
       if (!micPassed.value) {
         micChecking.value = false;
@@ -688,6 +562,7 @@ const confirmSpeakerHeard = () => {
   speakerPassed.value = true;
 };
 
+
 /* ----- 마지막: 테스트 시작 ----- */
 const isStarting = ref(false);
 
@@ -698,6 +573,7 @@ const startTest = async () => {
   isStarting.value = true;
 
   try {
+    // 기본 준비(warmup + 문제 프리로드)가 되어 있는지 확인
     if (!problemData.value) {
       const ok = await runInitialSetup();
       if (!ok) {
@@ -722,20 +598,13 @@ const startTest = async () => {
       window.alert(data.detail || "라이브 코딩 세션을 시작하지 못했습니다.");
       return;
     }
-
-    if (!data.problem_data) {
-      window.alert("problem_data를 받지 못했습니다. 설정을 다시 진행해 주세요.");
-      return;
-    }
-
     if (!data.session_id) {
       window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
       return;
     }
-
-    problemData.value = data.problem_data;
     localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
 
+ 
     router.replace({
       name: "coding-session",
       query: {
@@ -751,6 +620,94 @@ const startTest = async () => {
     isStarting.value = false;
   }
 };
+
+/* -----------------------------------------
+   LangGraph / 문제
+-------------------------------------------- */
+const problemData = ref(null);
+const hasInitRun = ref(false);
+const isWarmed = ref(false);
+const isPreloading = ref(false);
+const warmupLanggraph = async () => {
+  if (isWarmed.value) return true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data?.status === "warmed") {
+      isWarmed.value = true;
+      return true;
+    }
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
+  return false;
+};
+
+const preloadProblem = async () => {
+  if (problemData.value) return true; // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
+  if (isPreloading.value) return !!problemData.value;
+  isPreloading.value = true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        language: DEFAULT_LANGUAGE,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
+      return false;
+    }
+    if (!data?.problem_id) {
+      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
+      return false;
+    }
+    console.log("[livecoding][preload] problem loaded", {
+      problem_id: data.problem_id,
+    });
+    problemData.value = data;
+    return true;
+  } catch (err) {
+    console.error(err);
+    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    return false;
+  } finally {
+    isPreloading.value = false;
+  }
+};
+
+/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
+const runInitialSetup = async () => {
+  if (hasInitRun.value) return true;
+  try {
+    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
+    if (!warmOk || !preloaded) return false;
+
+    hasInitRun.value = true;
+    return true;
+  } catch (e) {
+    console.error("runInitialSetup 실패:", e);
+    return false;
+  }
+};
+
+/* ----- 컴포넌트 언마운트 시 정리 ----- */
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();
@@ -1024,7 +981,7 @@ onMounted(() => {
   border-radius: 999px;
   background: #e5e7eb;
   overflow: hidden;
-  position: relative;
+  position: relative; /* 기준선 absolute 포지셔닝용 */
 }
 
 .audio-bar-fill {
@@ -1034,12 +991,13 @@ onMounted(() => {
   transition: width 0.12s ease-out;
 }
 
+/* ✅ 통과 기준선 */
 .audio-bar-threshold {
   position: absolute;
   top: 0;
   bottom: 0;
   width: 2px;
-  background: #ef4444;
+  background: #ef4444; /* 빨간 기준선 */
   transform: translateX(-50%);
   opacity: 0.9;
 }

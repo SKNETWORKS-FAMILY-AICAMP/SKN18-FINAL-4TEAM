@@ -1,5 +1,11 @@
 <template>
   <div class="aboutus">
+    <button type="button" class="back-button" @click="goBack" aria-label="Back">
+      <svg class="back-icon" viewBox="0 0 28 24" aria-hidden="true">
+        <path d="M14.5 5.5L8 12l6.5 6.5" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="3" />
+        <path d="M9 12h15" fill="none" stroke="currentColor" stroke-linecap="round" stroke-width="3" />
+      </svg>
+    </button>
     <section class="hero">
       <div class="hero-grid">
         <div class="hero-panel">
@@ -31,7 +37,7 @@
           그리고 동료와 나누는 유연한 소통에 집중합니다.
         </p>
         <p>
-          JOBTORY는 누구나 설득 가능한 채용 근거를 만들 수 있어야 한다고 믿습니다.
+          JOBTORY는 누구나 설득 가능한 채용 근거를 만들 수 있어야 한다고 생각합니다.
           <br />
           실시간 라이브 코딩과 협업형 인터뷰 환경을 통해 문제 해결 흐름과 커뮤니케이션을 명확히 기록하고, 
           <br />
@@ -84,6 +90,13 @@
 </template>
 
 <script setup>
+import { useRouter } from "vue-router";
+
+const router = useRouter();
+const goBack = () => {
+  router.back();
+};
+
 const heroLeft = new URL("../assets/aboutus1.png", import.meta.url).href;
 const heroCenter = new URL("../assets/aboutus2.png", import.meta.url).href;
 const heroRight = new URL("../assets/aboutus3.png", import.meta.url).href;
@@ -106,6 +119,37 @@ const memberImages = [
   background: #f6f4ef;
   font-family: "SF Pro", sans-serif;
   color: #111827;
+  position: relative;
+}
+
+.back-button {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  z-index: 10;
+  width: 42px;
+  height: 42px;
+  padding: 0;
+  border-radius: 12px;
+  border: none;
+  background: transparent;
+  color: #ffffff;
+  cursor: pointer;
+  box-shadow: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+}
+
+.back-button:hover {
+  background: rgba(17, 24, 39, 0.08);
+}
+
+.back-icon {
+  width: 24px;
+  height: 20px;
+  display: block;
 }
 
 .hero {
@@ -130,6 +174,7 @@ const memberImages = [
   height: 100%;
   object-fit: cover;
   display: block;
+  filter: blur(3px);
 }
 
 .hero-overlay {

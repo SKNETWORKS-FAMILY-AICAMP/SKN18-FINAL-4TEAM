@@ -61,7 +61,7 @@
 
     <section class="hero">
       <div class="hero-inner">
-        <div class="hero-text">
+        <div class="hero-text scroll-reveal">
           <h2 class="hero-title">
             Build confidence through
             <br />
@@ -73,40 +73,48 @@
           </div>
         </div>
 
-        <div class="hero-image-wrap">
+        <div class="hero-image-wrap scroll-reveal">
           <img :src="heroImage" alt="Live coding interface" class="hero-image" />
         </div>
       </div>
     </section>
 
     <section class="insights">
-      <div class="insights-header">
+      <div class="insights-header scroll-reveal">
         <h3 class="insights-title">
           Real-time coding.
           <br />
           Real insights.
         </h3>
-        <p class="insights-description">실시간 코딩 인터뷰를 통해 문제 해결 과정과 커뮤니케이션을 함께 평가하고, 지원자의 잠재력을 깊이 있게 이해할 수 있습니다.</p>
+        <p class="insights-description">정답을 맞히는 테스트를 넘어, 당신이라는 인재를 깊이 있게 이해하는 시간.
+        <br />
+        당신의 잠재력을 가장 입체적으로 보여주는 라이브 인터뷰 플랫폼입니다.</p>
       </div>
 
       <div class="insights-cards">
-        <div class="insight-card card-one">
+        <div class="insight-card card-one scroll-reveal">
           <h4 class="card-heading">라이브 코드 실행</h4>
-          <p class="card-copy">코드를 작성하고 바로 실행하며 사고 과정을 투명하게 보여줍니다.</p>
+          <p class="card-copy">작성된 코드는 실시간으로 실행되어 살아있는 결과물이 됩니다. 
+          <br />
+          논리 구조부터 최적화까지, 당신이 코딩에 담은 디테일한 고민들이 면접관에게 그대로 전달됩니다.</p>
           <div class="hero-image-wrap">
             <img :src="heroImage2" alt="Live coding interface" class="hero-image" />
           </div>
         </div>
-        <div class="insight-card card-two">
+        <div class="insight-card card-two scroll-reveal">
           <h4 class="card-heading">협업형 인터뷰</h4>
-          <p class="card-copy">실시간 채팅으로 문제 해결 과정과 커뮤니케이션을 함께 확인합니다.</p>
+          <p class="card-copy">실시간 인터랙션을 통해 함께 일하고 싶은 동료로서의 매력을 발산합니다. 
+          <br />
+          대화를 통해 정답을 찾아가는 과정 자체가 당신의 훌륭한 커뮤니케이션 포트폴리오가 됩니다.</p>
           <div class="hero-image-wrap">
             <img :src="heroImage3" alt="Live coding interface" class="hero-image" />
           </div>
         </div>
-        <div class="insight-card card-three">
+        <div class="insight-card card-three scroll-reveal">
           <h4 class="card-heading">정량 + 정성 리포트</h4>
-          <p class="card-copy">결과와 행동 기록을 모두 남겨 채용 의사결정을 뒷받침합니다.</p>
+          <p class="card-copy">당신의 모든 인터뷰 여정은 데이터로 기록됩니다. 
+          <br />
+          코드 효율성 지표와 행동 분석이 결합된 상세 리포트는 당신의 실력을 가장 설득력 있게 대변해 줍니다.</p>
           <div class="hero-image-wrap">
             <img :src="heroImage4" alt="Live coding interface" class="hero-image" />
           </div>
@@ -114,7 +122,7 @@
       </div>
     </section>
 
-    <section class="email-banner">
+    <section class="email-banner scroll-reveal">
       <div class="email-inner">
         <p class="email-label">Company Email</p>
         <a href="mailto:jobtory@gmail.com" class="email-link">jobtory@gmail.com</a>
@@ -175,14 +183,46 @@ const checkForcedAlert = () => {
   }
 };
 
+let revealObserver;
+
+const setupScrollReveal = () => {
+  const targets = Array.from(document.querySelectorAll(".scroll-reveal"));
+  if (!targets.length) return;
+  if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    targets.forEach((el) => el.classList.add("is-visible"));
+    return;
+  }
+  if (!("IntersectionObserver" in window)) {
+    targets.forEach((el) => el.classList.add("is-visible"));
+    return;
+  }
+  revealObserver = new IntersectionObserver(
+    (entries) => {
+      entries.forEach((entry) => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add("is-visible");
+          revealObserver.unobserve(entry.target);
+        }
+      });
+    },
+    { threshold: 0.15, rootMargin: "0px 0px -10% 0px" }
+  );
+  targets.forEach((el) => revealObserver.observe(el));
+};
+
+
 onMounted(() => {
   window.addEventListener("storage", syncProfile);
   syncProfile();
   checkForcedAlert();
+  setupScrollReveal();
 });
 
 onUnmounted(() => {
   window.removeEventListener("storage", syncProfile);
+  if (revealObserver) {
+    revealObserver.disconnect();
+  }
 });
 
 const heroImage = new URL("../assets/mainpage_image1.png", import.meta.url).href;
@@ -194,6 +234,14 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 <style scoped>
 @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@900&display=swap");
+
+:global(html),
+:global(body) {
+  scroll-snap-type: y proximity;
+  scroll-padding-top: 8px;
+}
+
+
 
 .landing {
   min-height: 100vh;
@@ -435,38 +483,46 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .insights {
+  scroll-snap-align: start;
   background: #1f252d;
   color: #f9fafb;
-  padding: 100px 40px 170px;
+  min-height: 100vh;
+  min-height: 100svh;
+  height: 100svh;
+  box-sizing: border-box;
+  padding: clamp(100px, 3vh, 48px) clamp(16px, 3vw, 32px);
+  display: grid;
+  grid-template-rows: auto 0fr;
+  gap: clamp(10px, 2vh, 20px);
 }
 
 .insights-header {
   max-width: 1280px;
-  margin: 0 auto 50px;
+  margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
-  gap: 36px;
-  align-items: start;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: clamp(12px, 2.5vw, 24px);
+  align-items: center;
   text-align: left;
 }
 
 .insights-title {
-  margin: 50;
+  margin: 0;
   font-family: "SF Pro", sans-serif;
   font-style: normal;
   font-weight: 800;
-  font-size: 56px;
-  line-height: 1.54;
+  font-size: clamp(34px, 4.6vw, 52px);
+  line-height: 1.2;
   color: #f9fafb;
 }
 
 .insights-description {
-  margin: 125px 0 0;
+  margin: clamp(8px, 1.5vh, 16px) 0 0;
   max-width: 800px;
   font-family: 'SF Pro', sans-serif;
   font-weight: 400;
-  font-size: 20px;
-  line-height: 1.7;
+  font-size: clamp(14px, 1.6vw, 18px);
+  line-height: 1.6;
   color: #cbd5e1;
 }
 
@@ -474,8 +530,10 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   max-width: 1280px;
   margin: 0 auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
-  gap: 32px;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  gap: clamp(20px, 3vw, 32px);
   justify-items: center;
 }
 
@@ -483,33 +541,41 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 .insight-card {
   border-radius: 18px;
-  padding: 100px 10px 20px;
+  padding: clamp(28px, 4vh, 48px) clamp(20px, 0.6vw, 32px);
   display: flex;
   flex-direction: column;
-  justify-content: space-between;
+  justify-content: flex-start;
   align-items: center;
   text-align: center;
-  min-height: 650px;
+  min-height: clamp(240px, 32vh, 380px);
   color: #111827;
-  width: 100%;
-  max-width: 420px;
+  width: min(94%, 420px);
+  max-width: none;
   box-shadow: 0 20px 48px rgba(0, 0, 0, 0.24);
   border: 1px solid rgba(255, 255, 255, 0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.insight-card:hover {
+  transform: translateY(-6px);
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.3);
 }
 
 .insight-card h4 {
-  margin-bottom: 30px;
-  font-size: 40px;
+  margin-bottom: clamp(12px, 2vh, 20px);
+  font-size: clamp(26px, 3vw, 36px);
+  line-height: 1.15;
 }
 
 .insight-card p {
-  margin: 30px;
-  font-size: 20px;
+  margin: 0;
+  max-width: 90%;
+  font-size: clamp(13px, 1.6vw, 17px);
+  line-height: 1.65;
 }
 
 .card-heading {
-  margin: 0 0 18px;
-  font-size: 32px;
+  font-size: clamp(26px, 3vw, 36px);
   font-weight: 800;
   letter-spacing: 0.01em;
   color: #0f172a;
@@ -517,22 +583,22 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 .card-copy {
   margin: 0px;
-  font-size: 20px;
-  line-height: 1.7;
+  font-size: clamp(13px, 1.6vw, 17px);
+  line-height: 1.65;
   color: #1f2937;
 }
 
 .insight-card .hero-image-wrap {
-  margin-top: 32px;
+  margin-top: clamp(18px, 3vh, 36px);
   display: flex;
   justify-content: center;
   align-items: flex-start;
   width: 100%;
-  min-height: 320px;
+  min-height: clamp(120px, 14vh, 180px);
 }
 
 .insight-card .hero-image {
-  max-width: 320px;
+  max-width: clamp(180px, 14vw, 220px);
   box-shadow: none;
   border: none;
   border-radius: 12px;
@@ -549,6 +615,39 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 .card-three {
   background: #bfacf9;
+}
+
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  will-change: opacity, transform;
+}
+
+.scroll-reveal.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.insights-cards .insight-card.scroll-reveal {
+  transition-delay: 0ms;
+}
+
+.insights-cards .insight-card.scroll-reveal:nth-child(2) {
+  transition-delay: 120ms;
+}
+
+.insights-cards .insight-card.scroll-reveal:nth-child(3) {
+  transition-delay: 240ms;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .scroll-reveal {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 @media (max-width: 768px) {
@@ -570,10 +669,6 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
     margin-bottom: 16px;
   }
 
-  .email-logo {
-    font-size: 40px;
-  }
-
   .insights-header {
     gap: 16px;
     grid-template-columns: 1fr;
@@ -583,5 +678,14 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   .insights-cards {
     grid-template-columns: 1fr;
   }
+
+
+  .insights {
+    height: auto;
+    min-height: 100svh;
+    padding: 40px 20px 64px;
+  }
+
 }
+
 </style>

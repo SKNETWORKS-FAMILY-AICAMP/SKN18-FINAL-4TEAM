@@ -13,15 +13,14 @@
         </div>
       </div>
       <div class="hero-overlay">
-        <p>Build Well.</p>
-        <p>Effortless.</p>
-        <p>Conscious. Clear.</p>
+        <p>Build Trust.</p>
+        <p>Live Coding.</p>
+        <p>Clear Reports.</p>
       </div>
     </section>
 
     <section class="manifesto">
       <div class="manifesto-inner">
-        <h1>Our JOBTORY Philosophy</h1>
         <p class="manifesto-subtitle">우리는 당신의 '결과'보다 '과정'에 담긴 가치를 믿습니다.</p>
         <p>
           단순히 정답을 맞히는 코딩 테스트는 한 사람의 진면목을 보여주기에 부족합니다. 
@@ -39,7 +38,48 @@
           신뢰할 수 있는 리포트를 제공합니다.
         </p>
       </div> 
+  
+
+    <section class="team">
+      <div class="team-inner">
+        <h2>JOBTORY</h2>
+        <p class="team-subtitle">우리팀 소개</p>
+        <div class="team-grid">
+          <article class="team-card">
+            <img :src="memberImages[0]" alt="Team member 1" />
+            <h3>김규리</h3>
+            <p>PM</p>
+          </article>
+          <article class="team-card">
+            <img :src="memberImages[1]" alt="Team member 2" />
+            <h3>김준규</h3>
+            <p>APM</p>
+          </article>
+          <article class="team-card">
+            <img :src="memberImages[2]" alt="Team member 3" />
+            <h3>김민주</h3>
+            <p>팀원</p>
+          </article>
+          <article class="team-card">
+            <img :src="memberImages[3]" alt="Team member 4" />
+            <h3>손주영</h3>
+            <p>팀원</p>
+          </article>
+          <article class="team-card">
+            <img :src="memberImages[4]" alt="Team member 5" />
+            <h3>정동석</h3>
+            <p>팀원</p>
+          </article>
+          <article class="team-card">
+            <img :src="memberImages[5]" alt="Team member 6" />
+            <h3>채린</h3>
+            <p>팀원</p>
+          </article>
+        </div>
+      </div>
     </section>
+
+  </section>
   </div>
 </template>
 
@@ -47,6 +87,14 @@
 const heroLeft = new URL("../assets/aboutus1.png", import.meta.url).href;
 const heroCenter = new URL("../assets/aboutus2.png", import.meta.url).href;
 const heroRight = new URL("../assets/aboutus3.png", import.meta.url).href;
+const memberImages = [
+  new URL("../assets/김규리.png", import.meta.url).href,
+  new URL("../assets/김준규.png", import.meta.url).href,
+  new URL("../assets/김민주.png", import.meta.url).href,
+  new URL("../assets/손주영.png", import.meta.url).href,
+  new URL("../assets/정동석.jpg", import.meta.url).href,
+  new URL("../assets/채린.png", import.meta.url).href,
+];
 </script>
 
 <style scoped>
@@ -103,7 +151,7 @@ const heroRight = new URL("../assets/aboutus3.png", import.meta.url).href;
 }
 
 .manifesto {
-  background: #f6ded2;
+  background: #f9fafb;
   padding: 56px 24px 64px;
 }
 
@@ -133,6 +181,67 @@ const heroRight = new URL("../assets/aboutus3.png", import.meta.url).href;
   color: #374151;
   line-height: 1.7;
   font-size: 16px;
+}
+
+
+
+.team {
+  background: #ffffff;
+  padding: 56px 24px 72px;
+}
+
+.team-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  text-align: center;
+}
+
+.team-inner h2 {
+  margin: 0 0 12px;
+  font-size: clamp(24px, 2.6vw, 34px);
+  color: #1f2937;
+}
+
+.team-subtitle {
+  margin: 0 0 28px;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.team-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.team-card {
+  background: #f6f4ef;
+  border-radius: 18px;
+  padding: 18px;
+  display: grid;
+  gap: 12px;
+  text-align: left;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+}
+
+.team-card img {
+  width: 100%;
+  height: 180px;
+  object-fit: cover;
+  border-radius: 14px;
+  display: block;
+}
+
+.team-card h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #111827;
+}
+
+.team-card p {
+  margin: 0;
+  color: #4b5563;
+  font-size: 14px;
 }
 
 @media (max-width: 900px) {

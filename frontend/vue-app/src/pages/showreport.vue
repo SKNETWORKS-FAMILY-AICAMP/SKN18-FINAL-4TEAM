@@ -9,6 +9,7 @@
         </div>
 
         <div class="actions">
+          <button class="btn" @click="goHome" :disabled="loading">초기 화면</button>
           <button class="btn" @click="reload" :disabled="loading">새로고침</button>
           <button class="btn primary" @click="downloadPdf" :disabled="loading || !reportMarkdown">
             PDF 다운로드
@@ -222,6 +223,10 @@ const BACKEND_BASE =
 
 const route = useRoute();
 const router = useRouter();
+
+const goHome = () => {
+  router.replace({ path: "/" });
+};
 
 const sessionId = String(route.query.session_id || "");
 const token = localStorage.getItem("jobtory_access_token");

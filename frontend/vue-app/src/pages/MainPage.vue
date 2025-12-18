@@ -12,7 +12,7 @@
           <span class="chevron">&#9662;</span>
         </button>
         <div class="dropdown-menu" v-show="isMenuOpen">
-          <RouterLink to="/interview" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+          <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
             ABOUT US
           </RouterLink>
           <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
@@ -28,7 +28,7 @@
           aria-haspopup="true"
           :aria-expanded="isDropdownOpen"
         >
-          <span>{{ isAuthenticated ? userName : "Dropdown" }}</span>
+          <span>{{ isAuthenticated ? userName : "LOGIN" }}</span>
           <span class="chevron">&#9662;</span>
         </button>
         <div class="dropdown-menu" v-show="isDropdownOpen">

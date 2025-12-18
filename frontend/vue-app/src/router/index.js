@@ -3,7 +3,7 @@ import { useAuth } from "../hooks/useAuth";
 import MainPage from "../pages/MainPage.vue";
 import LoginPage from "../pages/LoginPage.vue";
 import LiveCodingPage from "../pages/LiveCodingPage.vue";
-import InterviewPage from "../pages/InterviewPage.vue";
+import AboutusPage from "../pages/AboutusPage.vue";
 import LiveCodingSessionPage from "../pages/LiveCodingSessionPage.vue";
 import SignUpChoicePage from "../pages/SignUpChoicePage.vue";
 import SignUpTermsPage from "../pages/SignUpTermsPage.vue";
@@ -23,7 +23,7 @@ const routes = [
   { path: "/coding-test", name: "coding-test", component: LiveCodingPage },
   { path: "/coding-test/settings", name: "coding-settings", component: LiveCodingSettingPage },
   { path: "/coding-test/session", name: "coding-session", component: LiveCodingSessionPage },
-  { path: "/interview", name: "interview", component: InterviewPage },
+  { path: "/aboutus", name: "about-us", component: AboutusPage },
   { path: "/mypage", name: "mypage", component: MyPage, meta: { requiresAuth: true } },
   { path: "/profile/edit", name: "profile-edit", component: ProfileEditPage, meta: { requiresAuth: true } },
 ];

@@ -35,6 +35,7 @@ from .models import (
     CodingProblemLanguage,
     TestCase,
     User,
+    LivecodingReport,
 )
 from .serializers import SignupSerializer
 from .authentication import JWTAuthentication
@@ -1519,7 +1520,33 @@ class LiveCodingFinalEvalReportView(APIView):
             except Exception as e:
                 values["graph_output"] = graph_output
                 print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
+        try:
+            from api.models import LivecodingReport  # 지연 import로 순환참조 회피
 
+            defaults = {
+                "user": user,
+                "report_md": report_md,
+                "final_score": values.get("final_score"),
+                "final_grade": values.get("final_grade"),
+                "final_flags": values.get("final_flags") or [],
+                "graph_output": values.get("graph_output") or {},
+                "problem_eval_score": values.get("problem_eval_score"),
+                "problem_eval_feedback": values.get("problem_eval_feedback"),
+                "code_collab_score": values.get("code_collab_score"),
+                "code_collab_feedback": values.get("code_collab_feedback"),
+                "problem_evidence": values.get("problem_evidence"),
+                "code_collab_evidence": values.get("code_collab_evidence"),
+                "step": values.get("step"),
+                "status": values.get("status"),
+                "error": values.get("error"),
+            }
+            LivecodingReport.objects.update_or_create(
+                session_id=session_id,
+                defaults=defaults,
+            )
+        except Exception as e:
+            # 저장 실패는 조회 응답을 막지 않음
+            print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
         return Response(
             {
                 "status": "done",
@@ -1533,6 +1560,86 @@ class LiveCodingFinalEvalReportView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
+
+class LiveCodingReportListView(APIView):
+    """
+    DB에 저장된 최종 리포트 목록 (로그인 사용자 본인)
+    GET /api/livecoding/reports/
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        reports = (
+            LivecodingReport.objects.filter(user=user)
+            .order_by("-created_at", "-id")
+        )
+        results = []
+        for r in reports:
+            results.append(
+                {
+                    "session_id": r.session_id,
+                    "final_score": r.final_score,
+                    "final_grade": r.final_grade,
+                    "final_flags": r.final_flags or [],
+                    "has_report": bool(r.report_md),
+                    "has_pdf": bool(r.pdf_path),
+                    "pdf_path": r.pdf_path,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+            )
+
+        return Response({"results": results}, status=status.HTTP_200_OK)
+
+
+class LiveCodingReportDetailView(APIView):
+    """
+    DB에 저장된 최종 리포트 상세 (로그인 사용자 본인)
+    GET /api/livecoding/reports/<session_id>/
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, session_id: str):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
+        if not report:
+            return Response({"detail": "리포트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(
+            {
+                "status": report.status or "done",
+                "step": report.step or "saved",
+                "session_id": report.session_id,
+                "final_report_markdown": report.report_md or "",
+                "final_score": report.final_score,
+                "final_grade": report.final_grade,
+                "final_flags": report.final_flags or [],
+                "graph_output": report.graph_output or {},
+                "problem_eval_score": report.problem_eval_score,
+                "problem_eval_feedback": report.problem_eval_feedback,
+                "code_collab_score": report.code_collab_score,
+                "code_collab_feedback": report.code_collab_feedback,
+                "problem_evidence": report.problem_evidence,
+                "code_collab_evidence": report.code_collab_evidence,
+                "error": report.error,
+                "pdf_path": report.pdf_path,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 @api_view(["POST"])

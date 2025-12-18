@@ -11,6 +11,10 @@ from interview_engine.nodes.coding_intro_node import coding_stage_intro_agent
 from interview_engine.nodes.coding_answer_feedback_node import (
     coding_answer_feedback_agent,
 )
+from interview_engine.state import FinalEvalState
+from interview_engine.nodes.code_collabo_eval_node import code_collabo_eval_node
+from interview_engine.nodes.problem_solving_eval_node import problem_solving_eval_node
+from interview_engine.nodes.create_report_node import create_report_node
 
 
 def create_chapter1_graph_flow(checkpointer=None):
@@ -82,3 +86,17 @@ def create_chapter2_hint_graph(checkpointer=None):
     graph.set_entry_point("hint_agent")
     
     return graph.compile(checkpointer=checkpointer)
+
+def create_chapter3_graph_flow(checkpointer=None):
+    g = StateGraph(FinalEvalState)
+
+    g.add_node("code_collabo_eval", code_collabo_eval_node)
+    g.add_node("problem_eval", problem_solving_eval_node)
+    g.add_node("create_report", create_report_node)
+
+    g.set_entry_point("code_collabo_eval")
+    g.add_edge("code_collabo_eval", "problem_eval")
+    g.add_edge("problem_eval", "create_report")
+    g.add_edge("create_report", END)
+
+    return g.compile(checkpointer=checkpointer)

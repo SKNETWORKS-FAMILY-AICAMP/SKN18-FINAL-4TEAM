@@ -7,21 +7,8 @@
       </svg>
     </button>
     <section class="hero">
-      <div class="hero-grid">
-        <div class="hero-panel">
-          <img :src="heroLeft" alt="Live interview" />
-        </div>
-        <div class="hero-panel">
-          <img :src="heroCenter" alt="Team collaboration" />
-        </div>
-        <div class="hero-panel">
-          <img :src="heroRight" alt="Feedback review" />
-        </div>
-      </div>
       <div class="hero-overlay">
-        <p>Build Trust.</p>
-        <p>Live Coding.</p>
-        <p>Clear Reports.</p>
+        <p>About Us</p>
       </div>
     </section>
 
@@ -97,9 +84,6 @@ const goBack = () => {
   router.back();
 };
 
-const heroLeft = new URL("../assets/aboutus1.png", import.meta.url).href;
-const heroCenter = new URL("../assets/aboutus2.png", import.meta.url).href;
-const heroRight = new URL("../assets/aboutus3.png", import.meta.url).href;
 const memberImages = [
   new URL("../assets/김규리.png", import.meta.url).href,
   new URL("../assets/김준규.png", import.meta.url).href,
@@ -154,41 +138,20 @@ const memberImages = [
 
 .hero {
   position: relative;
-  background: #f6f4ef;
-  overflow: hidden;
-}
-
-.hero-grid {
+  background: #caa3b1;
+  min-height: 530px;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  min-height: 380px;
-}
-
-.hero-panel {
-  position: relative;
-  overflow: hidden;
-}
-
-.hero-panel img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  display: block;
-  filter: blur(3px);
+  place-content: center;
 }
 
 .hero-overlay {
-  position: absolute;
-  inset: 0;
-  display: grid;
-  place-content: center;
   text-align: center;
-  gap: 12px;
-  font-family: "Playfair Display", "Times New Roman", serif;
-  font-size: clamp(26px, 3.4vw, 44px);
-  color: #ffffff;
-  text-shadow: 0 12px 30px rgba(0, 0, 0, 0.35);
-  background: rgba(0, 0, 0, 0.18);
+  gap: 0;
+  font-family: "Inter", sans-serif;
+  font-style: normal;
+  font-weight: 900;
+  font-size: 90px;
+  color: #111827;
 }
 
 .hero-overlay p {
@@ -290,12 +253,8 @@ const memberImages = [
 }
 
 @media (max-width: 900px) {
-  .hero-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .hero-panel {
-    min-height: 220px;
+  .hero {
+    min-height: 180px;
   }
 }
 </style>

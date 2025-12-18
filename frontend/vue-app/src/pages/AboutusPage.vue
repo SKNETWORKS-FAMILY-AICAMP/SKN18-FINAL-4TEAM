@@ -103,14 +103,14 @@ const memberImages = [
 
 .aboutus {
   min-height: 100vh;
-  background: #f6efe8;
+  background: #f6f4ef;
   font-family: "SF Pro", sans-serif;
   color: #111827;
 }
 
 .hero {
   position: relative;
-  background: #bfbfbf;
+  background: #f6f4ef;
   overflow: hidden;
 }
 
@@ -151,7 +151,7 @@ const memberImages = [
 }
 
 .manifesto {
-  background: #f9fafb;
+  background: #f6f4ef;
   padding: 56px 24px 64px;
 }
 
@@ -186,7 +186,7 @@ const memberImages = [
 
 
 .team {
-  background: #ffffff;
+  background: #f6f4ef;
   padding: 56px 24px 72px;
 }
 
@@ -198,7 +198,7 @@ const memberImages = [
 
 .team-inner h2 {
   margin: 0 0 12px;
-  font-size: clamp(24px, 2.6vw, 34px);
+  font-size: clamp(28px, 2.6vw, 40px);
   color: #1f2937;
 }
 
@@ -215,7 +215,7 @@ const memberImages = [
 }
 
 .team-card {
-  background: #f6f4ef;
+  background: #ffffff;
   border-radius: 18px;
   padding: 18px;
   display: grid;

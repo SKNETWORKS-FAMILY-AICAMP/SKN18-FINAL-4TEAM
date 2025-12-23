@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     "rest_framework",
     "api",
     "anti_cheat",
+    "chatbot",
 ]
 
 MIDDLEWARE = [
@@ -94,6 +95,19 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOW_ALL_ORIGINS = True
+# 프런트에서 보내는 커스텀 헤더 허용
+CORS_ALLOW_HEADERS = [
+    "accept",
+    "accept-encoding",
+    "authorization",
+    "content-type",
+    "dnt",
+    "origin",
+    "user-agent",
+    "x-csrftoken",
+    "x-requested-with",
+    "x-communication-id",
+]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

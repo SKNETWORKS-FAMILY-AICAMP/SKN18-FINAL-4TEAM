@@ -5,6 +5,7 @@ import LoginPage from "../pages/LoginPage.vue";
 import LiveCodingPage from "../pages/LiveCodingPage.vue";
 import InterviewPage from "../pages/InterviewPage.vue";
 import LiveCodingSessionPage from "../pages/LiveCodingSessionPage.vue";
+import ChatbotPage from "../pages/ChatbotPage.vue";
 import SignUpChoicePage from "../pages/SignUpChoicePage.vue";
 import SignUpTermsPage from "../pages/SignUpTermsPage.vue";
 import SignUpPersonalPage from "../pages/SignUpPersonalPage.vue";
@@ -26,6 +27,7 @@ const routes = [
   { path: "/coding-test/settings", name: "coding-settings", component: LiveCodingSettingPage },
   { path: "/coding-test/session", name: "coding-session", component: LiveCodingSessionPage },
   { path: "/interview", name: "interview", component: InterviewPage },
+  { path: "/chatbot", name: "chatbot", component: ChatbotPage },
   { path: "/mypage", name: "mypage", component: MyPage, meta: { requiresAuth: true } },
   { path: "/profile/edit", name: "profile-edit", component: ProfileEditPage, meta: { requiresAuth: true } },
   { path: "/coding-test/rendering", name: "livecoding-rendering", component: RenderingPage },

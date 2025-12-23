@@ -24,9 +24,11 @@
       <!-- 인트로 준비 오버레이 -->
       <div v-if="isIntroPreparing" class="intro-loading-overlay">
         <div class="intro-loading-card">
-          <div class="intro-spinner"></div>
-          <p class="intro-loading-text">라이브 코딩 환경을 준비하고 있어요...</p>
-          <p class="intro-loading-sub">문제와 평가 에이전트를 초기화하는 중입니다.</p>
+          <div class="intro-spinner" aria-hidden="true">
+            <span v-for="bar in 12" :key="bar" :style="{ '--i': bar }"></span>
+          </div>
+          <p class="intro-loading-text">면접을 진행할 면접관을 배정 중입니다.</p>
+          <p class="intro-loading-sub">잠시만 기다려주세요.</p>
         </div>
       </div>
 
@@ -122,8 +124,14 @@
             <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
           </div>
           <div class="footer-right">
-            <button type="button" class="run-button" @click="onSubmitClick">제출하기</button>
-            <span class="hint">제출 후 렌더링 페이지로 이동 (추후 연동 예정)</span>
+            <button
+              type="button"
+              class="run-button"
+              @click="onSubmitClick"
+              :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording"
+            >
+              {{ isSubmitting ? "제출 중..." : "제출하기" }}
+            </button>
           </div>
         </footer>
       </section>
@@ -175,7 +183,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
+import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
@@ -191,8 +199,9 @@ const {
 } = useAntiCheatStatus();
 
 /* -----------------------------
-   🎤 녹음 관련 상태
+   변수 선언
 ----------------------------- */
+const INTRO_AUDIO_KEY = (sessionId) => `jobtory_intro_audio_${sessionId}`;
 let audioStream = null;
 let mediaRecorder = null;
 let audioChunks = [];
@@ -201,10 +210,12 @@ const isRecording = ref(false);
 const isSttRunning = ref(false);
 const isTtsPlaying = ref(false);
 const isMicCooldown = ref(false);
+
 const answerCountdown = ref(null);
 let answerCountdownTimer = null;
 let micCooldownTimer = null;
 const ANSWER_COUNTDOWN_SECONDS = 30;
+
 const HINT_LIMIT = 3;
 const hintCount = ref(0);
 const isHintLoading = ref(false);
@@ -212,18 +223,16 @@ const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= 
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
-const hasPlayedIntroTts = ref(false);
-const INTRO_PLAYED_KEY = (sid) => `jobtory_intro_played_${sid}`;
-const INTRO_AUDIO_KEY = (sid) => `jobtory_intro_tts_audio_${sid}`;
-const INTRO_TEXT_KEY = (sid) => `jobtory_intro_tts_text_${sid}`;
-const STAGE_KEY = (sid) => `jobtory_stage_${sid}`;
 const LAST_PATH_KEY = "jobtory_last_path";
-const stage = ref("intro"); // intro | coding | end_session
+const sessionStage = ref("intro"); // 서버 stage/state를 반영하는 클라이언트 단계
+
 const introPlayBlocked = ref(false);
 const showReloadIntroModal = ref(false);
 const cameFromReload = ref(false);
 let introGestureHandler = null;
 const isIntroPreparing = ref(false);
+const countdownStarted = ref(false);
+const introSecondChanceUsed = ref(false);
 
 /* -----------------------------
    🔥 버튼 클릭 로직
@@ -304,21 +313,50 @@ const ringStrokeOffset = computed(() => {
 /* -----------------------------
   📤 코드 제출 버튼 (렌더링 페이지 이동 예정)
 ----------------------------- */
-const onSubmitClick = () => {
+const isSubmitting = ref(false);
+
+const onSubmitClick = async () => {
   const sessionId = route.query.session_id;
-  // 렌더링/리포트 페이지 라우트는 추후 구현 예정입니다.
-  // 여기서는 예상 라우트 이름으로 네비게이션만 연결해 두고,
-  // 아직 라우트가 없으면 경고만 출력합니다.
+  const token = localStorage.getItem("jobtory_access_token");
+
+  if (!sessionId) return window.alert("session_id가 없습니다.");
+  if (!token) return router.push({ name: "login" });
+  if (isSubmitting.value) return;
+
+  isSubmitting.value = true;
   try {
-    router.push({
-      name: "livecoding-render", // TODO: 렌더링 페이지 라우트 이름 확정 시 맞추어 수정
-      query: sessionId ? { session_id: sessionId } : {},
+    // (선택) 마지막 코드 저장
+    await saveCodeSnapshot(code.value);
+
+    // ✅ step3(langgraph) 시작 트리거
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/final-eval/start/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ session_id: sessionId }),
     });
-  } catch (err) {
-    console.warn("렌더링 페이지 라우트가 아직 정의되지 않았습니다.", err);
-    window.alert("제출 후 렌더링 페이지 연동은 추후 구현될 예정입니다.");
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("final-eval start failed", resp.status, data);
+      return window.alert(data?.detail || "최종 평가 시작에 실패했습니다.");
+    }
+
+    // ✅ rendering.vue 이동
+    router.replace({
+      name: "livecoding-rendering",
+      query: { session_id: sessionId },
+    });
+  } catch (e) {
+    console.error(e);
+    window.alert("제출 처리 중 오류가 발생했습니다.");
+  } finally {
+    isSubmitting.value = false;
   }
 };
+
 
 /* -----------------------------
   🎙️ 녹음 시작
@@ -462,6 +500,31 @@ const runSttClient = async () => {
       showAntiCheat("sttError", eventData?.detail || "응답을 생성하지 못했습니다.");
       return;
     }
+    // ✅ strategy로 분류되었고 STT 텍스트가 있다면 저장
+    if (eventData.user_answer_class === "strategy" && sttText) {
+      try {
+        // 1. localStorage에 백업 저장
+        const strategyKey = `strategy_answer_${sessionId}`;
+        localStorage.setItem(strategyKey, sttText);
+        console.log("✅ localStorage 백업:", strategyKey, sttText.substring(0, 30));
+        // 백엔드에 명시적으로 전략 답변 저장 요청
+        await fetch(`${BACKEND_BASE}/api/livecoding/session/strategy/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            strategy_answer: sttText,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+        console.log("✅ 전략 답변 저장 완료:", sttText.substring(0, 30));
+      } catch (e) {
+        console.error("❌ 전략 답변 저장 실패:", e);
+      }
+    }
 
     // 백엔드가 tts_text를 문자열(텍스트)로 줄 수도 있고,
     // 이미 TTS가 적용된 오디오 청크 배열로 줄 수도 있으므로 둘 다 처리한다.
@@ -523,7 +586,11 @@ const runSttClient = async () => {
             ? ttsData.tts_text
             : [];
           if (chunks.length) {
-            await playTtsChunks(chunks);
+            await playTtsChunks(chunks, {
+              onStart: () => {
+                isSttRunning.value = false;
+              },
+            });
           }
         }
       } catch (err) {
@@ -538,7 +605,11 @@ const runSttClient = async () => {
       try {
         // 이미 오디오 청크가 내려온 경우 그대로 재생
         if (replyChunks.length > 0) {
-          await playTtsChunks(replyChunks);
+          await playTtsChunks(replyChunks, {
+            onStart: () => {
+              isSttRunning.value = false;
+            },
+          });
         } else if (replyText) {
           // 텍스트만 온 경우에만 TTS API를 호출
           const ttsResp = await fetch(
@@ -564,7 +635,11 @@ const runSttClient = async () => {
             ? ttsData.tts_text
             : [];
           if (chunks.length) {
-            await playTtsChunks(chunks);
+            await playTtsChunks(chunks, {
+              onStart: () => {
+                isSttRunning.value = false;
+              },
+            });
           }
         }
       } catch (err) {
@@ -584,11 +659,46 @@ const runSttClient = async () => {
 /* -----------------------------
   🔊 TTS
 ------------------------------ */
-const playTtsChunks = async (chunks = [], opts = { throwOnError: false }) => {
+// 현재 재생 중인 TTS 오디오들을 추적해서 화면을 떠날 때 모두 중단할 수 있도록 한다.
+const activeTtsAudios = new Set();
+
+const stopAllTts = () => {
+  // 브라우저 Audio 요소로 재생 중인 TTS 정지
+  try {
+    activeTtsAudios.forEach((audio) => {
+      try {
+        audio.pause();
+        audio.src = "";
+      } catch {
+        // ignore
+      }
+    });
+    activeTtsAudios.clear();
+  } catch {
+    // ignore
+  }
+
+  // Web Speech API로 재생 중인 inline TTS도 정지
+  if (typeof window !== "undefined" && "speechSynthesis" in window) {
+    try {
+      window.speechSynthesis.cancel();
+    } catch {
+      // ignore
+    }
+  }
+};
+
+const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart: null }) => {
+  let started = false;
   for (const chunk of chunks) {
     if (!chunk?.audio) continue;
     const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
     try {
+      activeTtsAudios.add(audio);
+      if (!started && typeof opts.onStart === "function") {
+        started = true;
+        opts.onStart();
+      }
       await audio.play();
     } catch (err) {
       console.error("TTS 재생 실패:", err);
@@ -600,6 +710,7 @@ const playTtsChunks = async (chunks = [], opts = { throwOnError: false }) => {
       const cleanup = () => {
         audio.onended = null;
         audio.onerror = null;
+        activeTtsAudios.delete(audio);
       };
       audio.onended = () => {
         cleanup();
@@ -692,7 +803,6 @@ const fetchIntroTtsAudio = async () => {
   if (!token || !sessionId || !problemData?.value) return null;
 
   const audioKey = INTRO_AUDIO_KEY(sessionId);
-  const textKey = INTRO_TEXT_KEY(sessionId);
 
   const cachedAudio = sessionStorage.getItem(audioKey);
   if (cachedAudio) {
@@ -725,21 +835,9 @@ const fetchIntroTtsAudio = async () => {
     const refreshed = normalizeTtsChunks(initData.tts_text || initData.tts_audio);
     if (refreshed.length) {
       sessionStorage.setItem(audioKey, JSON.stringify(refreshed));
-      const joined = refreshed
-        .map((c) => (c.text || "").trim())
-        .filter(Boolean)
-        .join(" ");
-      if (joined) {
-        sessionStorage.setItem(textKey, joined);
-      }
       return refreshed;
     }
 
-    const fallbackText =
-      typeof initData?.tts_text === "string" ? initData.tts_text.trim() : "";
-    if (fallbackText) {
-      sessionStorage.setItem(textKey, fallbackText);
-    }
     console.warn("intro TTS 오디오를 다시 준비하지 못했습니다.", initData);
   } catch (err) {
     console.error("intro TTS 오디오 재요청 실패:", err);
@@ -755,7 +853,7 @@ const setupIntroGestureResume = () => {
     window.removeEventListener("keydown", handler, true);
     window.removeEventListener("touchstart", handler, true);
     introPlayBlocked.value = false;
-    hasPlayedIntroTts.value = false;
+    // intro는 서버 stage 기준으로 항상 재생 시도하므로 로컬 재생 플래그는 사용하지 않음
     void playIntroTtsFromSession();
   };
   introGestureHandler = handler;
@@ -790,18 +888,18 @@ const isReloadNavigation = () => {
 const confirmReloadIntro = async () => {
   showReloadIntroModal.value = false;
   introPlayBlocked.value = false;
-  hasPlayedIntroTts.value = false;
+  // intro는 서버 stage 기준으로 항상 재생 시도하므로 로컬 재생 플래그는 사용하지 않음
   clearIntroGestureHandler();
   sessionStorage.setItem(LAST_PATH_KEY, window.location.pathname);
   await playIntroTtsFromSession();
 };
 
 const playIntroTtsFromSession = async () => {
-  if (isTtsPlaying.value || hasPlayedIntroTts.value) {
+  if (isTtsPlaying.value) {
     isIntroPreparing.value = false;
     return;
   }
-  if (stage.value !== "intro") {
+  if (sessionStage.value !== "intro") {
     isIntroPreparing.value = false;
     return;
   }
@@ -809,10 +907,7 @@ const playIntroTtsFromSession = async () => {
   isIntroPreparing.value = true;
 
   const sessionId = route.query.session_id;
-  // stage가 intro이면 이전 재생 플래그는 무시하고 항상 재생을 시도한다.
-  if (sessionId) {
-    sessionStorage.removeItem(INTRO_PLAYED_KEY(sessionId));
-  }
+  // stage가 intro이면 이전 재생 여부와 관계없이 항상 재생을 시도한다.
 
   const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
   const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
@@ -842,21 +937,15 @@ const playIntroTtsFromSession = async () => {
   introPlayBlocked.value = false;
   isTtsPlaying.value = true;
   isIntroPreparing.value = false;
+  startCountdownOnce(); // 로딩 오버레이가 사라지고 음성이 재생될 때 타이머 시작
   try {
     const completed = await playTtsChunks(chunks, { throwOnError: true });
-    if (completed && stage.value === "intro") {
+    if (completed && sessionStage.value === "intro") {
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-      if (sessionId) {
-        sessionStorage.setItem(INTRO_PLAYED_KEY(sessionId), "true");
-      }
-      hasPlayedIntroTts.value = true;
       showReloadIntroModal.value = false;
-    } else {
-      hasPlayedIntroTts.value = false;
     }
   } catch (err) {
     console.error("인트로 TTS 재생 오류:", err);
-    hasPlayedIntroTts.value = false;
     if (err && err.name === "NotAllowedError") {
       introPlayBlocked.value = true;
       if (cameFromReload.value) {
@@ -963,7 +1052,7 @@ const stopCodingQuestionTimer = () => {
 };
 
 const requestAndPlayTts = async (problemPayload) => {
-  if (!problemPayload || isTtsPlaying.value || hasPlayedIntroTts.value) return;
+  if (!problemPayload || isTtsPlaying.value) return;
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
   if (!token) {
@@ -994,7 +1083,6 @@ const requestAndPlayTts = async (problemPayload) => {
     if (!initResp.ok) {
       console.error("TTS 인트로 텍스트 요청 실패:", initData);
       // TTS 재생이 실패해도 카운트다운은 진행
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
@@ -1002,7 +1090,6 @@ const requestAndPlayTts = async (problemPayload) => {
     const introText = (initData && initData.tts_text) || "";
     if (!introText) {
       // 인트로 텍스트가 없어도 타이머는 시작
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
@@ -1026,7 +1113,6 @@ const requestAndPlayTts = async (problemPayload) => {
     const ttsData = await ttsResp.json().catch(() => ({}));
     if (!ttsResp.ok) {
       console.error("TTS 오디오 생성 요청 실패:", ttsData);
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       return;
     }
@@ -1034,26 +1120,17 @@ const requestAndPlayTts = async (problemPayload) => {
     const chunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
     if (chunks.length) {
       await playTtsChunks(chunks);
-      hasPlayedIntroTts.value = true;
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
     } else {
       // 오디오 청크가 없어도 타이머는 시작
-    hasPlayedIntroTts.value = true;
-    startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-  }
+      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
+    }
   } catch (err) {
     console.error("TTS 요청/재생 오류:", err);
   } finally {
     isTtsPlaying.value = false;
   }
 };
-
-const retryIntroPlayback = async () => {
-  introPlayBlocked.value = false;
-  hasPlayedIntroTts.value = false;
-  await playIntroTtsFromSession();
-};
-
 
 /* -----------------------------
   ✂ 이하 기존 코드 유지
@@ -1176,7 +1253,6 @@ const fetchRandomProblem = async () => {
     }
 
     problemData.value = data;
-    hasPlayedIntroTts.value = false;
     introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
@@ -1190,8 +1266,6 @@ const fetchRandomProblem = async () => {
       await endSessionDueToTimeout();
       return;
     }
-
-    startCountdown();
 
     // 항상 python3 기준으로 시작 코드 설정
     if (selectedLanguage.value !== "python3") {
@@ -1208,9 +1282,8 @@ const fetchRandomProblem = async () => {
 
     // 새로 시작하기인 경우에만 문제 설명 인트로 TTS를 재생하고,
     // 이어하기(resume=1)로 들어온 경우에는 이미 들었던 인트로이므로 생략합니다.
-    const isResume = Boolean(route.query.resume);
-    if (!isResume) {
-      // 문제 안내 음성 자동 재생 (TTS 응답이 느려도 UI 로딩을 막지 않도록 fire-and-forget)
+    // stage가 intro이면 항상 인트로 음성 재생을 시도한다.
+    if (sessionStage.value === "intro") {
       void requestAndPlayTts(problemData.value);
     }
     // 코딩 단계 질문용 타이머 시작 (stage는 intro→coding 전환 시점에만 실제 동작)
@@ -1383,6 +1456,12 @@ const startCountdown = () => {
   }, 1000);
 };
 
+const startCountdownOnce = () => {
+  if (countdownStarted.value) return;
+  countdownStarted.value = true;
+  startCountdown();
+};
+
 const cmMode = computed(() => {
   switch (selectedLanguage.value) {
     case "python3":
@@ -1431,6 +1510,7 @@ let lastCameraStatus = "ok";
 const offscreenCount = ref(0);
 const isForceEnding = ref(false);
 let lastOffscreenAlert = 0;
+const isAntiCheatReady = computed(() => !isIntroPreparing.value);
 
 const KEY_WINDOW_MS = 2000;
 const KEY_THRESHOLD = 12;
@@ -1447,6 +1527,7 @@ const clearAntiCheatTimer = () => {
 };
 
 const showAntiCheat = (stateKey, detail) => {
+  if (!isAntiCheatReady.value) return;
   clearAntiCheatTimer();
   setAntiCheatState(stateKey, { detail, timestamp: Date.now() });
   antiCheatTimer = setTimeout(() => {
@@ -1456,6 +1537,7 @@ const showAntiCheat = (stateKey, detail) => {
 };
 
 const registerOffscreenInfraction = (stateKey, baseDetail) => {
+  if (!isAntiCheatReady.value) return;
   const now = Date.now();
   if (now - lastOffscreenAlert < OFFSCREEN_COOLDOWN_MS) {
     return;
@@ -1496,20 +1578,24 @@ const forceEndSession = async (reason = "") => {
 };
 
 const handleVisibilityChange = () => {
+  if (!isAntiCheatReady.value) return;
   if (document.visibilityState === "hidden") {
     registerOffscreenInfraction("tabSwitch", "시험 화면을 벗어났습니다.");
   }
 };
 
 const handleWindowBlur = () => {
+  if (!isAntiCheatReady.value) return;
   registerOffscreenInfraction("windowBlur", "다른 창으로 이동이 감지되었습니다.");
 };
 
 const handlePaste = () => {
+  if (!isAntiCheatReady.value) return;
   showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 차단되었습니다.");
 };
 
 const handleCopy = () => {
+  if (!isAntiCheatReady.value) return;
   const now = Date.now();
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
@@ -1517,6 +1603,7 @@ const handleCopy = () => {
 };
 
 const sendFrameForMediapipe = async () => {
+  if (!isAntiCheatReady.value) return;
   const video = videoRef.value;
   if (!video || video.readyState < 2) return;
 
@@ -1606,6 +1693,7 @@ const startWebcamMonitor = () => {
     webcamMonitor = null;
   }
   webcamMonitor = setInterval(() => {
+    if (!isAntiCheatReady.value) return;
     const hasLiveTrack =
       mediaStream &&
       mediaStream.getVideoTracks().some((track) => track.readyState === "live");
@@ -1683,16 +1771,14 @@ const loadSessionFromApi = async () => {
     }
 
     problemData.value = data;
-    
 
-    // 타이머 / 상태 초기화
-    const introFlag = sessionStorage.getItem(INTRO_PLAYED_KEY(sessionId));
-    const storedStage = sessionStorage.getItem(STAGE_KEY(sessionId)) || "intro";
-    stage.value = storedStage;
-    sessionStorage.setItem(STAGE_KEY(sessionId), storedStage);
-    // stage가 intro라면 항상 다시 재생 시도하기 위해 플래그를 리셋
-    hasPlayedIntroTts.value =
-      storedStage === "intro" ? false : introFlag === "true" || true;
+    // 서버 stage/state에 맞춰 단계 설정 (sessionStorage 단계 값은 사용하지 않음)
+    const serverStage = String(data.stage || data.state || "intro").toLowerCase();
+    sessionStage.value = serverStage;
+    // 이어하기 진입 시에도 코딩 스테이지 질문 타이머와 상태가 정상 동작하도록
+    // LangGraph 기반 현재 단계(currentStage)도 서버 단계와 동기화한다.
+    currentStage.value = serverStage;
+    introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
 
@@ -1701,6 +1787,15 @@ const loadSessionFromApi = async () => {
       data.remaining_seconds !== undefined && data.remaining_seconds !== null
         ? Number(data.remaining_seconds)
         : timeLimitSeconds.value;
+
+    // intro 단계에서는 안내 음성 재생 시점에 타이머를 시작하고,
+    // 그 외 단계(이어하기 등)는 바로 카운트다운과 코딩 질문 타이머를 시작한다.
+    if (sessionStage.value !== "intro") {
+      startCountdownOnce();
+      if (sessionStage.value === "coding") {
+        startCodingQuestionTimer();
+      }
+    }
 
     // 언어 & starter code 세팅
     const mappedLang = mapProblemLanguage((data.language || "").toLowerCase());
@@ -1711,7 +1806,6 @@ const loadSessionFromApi = async () => {
       code.value = languageTemplates[mappedLang] || languageTemplates.python3;
     }
 
-    startCountdown();
     await loadSavedCodeIfExists(sessionId, token, mappedLang);
 
     return true;
@@ -1727,15 +1821,17 @@ const loadSessionFromApi = async () => {
 onMounted(async () => {
   const loaded = await loadSessionFromApi();
   if (loaded) {
-    isIntroPreparing.value = stage.value === "intro";
+    isIntroPreparing.value = sessionStage.value === "intro";
     const lastPath = sessionStorage.getItem(LAST_PATH_KEY) || "";
     const currentPath = window.location.pathname;
     const isReload = isReloadNavigation() && lastPath === currentPath;
-    cameFromReload.value = isReload && stage.value === "intro";
-    if (stage.value === "intro" && isReload) {
+    cameFromReload.value = isReload && sessionStage.value === "intro";
+    // 새로고침이라도 intro이면 재생 시도 (자동재생 차단 시 모달/gesture로 처리)
+    if (sessionStage.value === "intro" && isReload) {
       showReloadIntroModal.value = true;
       introPlayBlocked.value = true;
-    } else {
+    }
+    if (sessionStage.value === "intro") {
       playIntroTtsFromSession();
     }
     sessionStorage.setItem(LAST_PATH_KEY, currentPath);
@@ -1794,10 +1890,16 @@ onBeforeUnmount(() => {
   clearAnswerCountdown();
   stopCodingQuestionTimer();
 });
+
+// 라우트 전환(뒤로가기 / 다른 페이지 이동) 시
+// 재생 중인 모든 TTS를 정리해 화면을 떠난 뒤에는 음성이 남지 않도록 한다.
+onBeforeRouteLeave(() => {
+  stopAllTts();
+});
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap");
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 
 .session-page {
   min-height: 100vh;
@@ -1805,7 +1907,7 @@ onBeforeUnmount(() => {
   flex-direction: column;
   background: #111827;
   color: #e5e7eb;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .session-header {
@@ -2206,47 +2308,69 @@ onBeforeUnmount(() => {
 }
 
 .intro-loading-overlay {
-  position: absolute;
+  position: fixed;
   inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: rgba(15, 23, 42, 0.9);
-  z-index: 1002;
-  backdrop-filter: blur(4px);
+  background: #0b1220;
+  z-index: 1200;
   pointer-events: all;
 }
 
 .intro-loading-card {
   background: #0b1220;
-  border: 1px solid #1f2937;
-  border-radius: 12px;
-  padding: 20px 24px;
-  min-width: 260px;
+  border: none;
+  border-radius: 14px;
+  padding: 24px 28px;
+  min-width: 280px;
   text-align: center;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.45);
+  box-shadow: 0 18px 36px rgba(0, 0, 0, 0.35);
 }
 
 .intro-spinner {
-  width: 48px;
-  height: 48px;
-  margin: 0 auto 12px;
-  border-radius: 50%;
-  border: 5px solid rgba(255, 255, 255, 0.2);
-  border-top-color: #38bdf8;
-  animation: spin 0.85s linear infinite;
+  position: relative;
+  width: 132px;
+  height: 132px;
+  margin: 0 auto 18px;
 }
+
+.intro-spinner span {
+  position: absolute;
+  inset: 0;
+  transform-origin: 50% 50%;
+  --count: 12;
+  --deg-step: calc(360deg / var(--count));
+  --delay-step: calc(1s / var(--count));
+  transform: rotate(calc((var(--i) - 1) * var(--deg-step)));
+}
+
+.intro-spinner span::before {
+  content: "";
+  position: absolute;
+  top: 14px;
+  left: 50%;
+  width: 9px;
+  height: 36px;
+  margin-left: -4.5px;
+  border-radius: 10px;
+  background: #e5e7eb;
+  opacity: 0.18;
+  animation: intro-spinner-fade 1s linear infinite;
+  animation-delay: calc(-1s + var(--i) * var(--delay-step));
+}
+
 
 .intro-loading-text {
   margin: 0 0 6px;
   font-weight: 700;
-  font-size: 15px;
+  font-size: 17px;
   color: #f9fafb;
 }
 
 .intro-loading-sub {
   margin: 0;
-  font-size: 13px;
+  font-size: 15px;
   color: #9ca3af;
 }
 
@@ -2326,6 +2450,15 @@ onBeforeUnmount(() => {
   margin: 0;
   font-size: 13px;
   color: #9ca3af;
+}
+
+@keyframes intro-spinner-fade {
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
 }
 
 @keyframes spin {

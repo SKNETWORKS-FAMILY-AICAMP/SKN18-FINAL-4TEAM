@@ -31,7 +31,8 @@ class CodingState(TypedDict, total=False):
     meta: MetaState                 # 세션/유저 식별용 메타 정보
     event_type: str                 # 현재 이벤트 유형 (coding, feedback 등)
     language: str                   # 사용 언어 (python/js 등)
-    question: str                   # 현재 질문 텍스트
+    question: List[str]             # 질문 텍스트
+    user_answers:List[str]          # 사용자 답변 텍스트들
     last_question_text: str         # 마지막으로 노출한 질문 텍스트(반복 방지용)
     code: str                       # 실시간 코드 스냅샷
 
@@ -50,12 +51,39 @@ class CodingState(TypedDict, total=False):
     # 1. 핵심 컨텍스트 (Redis Shared Data)
     current_user_code: str          # 현재 에디터 코드
     problem_description: str        # 문제 지문
-    user_algorithm_category: str    # Step1에서 사용자가 선택한 알고리즘 (예: Greedy)
     real_algorithm_category: str    # 실제 문제 알고리즘 (예: DP)
-    test_cases: str                 # 테스트 케이스 정보 (JSON 문자열 등)
+
     # 2. 힌트 에이전트 상태 관리 필드
     hint_trigger: str               # "manual" (버튼)
     hint_count: int                 # 사용한 힌트 횟수
-    hint_text: str                  # 생성된 힌트 내용
+    hint_text: str            # 생성된 힌트 내용
     conversation_log: List[Any]     # 대화 내역 (질문 에이전트와 공유)
     is_done: bool                   # 코딩 챕터 종료 여부
+
+    # chapter3
+class FinalEvalState(TypedDict, total=False):
+    meta: Dict[str, Any]
+
+    step: Literal[
+        "init",
+        "code_collab_eval",
+        "problem_eval",
+        "report_generate",
+        "saved",
+        "error",
+        ]
+
+    status: Literal["running", "done", "error"]
+    error: Optional[str]
+    # 결과 자리(추후)
+    final_report_markdown: Optional[str]
+    final_score: Optional[float]
+    final_grade: Optional[str]
+    code_collab_score: Optional[float]
+    code_collab_feedback: Optional[str]
+    problem_eval_score: Optional[float]
+    problem_eval_feedback: Optional[str]
+    final_flags: Optional[list]
+    problem_evidence: Optional[Dict[str, Any]]
+    code_collab_evidence: Optional[Dict[str, Any]]
+    graph_output: Optional[Dict[str, Any]]

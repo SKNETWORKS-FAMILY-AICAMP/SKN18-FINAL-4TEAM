@@ -109,27 +109,25 @@ def question_generation_agent(state: CodingState) -> CodingState:
     current_code = (state.get("code") or "").strip()
     starter_code = (state.get("starter_code") or "").strip()
     prev_code = (state.get("prev_code") or "").strip()
-    question_cnt = int(state.get("question_cnt") or 0)
     last_question_text = (state.get("last_question_text") or "").strip()
     language = (state.get("language") or "python").strip() or "python"
-
+    existing_questions = state.get("question") or []
+    if not isinstance(existing_questions, list):
+        existing_questions = [str(existing_questions)] if str(existing_questions) else []
+            
     norm_current = _normalize_code_for_compare(current_code)
     norm_prev = _normalize_code_for_compare(prev_code)
     norm_starter = _normalize_code_for_compare(starter_code)
 
     # 1) 아직 starter code에서 크게 벗어나지 않았다면(거의 손대지 않은 상태) 질문 스킵
     is_starter_only = norm_starter == norm_current
-    print("is starter", is_starter_only)
 
     # 2) 라인/문자/AST 기반으로 코드 변화량을 계산하고,
     #    변화량이 아주 작으면 "실질적인 진행 없음"으로 간주
     #    - 이전 질문이 없다면 starter_code 기준으로 비교
     baseline_code = prev_code if norm_prev else starter_code
-    print("baseline code", baseline_code)
     change_metrics = _compute_change_metrics(baseline_code, current_code, language)
-    print("change_metrics", change_metrics)
     change_score = change_metrics.get("score", 0.0)
-    print("score", change_score)
 
     NO_PROGRESS_THRESHOLD = 0.2  # 0~1 사이, 거의 변화가 없는 수준
 
@@ -137,10 +135,8 @@ def question_generation_agent(state: CodingState) -> CodingState:
     baseline_norm = norm_prev if norm_prev else norm_starter
     
     no_progress = change_score < NO_PROGRESS_THRESHOLD and bool(baseline_norm)
-    print("no_progress", no_progress)
 
     if no_progress or is_starter_only:
-        state["question"] = ""
         state["tts_text"] = ""
         return state
 
@@ -165,12 +161,12 @@ def question_generation_agent(state: CodingState) -> CodingState:
 
     human_prompt = (
         f"코드 언어: {language}\n"
-        f"현재 질문 번호(0부터 시작): {question_cnt}\n"
         f"[현재 전체 코드]\n{norm_current}\n\n"
         f"[코드 품질 피드백]\n{raw_quality}\n\n"
         f"[협업/스타일 피드백]\n{raw_collab}\n\n"
         f"[이전 질문]\n{last_question_text}\n\n"
         "위 정보를 바탕으로, 지원자의 코드에 대해 후속 질문 1개를 생성하세요.\n"
+        "- ruff 피드백에 대해선 언급하지 않고 참고만 합니다."
         "- 질문은 개선이 필요한 부분(가독성, 구조, 성능, 안정성 등)을 자연스럽게 짚어야 합니다.\n"
         "- 예를 들어, '이 부분의 변수 이름을 이렇게 정한 이유가 있나요?' 와 같이 맥락이 드러나야 합니다.\n"
         "- 이전에 물어본 것과 최대한 중복되지 않도록, 코드와 피드백에서 새롭게 눈에 띄는 부분을 중심으로 질문하세요.\n"
@@ -179,6 +175,11 @@ def question_generation_agent(state: CodingState) -> CodingState:
 
     model = init_chat_model("gpt-5-nano")
     messages = [SystemMessage(content=system_prompt), HumanMessage(content=human_prompt)]
+
+    existing_questions = state.get("question") or []
+    if not isinstance(existing_questions, list):
+        existing_questions = [str(existing_questions)] if str(existing_questions) else []
+    state["question"] = existing_questions
 
     try:
         response = model.invoke(messages)
@@ -206,17 +207,19 @@ def question_generation_agent(state: CodingState) -> CodingState:
 
         if not question_text:
             # JSON 파싱이 되지 않거나 question 필드가 비어 있으면 스킵 처리
-            state["question"] = ""
+            state["question"] = existing_questions
             state["tts_text"] = ""
             state["question_skip_reason"] = "llm_invalid_or_empty_json"
             return state
 
-        state["question"] = question_text
+
+        existing_questions.append(question_text)
+        state["question"] = existing_questions
         state["tts_text"] = question_text
 
     except Exception:
         # 에러 시에는 질문을 생성하지 않고 스킵 처리
-        state["question"] = ""
+        state["question"] = existing_questions
         state["tts_text"] = ""
         state["question_skip_reason"] = "llm_error"
 

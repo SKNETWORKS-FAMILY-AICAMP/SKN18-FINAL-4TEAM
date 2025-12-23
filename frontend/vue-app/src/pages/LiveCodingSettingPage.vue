@@ -279,94 +279,6 @@ const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
 };
 
-/* -----------------------------------------
-   LangGraph / 문제
--------------------------------------------- */
-const problemData = ref(null);
-const hasInitRun = ref(false);
-const isWarmed = ref(false);
-const isPreloading = ref(false);
-const warmupLanggraph = async () => {
-  if (isWarmed.value) return true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (resp.ok && data?.status === "warmed") {
-      isWarmed.value = true;
-      return true;
-    }
-  } catch (err) {
-    console.warn("warmup failed", err);
-  }
-  return false;
-};
-
-const preloadProblem = async () => {
-  // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
-  if (problemData.value) return true;
-  if (isPreloading.value) return !!problemData.value;
-  isPreloading.value = true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        language: DEFAULT_LANGUAGE,
-      }),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
-      return false;
-    }
-    if (!data?.problem_id) {
-      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
-      return false;
-    }
-    console.log("[livecoding][preload] problem loaded", {
-      problem_id: data.problem_id,
-      language: data.language,
-    });
-    problemData.value = data;
-    return true;
-  } catch (err) {
-    console.error(err);
-    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
-    return false;
-  } finally {
-    isPreloading.value = false;
-  }
-};
-
-/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
-const runInitialSetup = async () => {
-  if (hasInitRun.value) return true;
-  try {
-    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
-    if (!warmOk || !preloaded) return false;
-
-    hasInitRun.value = true;
-    return true;
-  } catch (e) {
-    console.error("runInitialSetup 실패:", e);
-    return false;
-  }
-};
-
 /* ----- 웹캠 체크 ----- */
 const videoRef = ref(null);
 const canvasRef = ref(null);
@@ -407,8 +319,9 @@ const sendFrameForMediapipe = async () => {
   if (!video || video.readyState < 2) return;
 
   const canvas = document.createElement("canvas");
-  canvas.width = 320;
-  canvas.height = 180;
+  // 경량화를 위해 해상도 축소
+  canvas.width = 192;
+  canvas.height = 108;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
@@ -429,8 +342,9 @@ const sendFrameForMediapipe = async () => {
     formData.append("image", blob, "frame.jpg");
 
     try {
+      // 설정 페이지는 얼굴 존재만 확인하는 경량 엔드포인트 사용
       const resp = await fetch(
-        `${BACKEND_BASE}/mediapipe/analyze/?session_id=livecoding-setting`,
+        `${BACKEND_BASE}/mediapipe/presence/`,
         {
           method: "POST",
           body: formData,
@@ -448,11 +362,15 @@ const sendFrameForMediapipe = async () => {
       const hasFace = faceCount >= 1;
       detectionStatus.value = hasFace ? "success" : "fail";
       cameraPassed.value = hasFace;
+      // 한 번 성공하면 추가 요청을 중단해 부하를 줄입니다.
+      if (hasFace) {
+        stopFaceDetection();
+      }
     } catch (err) {
       detectionStatus.value = "fail";
       cameraPassed.value = false;
     }
-  }, "image/jpeg", 0.6);
+  }, "image/jpeg", 0.35);
 };
 
 const startCameraTest = async () => {
@@ -475,7 +393,7 @@ const startCameraTest = async () => {
       stopFaceDetection();
       mediapipeInterval = setInterval(() => {
         void sendFrameForMediapipe();
-      }, 1500);
+      }, 1000);
     }, 800);
   } catch (e) {
     cameraChecking.value = false;
@@ -650,10 +568,8 @@ const isStarting = ref(false);
 
 const startTest = async () => {
   if (isStarting.value) return;
-
   const token = ensureLoggedIn();
   if (!token) return;
-
   isStarting.value = true;
 
   try {
@@ -679,24 +595,13 @@ const startTest = async () => {
 
     const data = await resp.json().catch(() => ({}));
     if (!resp.ok) {
-      const detail = data.detail || "라이브 코딩 세션을 시작하지 못했습니다.";
-      window.alert(detail);
+      window.alert(data.detail || "라이브 코딩 세션을 시작하지 못했습니다.");
       return;
     }
-
-    // 백엔드가 반환한 problem_data가 반드시 있어야 front와 서버가 일치
-    if (!data.problem_data) {
-      window.alert("problem_data를 받지 못했습니다. 설정을 다시 진행해 주세요.");
-      return;
-    }
-
     if (!data.session_id) {
       window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
       return;
     }
-
-    // 메모리의 problemData도 백엔드 응답으로 동기화
-    problemData.value = data.problem_data;
     localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
 
  
@@ -716,6 +621,92 @@ const startTest = async () => {
   }
 };
 
+/* -----------------------------------------
+   LangGraph / 문제
+-------------------------------------------- */
+const problemData = ref(null);
+const hasInitRun = ref(false);
+const isWarmed = ref(false);
+const isPreloading = ref(false);
+const warmupLanggraph = async () => {
+  if (isWarmed.value) return true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
+      method: "GET",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data?.status === "warmed") {
+      isWarmed.value = true;
+      return true;
+    }
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
+  return false;
+};
+
+const preloadProblem = async () => {
+  if (problemData.value) return true; // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
+  if (isPreloading.value) return !!problemData.value;
+  isPreloading.value = true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        language: DEFAULT_LANGUAGE,
+      }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
+      return false;
+    }
+    if (!data?.problem_id) {
+      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
+      return false;
+    }
+    console.log("[livecoding][preload] problem loaded", {
+      problem_id: data.problem_id,
+    });
+    problemData.value = data;
+    return true;
+  } catch (err) {
+    console.error(err);
+    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
+    return false;
+  } finally {
+    isPreloading.value = false;
+  }
+};
+
+/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
+const runInitialSetup = async () => {
+  if (hasInitRun.value) return true;
+  try {
+    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
+    if (!warmOk || !preloaded) return false;
+
+    hasInitRun.value = true;
+    return true;
+  } catch (e) {
+    console.error("runInitialSetup 실패:", e);
+    return false;
+  }
+};
+
 /* ----- 컴포넌트 언마운트 시 정리 ----- */
 onBeforeUnmount(() => {
   stopCamera();
@@ -723,7 +714,9 @@ onBeforeUnmount(() => {
 });
 
 onMounted(() => {
-  void warmupLanggraph();
+  const token = ensureLoggedIn();
+  if (!token) return;          // 로그인 페이지로 보내고 초기화 중단
+  void runInitialSetup();      // warmup + preload 실행
 });
 </script>
 

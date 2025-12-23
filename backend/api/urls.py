@@ -63,7 +63,7 @@ urlpatterns = [
     ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
-    path("interview/event/",InterviewIntroEventView.as_view(),name="interview-event",),
+    path("interview/event/", InterviewIntroEventView.as_view(), name="interview-event"),
     path("livecoding/preload/", LiveCodingPreloadView.as_view(), name="livecoding-preload"),
     
     # livecoding 관련 
@@ -85,17 +85,7 @@ urlpatterns = [
         CodingQuestionView.as_view(),
         name="livecoding-session-question",
     ),
-    path(
-        "interview/event/",
-        InterviewIntroEventView.as_view(),
-        name="interview-event",
-    ),
-    path(
-        "tts/intro/",
-        TTSView.as_view(),
-        name="tts-intro",
-    ),
-    path( "livecoding/session/code/", LiveCodingCodeSnapshotView.as_view(),name="livecoding-session-code",),
+    # 중복 등록 제거
     
     # profile
     path("user/profile/", ProfileView.as_view(), name="profile"),

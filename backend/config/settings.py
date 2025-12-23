@@ -11,7 +11,11 @@ load_dotenv(env_path)
 
 SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-secret-key")
 DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if os.getenv("DJANGO_ALLOWED_HOSTS") else []
+ALLOWED_HOSTS = (
+    os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",")
+    if os.getenv("DJANGO_ALLOWED_HOSTS")
+    else []
+)
 
 INSTALLED_APPS = [
     "django.contrib.admin",
@@ -29,10 +33,12 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "api.middleware.RequestLoggingMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -90,10 +96,22 @@ USE_TZ = True
 
 STATIC_URL = "static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = os.getenv("CORS_ALLOW_ALL_ORIGINS", "false").lower() == "true"
+CORS_ALLOWED_ORIGINS = (
+    os.getenv("CORS_ALLOWED_ORIGINS", "").split(",")
+    if os.getenv("CORS_ALLOWED_ORIGINS")
+    else []
+)
+CORS_ALLOW_CREDENTIALS = os.getenv("CORS_ALLOW_CREDENTIALS", "false").lower() == "true"
+CSRF_TRUSTED_ORIGINS = (
+    os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",")
+    if os.getenv("CSRF_TRUSTED_ORIGINS")
+    else []
+)
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -147,4 +165,49 @@ CACHES = {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
         },
     }
+}
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "filters": {
+        "request_context": {
+            "()": "api.logging_context.RequestContextFilter",
+        },
+    },
+    "formatters": {
+        "simple": {
+            "format": "%(asctime)s %(levelname)s %(name)s %(message)s",
+        },
+        "request_json": {
+            "format": (
+                '{"ts":"%(asctime)s","level":"%(levelname)s","logger":"%(name)s",'
+                '"msg":"%(message)s","user_id":"%(user_id)s","session_id":"%(session_id)s",'
+                '"request_id":"%(request_id)s","method":"%(method)s","path":"%(path)s",'
+                '"status_code":"%(status_code)s","duration_ms":"%(duration_ms)s"}'
+            ),
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "simple",
+        },
+        "request_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "request_json",
+            "filters": ["request_context"],
+        },
+    },
+    "loggers": {
+        "app.request": {
+            "handlers": ["request_console"],
+            "level": "INFO",
+            "propagate": False,
+        },
+        "django": {
+            "handlers": ["console"],
+            "level": "INFO",
+        },
+    },
 }

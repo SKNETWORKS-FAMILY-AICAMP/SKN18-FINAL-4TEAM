@@ -221,3 +221,11 @@ npm run dev
 
 이후 브라우저에서 `http://localhost:5174/` 로 접속해  
 환경 설정 페이지 → 라이브 코딩 페이지로 진입하면 JobTory 라이브 코딩 인터뷰를 테스트할 수 있습니다.
+
+---
+
+## 🚢 EC2 배포 (Docker Compose)
+
+- 실행 스크립트: `docker/run-prod.sh`
+- 배포 가이드: `docs/deploy-ec2.md`
+- CloudWatch 로그 수집: `docs/cloudwatch-agent.md`

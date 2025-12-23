@@ -375,13 +375,51 @@ const prettyGraphOutput = computed(() => {
   }
 });
 
+const applyReportData = (data) => {
+  status.value = data.status || "";
+  step.value = data.step || "";
+
+  reportMarkdown.value = data.final_report_markdown || "";
+  finalScore.value = data.final_score ?? null;
+  finalGrade.value = data.final_grade ?? null;
+
+  const output = data.graph_output || {};
+  graphOutput.value = output;
+
+  problemText.value = data.problem_text || output.problem_text || "";
+  latestCode.value =
+    (data.latest_code && (data.latest_code.code || data.latest_code.value)) ||
+    output.submitted_code ||
+    "";
+
+  promptScore.value = output.prompt_score ?? null;
+  problemSolvingScore.value = output.problem_solving_score ?? null;
+  collaborationScore.value = output.collaboration_score ?? null;
+
+  strengthText.value = output.strength || "No strengths available yet.";
+  improvementText.value = output.improvement || "No improvement notes available yet.";
+  cheatingWarningText.value = output.cheating_warning || "";
+  comprehensiveEvaluationText.value =
+    output.comprehensive_evaluation || "Comprehensive evaluation is not available yet.";
+  annotatedCode.value = output.annotated_code || latestCode.value || "# Code could not be loaded.";
+
+  const psEval = output.problem_solving_evaluation || {};
+  initialStrategyAnswer.value = psEval.initial_strategy || "Initial strategy answer was not recorded.";
+  problemUnderstandingText.value = psEval.problem_understanding || "Pending review.";
+  problemUnderstandingFeedback.value = psEval.understanding_feedback || "";
+  approachValidityText.value = psEval.approach_validity || "Pending review.";
+  consistencyText.value = psEval.consistency_status || "Pending analysis.";
+  consistencyFeedback.value = psEval.consistency_feedback || "";
+  qaHistory.value = psEval.qa_history || [];
+};
+
 const fetchReport = async () => {
   if (!sessionId) {
-    error.value = "session_id가 없습니다.";
+    error.value = "session_id is missing.";
     return;
   }
   if (!token) {
-    router.replace({ name: "login" });
+    router.replace({ name: 'login' });
     return;
   }
 
@@ -389,63 +427,54 @@ const fetchReport = async () => {
   error.value = "";
 
   try {
-    const url = `${BACKEND_BASE}/api/livecoding/final-eval/report/?session_id=${encodeURIComponent(sessionId)}`;
-    const resp = await fetch(url, {
-      method: "GET",
+    const detailUrl = `${BACKEND_BASE}/api/livecoding/reports/${encodeURIComponent(sessionId)}/`;
+    let resp = await fetch(detailUrl, {
+      method: 'GET',
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = await resp.json().catch(() => ({}));
+    let data = await resp.json().catch(() => ({}));
 
     if (resp.status === 401) {
-      router.replace({ name: "login" });
+      router.replace({ name: 'login' });
       return;
     }
+    if (resp.ok) {
+      applyReportData(data);
+      return;
+    }
+
+    if (resp.status !== 404) {
+      error.value = data?.detail || `HTTP ${resp.status}`;
+      return;
+    }
+
+    const fallbackUrl = `${BACKEND_BASE}/api/livecoding/final-eval/report/?session_id=${encodeURIComponent(sessionId)}`;
+    resp = await fetch(fallbackUrl, {
+      method: 'GET',
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    data = await resp.json().catch(() => ({}));
+
+    if (resp.status === 401) {
+      router.replace({ name: 'login' });
+      return;
+    }
+
+    if (resp.status === 202) {
+      status.value = data.status || 'running';
+      step.value = data.step || 'init';
+      return;
+    }
+
     if (!resp.ok) {
       error.value = data?.detail || `HTTP ${resp.status}`;
       return;
     }
 
-    status.value = data.status || "";
-    step.value = data.step || "";
-
-    reportMarkdown.value = data.final_report_markdown || "";
-    finalScore.value = data.final_score ?? null;
-    finalGrade.value = data.final_grade ?? null;
-
-    problemText.value = data.problem_text || "";
-    latestCode.value = (data.latest_code && (data.latest_code.code || data.latest_code.value)) || "";
-
-    // ✅ 최종 output에서 세부 정보 추출
-    graphOutput.value = data.graph_output || {};
-    
-    // LangGraph output에서 상세 점수와 피드백 추출
-    const output = data.graph_output || {};
-    
-    // 점수 추출
-    promptScore.value = output.prompt_score ?? null;
-    problemSolvingScore.value = output.problem_solving_score ?? null;
-    collaborationScore.value = output.collaboration_score ?? null;
-    
-    // 피드백 추출
-    strengthText.value = output.strength || "데이터를 불러오는 중 문제가 발생했습니다.";
-    improvementText.value = output.improvement || "데이터를 불러오는 중 문제가 발생했습니다.";
-    cheatingWarningText.value = output.cheating_warning || "";
-    comprehensiveEvaluationText.value = output.comprehensive_evaluation || "종합 평가 데이터를 불러오는 중입니다.";
-    annotatedCode.value = output.annotated_code || latestCode.value || "# 코드를 불러올 수 없습니다.";
-    
-    // ✅ 문제 해결 능력 평가 데이터 추출
-    const psEval = output.problem_solving_evaluation || {};
-    initialStrategyAnswer.value = psEval.initial_strategy || "초기 전략 답변이 기록되지 않았습니다.";
-    problemUnderstandingText.value = psEval.problem_understanding || "평가 중";
-    problemUnderstandingFeedback.value = psEval.understanding_feedback || "";
-    approachValidityText.value = psEval.approach_validity || "평가 중";
-    consistencyText.value = psEval.consistency_status || "분석 중";
-    consistencyFeedback.value = psEval.consistency_feedback || "";
-    qaHistory.value = psEval.qa_history || [];
-    
+    applyReportData(data);
   } catch (e) {
-    error.value = "서버와 통신 중 오류가 발생했습니다.";
+    error.value = "Failed to load report. Please try again.";
     console.error(e);
   } finally {
     loading.value = false;

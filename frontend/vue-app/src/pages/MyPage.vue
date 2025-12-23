@@ -63,6 +63,7 @@
             <div class="report-actions">
               <button class="view-btn" @click="openReport(r.session_id)">보기</button>
               <a v-if="r.pdf_path" class="pdf-link" :href="r.pdf_path" target="_blank" rel="noopener">저장된 PDF</a>
+              <button class="delete-btn" @click="deleteReport(r.session_id)" :disabled="listLoading">삭제</button>
             </div>
           </div>
         </div>
@@ -153,6 +154,31 @@ const openReport = (sessionId) => {
 const closeModal = () => {
   showModal.value = false;
 };
+
+const deleteReport = async (sessionId) => {
+  const confirmed = window.confirm("Delete this report?");
+  if (!confirmed) return;
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/${encodeURIComponent(sessionId)}/`, {
+      method: "DELETE",
+      headers: {
+        Authorization: `Bearer ${token.value}`,
+      },
+    });
+    if (!resp.ok && resp.status !== 404) {
+      alert("Failed to delete report.");
+      return;
+    }
+    await fetchReports();
+    if (selectedSessionId.value === sessionId) {
+      closeModal();
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error occurred while deleting report.");
+  }
+};
+
 
 // 모달에서만 초기화면/새로고침 버튼을 숨기기 위해 iframe 로드 후 스타일 주입
 const onReportFrameLoad = () => {
@@ -373,6 +399,20 @@ const formatDate = (iso) => {
   color: #f9fafb;
   cursor: pointer;
 }
+
+.delete-btn {
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid #ef4444;
+  background: #fef2f2;
+  color: #b91c1c;
+  cursor: pointer;
+}
+.delete-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 
 .pdf-link {
   color: #2563eb;

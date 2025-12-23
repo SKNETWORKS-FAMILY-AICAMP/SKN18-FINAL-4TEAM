@@ -35,7 +35,10 @@ def verify_code(email: str, code: str):
     except EmailVerification.DoesNotExist:
         return False, "인증 코드가 올바르지 않습니다."
 
-    if record.expires_at and record.expires_at < timezone.now():
+    expires_at = record.expires_at
+    if expires_at and timezone.is_naive(expires_at):
+        expires_at = timezone.make_aware(expires_at, timezone.get_current_timezone())
+    if expires_at and expires_at < timezone.now():
         return False, "인증 코드가 만료되었습니다."
 
     record.verified_at = timezone.now()

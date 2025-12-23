@@ -93,3 +93,30 @@ class TestCase(models.Model):
   class Meta:
     managed = False
     db_table = "test_case"
+
+class LivecodingReport(models.Model):
+    id = models.AutoField(primary_key=True)
+    session_id = models.CharField(max_length=100, unique=True)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, db_column="user_id")
+    report_md = models.TextField()
+    final_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
+    final_grade = models.CharField(max_length=8, null=True, blank=True)
+    final_flags = models.JSONField(default=list)
+    graph_output = models.JSONField(default=dict)
+    problem_eval_score = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+    problem_eval_feedback = models.TextField(null=True, blank=True)
+    code_collab_score = models.DecimalField(max_digits=6, decimal_places=4, null=True, blank=True)
+    code_collab_feedback = models.TextField(null=True, blank=True)
+    problem_evidence = models.JSONField(null=True, blank=True)
+    code_collab_evidence = models.JSONField(null=True, blank=True)
+    step = models.CharField(max_length=20, null=True, blank=True)
+    status = models.CharField(max_length=20, null=True, blank=True)
+    error = models.TextField(null=True, blank=True)
+    pdf_path = models.TextField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "livecoding_reports"
+        indexes = [models.Index(fields=["user", "session_id"], name="idx_lc_report_user_sess")]

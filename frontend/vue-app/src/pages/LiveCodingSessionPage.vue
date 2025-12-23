@@ -124,8 +124,14 @@
             <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
           </div>
           <div class="footer-right">
-            <button type="button" class="run-button" @click="onSubmitClick">제출하기</button>
-            <span class="hint">제출 후 렌더링 페이지로 이동 (추후 연동 예정)</span>
+            <button
+              type="button"
+              class="run-button"
+              @click="onSubmitClick"
+              :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording"
+            >
+              {{ isSubmitting ? "제출 중..." : "제출하기" }}
+            </button>
           </div>
         </footer>
       </section>
@@ -307,21 +313,50 @@ const ringStrokeOffset = computed(() => {
 /* -----------------------------
   📤 코드 제출 버튼 (렌더링 페이지 이동 예정)
 ----------------------------- */
-const onSubmitClick = () => {
+const isSubmitting = ref(false);
+
+const onSubmitClick = async () => {
   const sessionId = route.query.session_id;
-  // 렌더링/리포트 페이지 라우트는 추후 구현 예정입니다.
-  // 여기서는 예상 라우트 이름으로 네비게이션만 연결해 두고,
-  // 아직 라우트가 없으면 경고만 출력합니다.
+  const token = localStorage.getItem("jobtory_access_token");
+
+  if (!sessionId) return window.alert("session_id가 없습니다.");
+  if (!token) return router.push({ name: "login" });
+  if (isSubmitting.value) return;
+
+  isSubmitting.value = true;
   try {
-    router.push({
-      name: "livecoding-render", // TODO: 렌더링 페이지 라우트 이름 확정 시 맞추어 수정
-      query: sessionId ? { session_id: sessionId } : {},
+    // (선택) 마지막 코드 저장
+    await saveCodeSnapshot(code.value);
+
+    // ✅ step3(langgraph) 시작 트리거
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/final-eval/start/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ session_id: sessionId }),
     });
-  } catch (err) {
-    console.warn("렌더링 페이지 라우트가 아직 정의되지 않았습니다.", err);
-    window.alert("제출 후 렌더링 페이지 연동은 추후 구현될 예정입니다.");
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("final-eval start failed", resp.status, data);
+      return window.alert(data?.detail || "최종 평가 시작에 실패했습니다.");
+    }
+
+    // ✅ rendering.vue 이동
+    router.replace({
+      name: "livecoding-rendering",
+      query: { session_id: sessionId },
+    });
+  } catch (e) {
+    console.error(e);
+    window.alert("제출 처리 중 오류가 발생했습니다.");
+  } finally {
+    isSubmitting.value = false;
   }
 };
+
 
 /* -----------------------------
   🎙️ 녹음 시작
@@ -464,6 +499,31 @@ const runSttClient = async () => {
       console.warn("Interview event 호출 실패", eventResp.status, eventData);
       showAntiCheat("sttError", eventData?.detail || "응답을 생성하지 못했습니다.");
       return;
+    }
+    // ✅ strategy로 분류되었고 STT 텍스트가 있다면 저장
+    if (eventData.user_answer_class === "strategy" && sttText) {
+      try {
+        // 1. localStorage에 백업 저장
+        const strategyKey = `strategy_answer_${sessionId}`;
+        localStorage.setItem(strategyKey, sttText);
+        console.log("✅ localStorage 백업:", strategyKey, sttText.substring(0, 30));
+        // 백엔드에 명시적으로 전략 답변 저장 요청
+        await fetch(`${BACKEND_BASE}/api/livecoding/session/strategy/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            session_id: sessionId,
+            strategy_answer: sttText,
+            timestamp: new Date().toISOString(),
+          }),
+        });
+        console.log("✅ 전략 답변 저장 완료:", sttText.substring(0, 30));
+      } catch (e) {
+        console.error("❌ 전략 답변 저장 실패:", e);
+      }
     }
 
     // 백엔드가 tts_text를 문자열(텍스트)로 줄 수도 있고,

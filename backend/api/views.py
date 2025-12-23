@@ -3,7 +3,7 @@ import json
 import secrets
 import string
 import time
-
+import threading
 from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse
@@ -15,6 +15,8 @@ import jwt
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
+from rest_framework.decorators import api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 
 from .email_utils import send_verification_code, verify_code
 from .throttling import (
@@ -33,6 +35,7 @@ from .models import (
     CodingProblemLanguage,
     TestCase,
     User,
+    LivecodingReport,
 )
 from .serializers import SignupSerializer
 from .authentication import JWTAuthentication
@@ -467,6 +470,8 @@ class LiveCodingStartView(APIView):
     - 저장되는 키: livecoding:{session_id}:meta, 
       값: { state, problem_id, user_id, session_id }
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         user = getattr(request, "user", None)
@@ -489,8 +494,6 @@ class LiveCodingStartView(APIView):
             "stage": "intro",
             "user_id": user.user_id,
             "session_id": session_id,
-            "problem_id": problem_data.get("problem_id"),
-            "language": problem_data.get("language"),
             "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
         }
@@ -509,7 +512,17 @@ class LiveCodingStartView(APIView):
         cache.set(f"livecoding:{session_id}:meta", meta, timeout=60*60)
         cache.set(f"livecoding:{session_id}:problem", problem_payload, timeout=60*60)
         cache.set(f"livecoding:user:{user.user_id}:current_session", session_id, timeout=60*60)
-        return Response({"session_id": session_id}, status=201)
+        return Response(
+            {
+                "session_id": session_id,
+                "state": meta["stage"],
+                "time_limit_seconds": meta["time_limit_seconds"],
+                "start_at": meta["start_at"],
+                "remaining_seconds": meta["time_limit_seconds"],
+                "problem_data": problem_payload,
+            },
+            status=status.HTTP_201_CREATED,
+        )
 
 class LiveCodingCodeSnapshotView(APIView):
     """
@@ -781,6 +794,9 @@ class LiveCodingSessionView(APIView):
     - query: ?session_id=<sid>
     - 응답: LiveCodingStartView와 동일한 형태의 문제/세션 정보
     """
+    # ✅ 추가: 명시적으로 인증 클래스 지정
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = getattr(request, "user", None)
@@ -808,7 +824,7 @@ class LiveCodingSessionView(APIView):
             )
 
         # 다른 사용자의 세션에 접근하지 못하도록 검증
-        if meta.get("user_id") != str(user.user_id):
+        if str(meta.get("user_id")) != str(user.user_id):
             return Response(
                 {"detail": "이 세션에 접근할 권한이 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
@@ -862,6 +878,8 @@ class LiveCodingActiveSessionView(APIView):
     - Authorization: Bearer <access_token>
     - 응답: 세션이 있으면 LiveCodingSessionView와 동일한 구조, 없으면 404
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
         user = getattr(request, "user", None)
@@ -881,9 +899,10 @@ class LiveCodingActiveSessionView(APIView):
             )
 
         meta_key = f"livecoding:{session_id}:meta"
-
+        problem_key =  f"livecoding:{session_id}:problem"
         meta = cache.get(meta_key)
-        if not meta:
+        problem = cache.get(problem_key)
+        if not meta and problem:
             return Response(
                 {"available": False},
                 status=status.HTTP_200_OK,
@@ -895,9 +914,9 @@ class LiveCodingActiveSessionView(APIView):
                 {"detail": "이 세션에 접근할 권한이 없습니다."},
                 status=status.HTTP_403_FORBIDDEN,
             )
-
-        problem_id = meta.get("problem_id")
-        language = meta.get("language")
+        
+        problem_id = problem.get("problem_id")
+        language = problem.get("language")
 
         qs = (
             CodingProblemLanguage.objects.select_related("problem")
@@ -961,6 +980,8 @@ class LiveCodingEndSessionView(APIView):
     - Authorization: Bearer <access_token>
     - Redis에서 메타/매핑/STT 버퍼를 제거합니다.
     """
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
         user = getattr(request, "user", None)
@@ -1261,4 +1282,399 @@ class CodingQuestionView(APIView):
                 "state": result,
             },
             status=status.HTTP_200_OK,
+        )
+
+class LiveCodingFinalEvalStartView(APIView):
+    """
+    제출하기 버튼 트리거:
+    - POST /api/livecoding/final-eval/start/
+      body: {"session_id": "..."}
+    - 즉시 202 반환하고, 백그라운드 스레드에서 chapter3 graph 실행 시작
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = (request.data or {}).get("session_id")
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증 (중요)
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        # ✅ 백그라운드 실행
+        def _runner():
+            try:
+                graph = get_cached_graph("chapter3")
+                config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+
+                # 최소 상태로 시작(노드 없으면 그래도 저장되도록)
+                init_state = {
+                    "meta": {"session_id": session_id, "user_id": str(user.user_id)},
+                    "step": "init",
+                    "status": "running",
+                }
+
+                graph.invoke(init_state, config=config)
+
+                # 그래프가 정상 종료되면 마지막 상태를 'saved/done'으로 맞춰두는 걸 추천
+                # (노드에서 처리해도 되고, 여기서 한 번 더 저장해도 됨)
+                try:
+                    # 최신 상태를 읽어서 step/status만 보정
+                    snap = graph.get_state(config)
+                    values = dict(snap.values or {})
+                    values["step"] = values.get("step") or "saved"
+                    values["status"] = "done"
+                    # invoke가 체크포인터에 저장했겠지만, 보정 저장이 필요하면 노드에서 하거나
+                    # 그래프 마지막 노드에서 saved로 세팅해.
+                except Exception:
+                    pass
+
+            except Exception as e:
+                # 에러 상태를 체크포인터에 남기고 싶으면
+                try:
+                    graph = get_cached_graph("chapter3")
+                    config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+                    err_state = {
+                        "meta": {"session_id": session_id, "user_id": str(user.user_id)},
+                        "step": "error",
+                        "status": "error",
+                        "error": str(e),
+                    }
+                    # graph.invoke 대신 저장만 하고 싶으면 체크포인터 접근이 필요하지만
+                    # 여기서는 최소로 "에러 상태를 state로 남길 수 있게" graph에 error node를 두는 걸 추천.
+                    # (지금은 그냥 출력)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_runner, daemon=True).start()
+
+        return Response({"status": "started"}, status=status.HTTP_202_ACCEPTED)
+
+
+class LiveCodingFinalEvalStatusView(APIView):
+    """
+    rendering.vue 폴링용:
+    - GET /api/livecoding/final-eval/status/?session_id=...
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증(권장)
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if meta and str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        graph = get_cached_graph("chapter3")
+        config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+
+        try:
+            snap = graph.get_state(config)
+            values = snap.values or {}
+        except Exception:
+            values = {}
+
+        # 그래프가 아직 시작 안됐거나 저장된 게 없으면 init으로 응답
+        step = values.get("step") or "init"
+        st = values.get("status") or ("done" if step == "saved" else "running")
+
+        return Response(
+            {
+                "status": st,
+                "step": step,
+                **values,
+            },
+            status=status.HTTP_200_OK,
+        )
+class LiveCodingFinalEvalReportView(APIView):
+    """
+    showreport.vue 용:
+    - GET /api/livecoding/final-eval/report/?session_id=...
+    - done이면 report/score/grade 반환
+    - 아직 running이면 202로 반환
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        session_id = request.query_params.get("session_id")
+        if not session_id:
+            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        graph = get_cached_graph("chapter3")
+        config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+
+        try:
+            snap = graph.get_state(config)
+            values = dict(snap.values or {})
+        except Exception as e:
+            return Response(
+                {"detail": "final-eval state를 읽을 수 없습니다.", "error": str(e)},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+        step = values.get("step") or "init"
+        st = values.get("status") or ("done" if step == "saved" else "running")
+
+        if st != "done" or step != "saved":
+            return Response(
+                {"status": st, "step": step},
+                status=status.HTTP_202_ACCEPTED,
+            )
+
+        report_md = values.get("final_report_markdown") or ""
+        
+        graph_output = values.get("graph_output") or {}
+
+        # graph_output에 problem_text가 없으면 여러 소스에서 최대한 찾아 채움
+        if not graph_output.get("problem_text"):
+            try:
+                problem_text = None
+
+                # 0) (혹시 로컬 meta에 이미 들어있으면)
+                if isinstance(meta, dict):
+                    problem_text = (
+                        meta.get("problem_text")
+                        or meta.get("problem_description")
+                        or meta.get("problem")
+                    )
+
+                # 1) 세션 meta 캐시에서 (livecoding:{session_id}:meta)
+                if not problem_text:
+                    meta_key = f"livecoding:{session_id}:meta"
+                    cached_meta = cache.get(meta_key) or {}
+                    if isinstance(cached_meta, dict):
+                        problem_text = (
+                            cached_meta.get("problem_text")
+                            or cached_meta.get("problem_description")
+                            or cached_meta.get("problem")
+                        )
+                        # problem_payload / problem_data 형태로 들어있을 수도 있음
+                        if not problem_text:
+                            pd = cached_meta.get("problem_payload") or cached_meta.get("problem_data") or {}
+                            if isinstance(pd, dict):
+                                problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
+
+                # 2) 별도 problem 캐시 키가 있다면 (프로젝트마다 다르게 저장하는 경우 대비)
+                if not problem_text:
+                    for k in (f"livecoding:{session_id}:problem", f"livecoding:{session_id}:problem_data"):
+                        pd = cache.get(k) or {}
+                        if isinstance(pd, dict):
+                            problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
+                            if problem_text:
+                                break
+
+                # 3) code 캐시에서
+                if not problem_text:
+                    code_key = f"livecoding:{session_id}:code"
+                    code_data = cache.get(code_key) or {}
+                    if isinstance(code_data, dict):
+                        problem_text = (
+                            code_data.get("problem_text")
+                            or code_data.get("problem_description")
+                            or code_data.get("problem")
+                        )
+
+                if problem_text:
+                    graph_output["problem_text"] = problem_text
+                    values["graph_output"] = graph_output  # ✅ 중요: values에 다시 박아줘야 return에서도 유지됨
+                    print(f"[✓ 리포트 API] 문제 텍스트 추가: {len(problem_text)}자", flush=True)
+                else:
+                    values["graph_output"] = graph_output
+                    print("[✗ 리포트 API] problem_text를 어디에서도 찾지 못했습니다.", flush=True)
+
+            except Exception as e:
+                values["graph_output"] = graph_output
+                print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
+        try:
+            from api.models import LivecodingReport  # 지연 import로 순환참조 회피
+
+            defaults = {
+                "user": user,
+                "report_md": report_md,
+                "final_score": values.get("final_score"),
+                "final_grade": values.get("final_grade"),
+                "final_flags": values.get("final_flags") or [],
+                "graph_output": values.get("graph_output") or {},
+                "problem_eval_score": values.get("problem_eval_score"),
+                "problem_eval_feedback": values.get("problem_eval_feedback"),
+                "code_collab_score": values.get("code_collab_score"),
+                "code_collab_feedback": values.get("code_collab_feedback"),
+                "problem_evidence": values.get("problem_evidence"),
+                "code_collab_evidence": values.get("code_collab_evidence"),
+                "step": values.get("step"),
+                "status": values.get("status"),
+                "error": values.get("error"),
+            }
+            LivecodingReport.objects.update_or_create(
+                session_id=session_id,
+                defaults=defaults,
+            )
+        except Exception as e:
+            # 저장 실패는 조회 응답을 막지 않음
+            print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
+        return Response(
+            {
+                "status": "done",
+                "step": "saved",
+                "final_report_markdown": report_md,
+                "final_score": values.get("final_score"),
+                "final_grade": values.get("final_grade"),
+                "final_flags": values.get("final_flags", []),
+                "graph_output": values.get("graph_output"),  # 위에서 values에 다시 저장했기 때문에 안전
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+
+class LiveCodingReportListView(APIView):
+    """
+    DB에 저장된 최종 리포트 목록 (로그인 사용자 본인)
+    GET /api/livecoding/reports/
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        reports = (
+            LivecodingReport.objects.filter(user=user)
+            .order_by("-created_at", "-id")
+        )
+        results = []
+        for r in reports:
+            results.append(
+                {
+                    "session_id": r.session_id,
+                    "final_score": r.final_score,
+                    "final_grade": r.final_grade,
+                    "final_flags": r.final_flags or [],
+                    "has_report": bool(r.report_md),
+                    "has_pdf": bool(r.pdf_path),
+                    "pdf_path": r.pdf_path,
+                    "created_at": r.created_at.isoformat() if r.created_at else None,
+                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                }
+            )
+
+        return Response({"results": results}, status=status.HTTP_200_OK)
+
+
+class LiveCodingReportDetailView(APIView):
+    """
+    DB에 저장된 최종 리포트 상세 (로그인 사용자 본인)
+    GET /api/livecoding/reports/<session_id>/
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, session_id: str):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
+        if not report:
+            return Response({"detail": "리포트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        return Response(
+            {
+                "status": report.status or "done",
+                "step": report.step or "saved",
+                "session_id": report.session_id,
+                "final_report_markdown": report.report_md or "",
+                "final_score": report.final_score,
+                "final_grade": report.final_grade,
+                "final_flags": report.final_flags or [],
+                "graph_output": report.graph_output or {},
+                "problem_eval_score": report.problem_eval_score,
+                "problem_eval_feedback": report.problem_eval_feedback,
+                "code_collab_score": report.code_collab_score,
+                "code_collab_feedback": report.code_collab_feedback,
+                "problem_evidence": report.problem_evidence,
+                "code_collab_evidence": report.code_collab_evidence,
+                "error": report.error,
+                "pdf_path": report.pdf_path,
+                "created_at": report.created_at.isoformat() if report.created_at else None,
+                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+@api_view(["POST"])
+@permission_classes([IsAuthenticated])
+def save_strategy_answer(request):
+    """chapter1 전략 답변을 명시적으로 저장"""
+    session_id = request.data.get("session_id")
+    strategy_answer = request.data.get("strategy_answer")
+    
+    if not session_id or not strategy_answer:
+        return Response(
+            {"error": "session_id and strategy_answer required"}, 
+            status=400
+        )
+    
+    try:
+        # Redis cache에 저장
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key) or {}
+        meta["strategy_answer"] = strategy_answer
+        cache.set(meta_key, meta, 3600)
+        
+        print(f"[save_strategy] 저장 완료: {strategy_answer[:50]}...", flush=True)
+        
+        return Response({
+            "success": True,
+            "message": "Strategy answer saved",
+            "length": len(strategy_answer),
+        })
+        
+    except Exception as e:
+        print(f"[save_strategy] 오류: {e}", flush=True)
+        import traceback
+        traceback.print_exc()
+        return Response(
+            {"error": str(e)}, 
+            status=500
         )

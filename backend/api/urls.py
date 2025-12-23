@@ -1,4 +1,5 @@
 from django.urls import path
+from . import views
 
 from .views import (
     EmailSendView,
@@ -22,6 +23,12 @@ from .views import (
     ProfileView,
     health,
     roadmap,
+    LiveCodingFinalEvalStartView, 
+    LiveCodingFinalEvalStatusView,
+    LiveCodingFinalEvalReportView,
+    LiveCodingReportListView,
+    LiveCodingReportDetailView,
+    save_strategy_answer,
 )
 
 from .chap1_views import (
@@ -92,4 +99,11 @@ urlpatterns = [
     
     # profile
     path("user/profile/", ProfileView.as_view(), name="profile"),
+    path("livecoding/final-eval/start/", views.LiveCodingFinalEvalStartView.as_view()),
+    path("livecoding/final-eval/status/", views.LiveCodingFinalEvalStatusView.as_view()),
+    path("livecoding/final-eval/report/", views.LiveCodingFinalEvalReportView.as_view()),
+    path("livecoding/reports/", views.LiveCodingReportListView.as_view(), name="livecoding-report-list"),
+    path("livecoding/reports/<str:session_id>/", views.LiveCodingReportDetailView.as_view(), name="livecoding-report-detail"),
+    path("livecoding/session/strategy/", views.save_strategy_answer, name="save-strategy"),
+    
 ]

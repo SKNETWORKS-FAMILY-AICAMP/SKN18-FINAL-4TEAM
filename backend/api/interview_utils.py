@@ -2,7 +2,7 @@ import os
 from dotenv import load_dotenv
 from langgraph.checkpoint.redis import RedisSaver
 from tts_client import generate_interview_audio_batch
-from dotenv import load_dotenv
+
 from interview_engine.graph import (
     create_chapter1_graph_flow,
     create_chapter2_graph_flow,
@@ -10,12 +10,12 @@ from interview_engine.graph import (
     create_chapter3_graph_flow,
 )
 from interview_engine import llm
-from langgraph.checkpoint.redis import RedisSaver
-from .stt_buffer import append_conversation_event
+from .stt_buffer import append_conversation_event  # noqa: F401  # kept for side effects
+
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
 
-# 모듈 전역
+# 캐시
 _checkpointer = None
 _graph_cache = {}  # {"chapter1": compiled_graph, ...}
 _llm_instance = None
@@ -29,13 +29,14 @@ def get_checkpointer():
     if REDIS_URL:
         try:
             cp = RedisSaver(REDIS_URL)
-            cp.setup()  # 연결 풀 및 키스페이스 준비
+            cp.setup()
             _checkpointer = cp
             return _checkpointer
-        except Exception as exc:  # noqa: BLE001
+        except Exception:
             pass
 
     return _checkpointer
+
 
 def get_cached_graph(name: str):
     if name not in _graph_cache:
@@ -46,24 +47,25 @@ def get_cached_graph(name: str):
             _graph_cache[name] = create_chapter2_graph_flow(checkpointer=cp)
         elif name == "chapter2_hint":
             _graph_cache[name] = create_chapter2_hint_graph(checkpointer=cp)
-        elif name == "chapter3":   # ✅ 추가
+        elif name == "chapter3":
             _graph_cache[name] = create_chapter3_graph_flow(checkpointer=cp)
         else:
             raise ValueError(f"unknown graph {name}")
     return _graph_cache[name]
 
+
 def get_cached_llm():
-    """interview_engine.llm.LLM 인스턴스를 캐싱해 재사용."""
+    """interview_engine.llm.LLM 클래스만 캐싱해서 반환합니다"""
     global _llm_instance
     if _llm_instance is None:
-        # llm 모듈 import 시 생성된 LLM을 활용
         _llm_instance = getattr(llm, "LLM", None)
     return _llm_instance
 
+
 def _generate_tts_payload(text: str, session_id: str | None = None, max_sentences=None):
     """
-    LangGraph thread_id와 문장 수 제한을 반영해 배치 TTS를 수행하고
-    프론트로 내려줄 청크 페이로드를 생성합니다.
+    LangGraph thread_id를 문장 단위로 반영해 배치 TTS를 실행하고
+    클라이언트로 전달할 base64 오디오 리스트를 리턴합니다.
     """
     config = {"configurable": {}}
     if session_id:

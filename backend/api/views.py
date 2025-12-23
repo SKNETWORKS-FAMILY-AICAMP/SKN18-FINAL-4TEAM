@@ -2,7 +2,6 @@ from datetime import datetime, timedelta, date
 import json
 import secrets
 import string
-import time
 import threading
 from django.conf import settings
 from django.core.mail import send_mail
@@ -757,7 +756,7 @@ class LiveCodingHintView(APIView):
                 state,
                 config={
                     "configurable": {
-                        "thread_id":f"{session_id}:chapter2_hint"
+                        "thread_id": f"{session_id}:chapter2_hint"
                     }
                 },
             )
@@ -1227,7 +1226,7 @@ class CodingQuestionView(APIView):
                 coding_state,
                 config={
                     "configurable": {
-                        "thread_id":f"{session_id}:chapter2"
+                        "thread_id": f"{session_id}:chapter2"
                     }
                 },
             )
@@ -1409,10 +1408,10 @@ class LiveCodingFinalEvalStatusView(APIView):
         )
 class LiveCodingFinalEvalReportView(APIView):
     """
-    showreport.vue 용:
+    showreport.vue ?:
     - GET /api/livecoding/final-eval/report/?session_id=...
-    - done이면 report/score/grade 반환
-    - 아직 running이면 202로 반환
+    - done?? report/score/grade ??
+    - ????? 202 ??
     """
 
     authentication_classes = [JWTAuthentication]
@@ -1421,145 +1420,154 @@ class LiveCodingFinalEvalReportView(APIView):
     def get(self, request):
         user = getattr(request, "user", None)
         if not isinstance(user, User):
-            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"detail": "???? ?????"}, status=status.HTTP_401_UNAUTHORIZED)
 
         session_id = request.query_params.get("session_id")
         if not session_id:
-            return Response({"detail": "session_id가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({"detail": "session_id? ?????"}, status=status.HTTP_400_BAD_REQUEST)
 
-        # 세션 소유권 검증
+        report = (
+            LivecodingReport.objects.filter(session_id=session_id)
+            .select_related("user")
+            .first()
+        )
+        if report and str(report.user_id) != str(user.user_id):
+            return Response({"detail": "?? ??? ?? ??? ????."}, status=status.HTTP_403_FORBIDDEN)
+
         meta_key = f"livecoding:{session_id}:meta"
         meta = cache.get(meta_key)
-        if not meta:
-            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
-        if str(meta.get("user_id")) != str(user.user_id):
-            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+        if not report and meta and str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "?? ??? ?? ??? ????."}, status=status.HTTP_403_FORBIDDEN)
 
-        graph = get_cached_graph("chapter3")
-        config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
+        def _fill_problem_text(graph_output: dict) -> dict:
+            graph_output = graph_output or {}
+            if graph_output.get("problem_text"):
+                return graph_output
+
+            problem_text = None
+
+            if isinstance(meta, dict):
+                problem_text = (
+                    meta.get("problem_text")
+                    or meta.get("problem_description")
+                    or meta.get("problem")
+                )
+
+            if not problem_text:
+                cached_meta = cache.get(meta_key) or {}
+                if isinstance(cached_meta, dict):
+                    problem_text = (
+                        cached_meta.get("problem_text")
+                        or cached_meta.get("problem_description")
+                        or cached_meta.get("problem")
+                    )
+                    if not problem_text:
+                        pd = cached_meta.get("problem_payload") or cached_meta.get("problem_data") or {}
+                        if isinstance(pd, dict):
+                            problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
+
+            if not problem_text:
+                for k in (f"livecoding:{session_id}:problem", f"livecoding:{session_id}:problem_data"):
+                    pd = cache.get(k) or {}
+                    if isinstance(pd, dict):
+                        problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
+                        if problem_text:
+                            break
+
+            if not problem_text:
+                code_key = f"livecoding:{session_id}:code"
+                code_data = cache.get(code_key) or {}
+                if isinstance(code_data, dict):
+                    problem_text = (
+                        code_data.get("problem_text")
+                        or code_data.get("problem_description")
+                        or code_data.get("problem")
+                    )
+
+            if problem_text:
+                graph_output["problem_text"] = problem_text
+
+            return graph_output
 
         try:
+            graph = get_cached_graph("chapter3")
+            config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
             snap = graph.get_state(config)
             values = dict(snap.values or {})
-        except Exception as e:
+        except Exception:
+            values = {}
+
+        if report and not values:
+            graph_output = _fill_problem_text(report.graph_output or {})
+            step_val = report.step or "saved"
+            status_val = report.status or ("done" if step_val == "saved" else "running")
+            resp_status = status.HTTP_200_OK if status_val == "done" and step_val == "saved" else status.HTTP_202_ACCEPTED
             return Response(
-                {"detail": "final-eval state를 읽을 수 없습니다.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {
+                    "status": status_val,
+                    "step": step_val,
+                    "final_report_markdown": report.report_md or "",
+                    "final_score": report.final_score,
+                    "final_grade": report.final_grade,
+                    "final_flags": report.final_flags or [],
+                    "graph_output": graph_output,
+                    "pdf_path": report.pdf_path,
+                },
+                status=resp_status,
             )
+
+        if not values and not report:
+            return Response({"detail": "?? ?? ??? ?? ? ????."}, status=status.HTTP_404_NOT_FOUND)
 
         step = values.get("step") or "init"
         st = values.get("status") or ("done" if step == "saved" else "running")
 
-        if st != "done" or step != "saved":
-            return Response(
-                {"status": st, "step": step},
-                status=status.HTTP_202_ACCEPTED,
-            )
+        report_md = values.get("final_report_markdown") or (report.report_md if report else "") or ""
+        graph_output = _fill_problem_text(values.get("graph_output") or (report.graph_output if report else {}) or {})
 
-        report_md = values.get("final_report_markdown") or ""
-        
-        graph_output = values.get("graph_output") or {}
+        defaults = {
+            "user": report.user if report else user,
+            "report_md": report_md,
+            "final_score": values.get("final_score"),
+            "final_grade": values.get("final_grade"),
+            "final_flags": values.get("final_flags") or (report.final_flags if report else []) or [],
+            "graph_output": graph_output,
+            "problem_eval_score": values.get("problem_eval_score"),
+            "problem_eval_feedback": values.get("problem_eval_feedback"),
+            "code_collab_score": values.get("code_collab_score"),
+            "code_collab_feedback": values.get("code_collab_feedback"),
+            "problem_evidence": values.get("problem_evidence"),
+            "code_collab_evidence": values.get("code_collab_evidence"),
+            "step": step,
+            "status": st,
+            "error": values.get("error"),
+            "updated_at": timezone.now(),
+        }
+        if not report:
+            defaults["created_at"] = timezone.now()
 
-        # graph_output에 problem_text가 없으면 여러 소스에서 최대한 찾아 채움
-        if not graph_output.get("problem_text"):
-            try:
-                problem_text = None
-
-                # 0) (혹시 로컬 meta에 이미 들어있으면)
-                if isinstance(meta, dict):
-                    problem_text = (
-                        meta.get("problem_text")
-                        or meta.get("problem_description")
-                        or meta.get("problem")
-                    )
-
-                # 1) 세션 meta 캐시에서 (livecoding:{session_id}:meta)
-                if not problem_text:
-                    meta_key = f"livecoding:{session_id}:meta"
-                    cached_meta = cache.get(meta_key) or {}
-                    if isinstance(cached_meta, dict):
-                        problem_text = (
-                            cached_meta.get("problem_text")
-                            or cached_meta.get("problem_description")
-                            or cached_meta.get("problem")
-                        )
-                        # problem_payload / problem_data 형태로 들어있을 수도 있음
-                        if not problem_text:
-                            pd = cached_meta.get("problem_payload") or cached_meta.get("problem_data") or {}
-                            if isinstance(pd, dict):
-                                problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
-
-                # 2) 별도 problem 캐시 키가 있다면 (프로젝트마다 다르게 저장하는 경우 대비)
-                if not problem_text:
-                    for k in (f"livecoding:{session_id}:problem", f"livecoding:{session_id}:problem_data"):
-                        pd = cache.get(k) or {}
-                        if isinstance(pd, dict):
-                            problem_text = pd.get("problem") or pd.get("problem_text") or pd.get("problem_description")
-                            if problem_text:
-                                break
-
-                # 3) code 캐시에서
-                if not problem_text:
-                    code_key = f"livecoding:{session_id}:code"
-                    code_data = cache.get(code_key) or {}
-                    if isinstance(code_data, dict):
-                        problem_text = (
-                            code_data.get("problem_text")
-                            or code_data.get("problem_description")
-                            or code_data.get("problem")
-                        )
-
-                if problem_text:
-                    graph_output["problem_text"] = problem_text
-                    values["graph_output"] = graph_output  # ✅ 중요: values에 다시 박아줘야 return에서도 유지됨
-                    print(f"[✓ 리포트 API] 문제 텍스트 추가: {len(problem_text)}자", flush=True)
-                else:
-                    values["graph_output"] = graph_output
-                    print("[✗ 리포트 API] problem_text를 어디에서도 찾지 못했습니다.", flush=True)
-
-            except Exception as e:
-                values["graph_output"] = graph_output
-                print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
         try:
-            from api.models import LivecodingReport  # 지연 import로 순환참조 회피
-
-            defaults = {
-                "user": user,
-                "report_md": report_md,
-                "final_score": values.get("final_score"),
-                "final_grade": values.get("final_grade"),
-                "final_flags": values.get("final_flags") or [],
-                "graph_output": values.get("graph_output") or {},
-                "problem_eval_score": values.get("problem_eval_score"),
-                "problem_eval_feedback": values.get("problem_eval_feedback"),
-                "code_collab_score": values.get("code_collab_score"),
-                "code_collab_feedback": values.get("code_collab_feedback"),
-                "problem_evidence": values.get("problem_evidence"),
-                "code_collab_evidence": values.get("code_collab_evidence"),
-                "step": values.get("step"),
-                "status": values.get("status"),
-                "error": values.get("error"),
-            }
             LivecodingReport.objects.update_or_create(
                 session_id=session_id,
                 defaults=defaults,
             )
         except Exception as e:
-            # 저장 실패는 조회 응답을 막지 않음
             print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
+
+        resp_status = status.HTTP_200_OK if st == "done" and step == "saved" else status.HTTP_202_ACCEPTED
         return Response(
             {
-                "status": "done",
-                "step": "saved",
+                "status": st,
+                "step": step,
                 "final_report_markdown": report_md,
                 "final_score": values.get("final_score"),
                 "final_grade": values.get("final_grade"),
                 "final_flags": values.get("final_flags", []),
-                "graph_output": values.get("graph_output"),  # 위에서 values에 다시 저장했기 때문에 안전
+                "graph_output": graph_output,
+                "pdf_path": report.pdf_path if report else None,
             },
-            status=status.HTTP_200_OK,
+            status=resp_status,
         )
-
 
 
 class LiveCodingReportListView(APIView):
@@ -1601,8 +1609,9 @@ class LiveCodingReportListView(APIView):
 
 class LiveCodingReportDetailView(APIView):
     """
-    DB에 저장된 최종 리포트 상세 (로그인 사용자 본인)
+    DB? ??? ?? ??? ?? (??? ??? ??)
     GET /api/livecoding/reports/<session_id>/
+    DELETE /api/livecoding/reports/<session_id>/
     """
 
     authentication_classes = [JWTAuthentication]
@@ -1611,11 +1620,11 @@ class LiveCodingReportDetailView(APIView):
     def get(self, request, session_id: str):
         user = getattr(request, "user", None)
         if not isinstance(user, User):
-            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+            return Response({"detail": "???? ?????"}, status=status.HTTP_401_UNAUTHORIZED)
 
         report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
         if not report:
-            return Response({"detail": "리포트를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+            return Response({"detail": "???? ?? ? ????."}, status=status.HTTP_404_NOT_FOUND)
 
         return Response(
             {
@@ -1640,6 +1649,18 @@ class LiveCodingReportDetailView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+    def delete(self, request, session_id: str):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "???? ?????"}, status=status.HTTP_401_UNAUTHORIZED)
+
+        report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
+        if not report:
+            return Response({"detail": "???? ?? ? ????."}, status=status.HTTP_404_NOT_FOUND)
+
+        report.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 @api_view(["POST"])

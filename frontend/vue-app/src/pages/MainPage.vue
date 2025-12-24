@@ -67,7 +67,9 @@
             <br />
             every live challenge.
           </h2>
-          <p class="hero-description">실시간 라이브 코딩과 행동 기반 인터뷰로 개발자의 문제 해결력과 커뮤니케이션을 있는 그대로 평가하세요.</p>
+          <p class="hero-description">실시간 라이브 코딩과 행동 기반 인터뷰로 개발자의 문제 해결력과
+          <br /> 
+          커뮤니케이션을 있는 그대로 평가하세요.</p>
           <div class="hero-actions">
             <RouterLink to="/coding-test" class="secondary">라이브 코딩 테스트 보기</RouterLink>
           </div>
@@ -94,18 +96,30 @@
       <div class="insights-cards">
         <div class="insight-card card-one scroll-reveal">
           <h4 class="card-heading">라이브 코드 실행</h4>
-          <p class="card-copy">작성된 코드는 실시간으로 실행되어 살아있는 결과물이 됩니다. 
+          <p class="card-copy">작성된 코드는 
           <br />
-          논리 구조부터 최적화까지, 당신이 코딩에 담은 디테일한 고민들이 면접관에게 그대로 전달됩니다.</p>
+          실시간으로 실행되어 살아있는 결과물이 됩니다. 
+          <br />
+          논리 구조부터 최적화까지, 
+          <br />
+          당신이 코딩에 담은 디테일한 고민들이 
+          <br />
+          면접관에게 그대로 전달됩니다.</p>
           <div class="hero-image-wrap">
             <img :src="heroImage2" alt="Live coding interface" class="hero-image" />
           </div>
         </div>
         <div class="insight-card card-two scroll-reveal">
           <h4 class="card-heading">협업형 인터뷰</h4>
-          <p class="card-copy">실시간 인터랙션을 통해 함께 일하고 싶은 동료로서의 매력을 발산합니다. 
+          <p class="card-copy">실시간 인터랙션을 통해 
           <br />
-          대화를 통해 정답을 찾아가는 과정 자체가 당신의 훌륭한 커뮤니케이션 포트폴리오가 됩니다.</p>
+          함께 일하고 싶은 동료로서의 매력을 발산합니다. 
+          <br />
+          대화를 통해 정답을 찾아가는 과정 자체가 
+          <br />
+          당신의 훌륭한 커뮤니케이션 포트폴리오가 
+          <br />
+          됩니다.</p>
           <div class="hero-image-wrap">
             <img :src="heroImage3" alt="Live coding interface" class="hero-image" />
           </div>
@@ -114,7 +128,9 @@
           <h4 class="card-heading">정량 + 정성 리포트</h4>
           <p class="card-copy">당신의 모든 인터뷰 여정은 데이터로 기록됩니다. 
           <br />
-          코드 효율성 지표와 행동 분석이 결합된 상세 리포트는 당신의 실력을 가장 설득력 있게 대변해 줍니다.</p>
+          코드 효율성 지표와 행동 분석이 결합된 
+          <br />
+          상세 리포트는 당신의 실력을 가장 설득력 있게 대변해 줍니다.</p>
           <div class="hero-image-wrap">
             <img :src="heroImage4" alt="Live coding interface" class="hero-image" />
           </div>
@@ -493,7 +509,6 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   min-height: 100vh;
   min-height: 100svh;
   height: 100svh;
-  box-sizing: border-box;
   padding: clamp(100px, 3vh, 48px) clamp(16px, 3vw, 32px);
   display: grid;
   grid-template-rows: auto 0fr;

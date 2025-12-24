@@ -2,7 +2,7 @@ Django==4.2.11
 djangorestframework==3.14.0
 django-cors-headers==4.3.1
 gunicorn==21.2.0
-psycopg==3.1.18
+psycopg==3.2.3
 elasticsearch==8.12.0
 psycopg2-binary==2.9.11
 requests==2.32.5
@@ -27,6 +27,9 @@ langgraph-checkpoint-redis==0.2.1
 
 # deepagent
 deepagents==0.3.0
+langgraph-checkpoint-postgres
+
+
 # media 분석용
 pandas==2.3.3
 scikit-learn==1.6.1

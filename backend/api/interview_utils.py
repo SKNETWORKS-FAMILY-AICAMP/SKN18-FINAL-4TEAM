@@ -10,7 +10,6 @@ from interview_engine.graph import (
     create_chapter3_graph_flow,
 )
 from interview_engine import llm
-from langgraph.checkpoint.redis import RedisSaver
 from .stt_buffer import append_conversation_event
 load_dotenv()
 REDIS_URL = os.getenv("REDIS_URL")
@@ -46,7 +45,7 @@ def get_cached_graph(name: str):
             _graph_cache[name] = create_chapter2_graph_flow(checkpointer=cp)
         elif name == "chapter2_hint":
             _graph_cache[name] = create_chapter2_hint_graph(checkpointer=cp)
-        elif name == "chapter3":   # ✅ 추가
+        elif name == "chapter3":  
             _graph_cache[name] = create_chapter3_graph_flow(checkpointer=cp)
         else:
             raise ValueError(f"unknown graph {name}")

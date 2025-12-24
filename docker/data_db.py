@@ -1,13 +1,15 @@
 import csv
+import os
 import psycopg2
 
-# Docker Compose 기준 연결 정보
+# 환경변수 우선, 없으면 기존 기본값 사용
 conn = psycopg2.connect(
-    host="localhost",
-    port="5432",
-    database="jobtory",
-    user="gyulcross",
-    password="gyulcross0113"
+    host=os.getenv("DB_HOST", "localhost"),
+    port=os.getenv("DB_PORT", "5432"),
+    database=os.getenv("DB_NAME", "jobtory"),
+    user=os.getenv("DB_USER", "gyulcross"),
+    password=os.getenv("DB_PASSWORD", "gyulcross0113"),
+    sslmode=os.getenv("DB_SSLMODE", "require"),
 )
 cur = conn.cursor()
 

@@ -27,7 +27,7 @@ except psycopg2.errors.UndefinedTable:
 
 # 1. coding_problem
 print("coding_problem 처리 시작...")
-with open('docker/csv_files/coding_problem_merged.csv', 'r', encoding='utf-8') as f:
+with open('docker/csv_files/coding_problem_merged.csv', 'r', encoding='utf-8-sig') as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:
@@ -43,7 +43,7 @@ with open('docker/csv_files/coding_problem_merged.csv', 'r', encoding='utf-8') a
 
 # 2. test_case
 print("test_case 처리 시작...")
-with open('docker/csv_files/coding_problems_testcases_merged.csv', 'r', encoding='utf-8') as f:
+with open('docker/csv_files/coding_problems_testcases_merged.csv', 'r', encoding='utf-8-sig') as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:
@@ -59,7 +59,7 @@ with open('docker/csv_files/coding_problems_testcases_merged.csv', 'r', encoding
 
 # 3. coding_problem_language
 print("coding_problem_language 처리 시작...")
-with open('docker/csv_files/coding_problem_language_all_merged.csv', 'r', encoding='utf-8') as f:
+with open('docker/csv_files/coding_problem_language_all_merged.csv', 'r', encoding='utf-8-sig') as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:

@@ -29,6 +29,8 @@ def hint_agent(state: CodingState) -> CodingState:
     real_algorithm_category = state.get("real_algorithm_category", "")
     hint_count = state.get("hint_count", 0)
     conversation_log = state.get("conversation_log", [])
+    user_strategy_answer = (state.get("user_strategy_answer") or "").strip()
+    hint_request_text = (state.get("hint_request_text") or "").strip()
 
     # 2. 상황 판단 로직
     
@@ -61,31 +63,58 @@ def hint_agent(state: CodingState) -> CodingState:
         f"현재 힌트 사용 횟수는 {hint_count}회입니다. 횟수가 많을수록 더 구체적으로 조언하세요."
     )
 
+    extra_context_lines = []
+    if user_strategy_answer:
+        extra_context_lines.append(
+            f"- 사용자의 문제 접근 방식(초기 전략 답변): {user_strategy_answer}"
+        )
+    if hint_request_text:
+        extra_context_lines.append(
+            f"- 이번 힌트를 요청하며 사용자가 말한 내용: {hint_request_text}"
+        )
+    extra_context = "\n".join(extra_context_lines) if extra_context_lines else "없음"
+
     system_prompt = (
         "당신은 라이브 코딩 테스트의 친절하고 통찰력 있는 '힌트 AI'입니다.\n"
         "절대로 정답을 직접 알려주지 말고, 소크라테스식 문답법을 사용하세요.\n\n"
         "[문제 정보]\n"
         f"- 문제 내용: {problem_description}\n"
         f"- 실제 정답 카테고리: {real_algorithm_category}\n\n"
+        "[사용자 컨텍스트]\n"
+        f"{extra_context}\n\n"
         "[생성 지침]\n"
         f"1. **현재 상황**: {situation_instruction}\n"
         f"2. {depth_instruction}\n"
-        "3. **출력 형식**: 마크다운 없이 줄바꿈으로 구분된 2~3문장의 텍스트. (한국어 구어체, 정중한 존댓말)\n"
+        "3. 사용자가 방금 힌트를 요청하며 말한 내용을 반드시 반영해서,\n"
+        "   어떤 부분(예: 특정 테스트케이스, 알고리즘 아이디어, 구현 단계)에서 막혔는지 먼저 한 문장으로 정리한 뒤,\n"
+        "   그 부분을 뚫어줄 수 있는 질문/힌트를 중심으로 2~3문장을 생성하세요.\n"
+        "4. 출력 형식: 마크다운 없이 줄바꿈으로 구분된 2~3문장의 텍스트. (한국어 구어체, 정중한 존댓말)\n"
     )
 
     # [Human Prompt 분기 처리]
-    if is_empty_code: # 코드가 비어있는 경우
+    if is_empty_code:  # 코드가 비어있는 경우
+        user_request_section = ""
+        if hint_request_text:
+            user_request_section = (
+                f"\n\n[사용자가 힌트를 요청하며 말한 내용]\n{hint_request_text}\n"
+            )
         human_prompt = (
-            "사용자가 아직 코드를 작성하지 않았습니다."
-            "문제 풀이를 시작할 수 있도록 힌트를 주세요."
+            "사용자가 아직 코드를 작성하지 않았습니다. "
+            "문제 풀이를 시작할 수 있도록 힌트를 주세요.\n"
+            f"{user_request_section}"
         )
-    else: # 코드가 있는 경우
+    else:  # 코드가 있는 경우
+        user_request_section = ""
+        if hint_request_text:
+            user_request_section = (
+                f"\n\n[사용자가 힌트를 요청하며 말한 내용]\n{hint_request_text}\n"
+            )
         human_prompt = (
-            f"""
-            아래는 사용자의 현재 코드입니다.
-            ```{current_user_code}```
-            위 코드를 분석하고 가장 적절한 힌트를 주세요.
-            """
+            "아래는 사용자의 현재 코드입니다.\n"
+            f"```{current_user_code}```\n"
+            "위 코드를 분석하고, 사용자가 막힌 부분(사용자의 힌트 요청 내용)을 기준으로 "
+            "가장 적절한 힌트를 주세요.\n"
+            f"{user_request_section}"
         )
 
     messages = [

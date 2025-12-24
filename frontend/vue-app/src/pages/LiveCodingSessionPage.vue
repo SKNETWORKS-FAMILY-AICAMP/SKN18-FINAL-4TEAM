@@ -106,7 +106,7 @@
               type="button"
               class="mic-button"
               @click="onAskButtonClick"
-              :disabled="isSttRunning || isTtsPlaying || isMicCooldown"
+              :disabled="isSttRunning || isTtsPlaying || isMicCooldown || isHintRecording || isHintLoading"
               :class="{ 'is-active': isRecording }"
             >
               <span class="mic-label">
@@ -116,10 +116,14 @@
             <button
               type="button"
               class="hint-button"
-              @click="requestHint"
+              @click="onHintButtonClick"
               :disabled="isSttRunning || isTtsPlaying || isHintDisabled"
             >
-              {{ isHintLoading ? "힌트 생성 중..." : "힌트 요청" }}
+              {{
+                isHintRecording
+                  ? "힌트 설명 중... 다시 눌러 전송"
+                  : (isHintLoading ? "힌트 생성 중..." : "힌트 요청")
+              }}
             </button>
             <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
           </div>
@@ -128,7 +132,7 @@
               type="button"
               class="run-button"
               @click="onSubmitClick"
-              :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording"
+              :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording || isHintRecording || isHintLoading"
             >
               {{ isSubmitting ? "제출 중..." : "제출하기" }}
             </button>
@@ -220,6 +224,7 @@ const HINT_LIMIT = 3;
 const hintCount = ref(0);
 const isHintLoading = ref(false);
 const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= HINT_LIMIT);
+const isHintRecording = ref(false);
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
@@ -238,6 +243,7 @@ const introSecondChanceUsed = ref(false);
    🔥 버튼 클릭 로직
 ----------------------------- */
 const onAskButtonClick = async () => {
+  if (isHintRecording.value) return;
   if (isMicCooldown.value) return;
   if (micCooldownTimer) {
     clearTimeout(micCooldownTimer);
@@ -272,6 +278,7 @@ const onAskButtonClick = async () => {
 };
 
 const onAnswerButtonClick = async () => {
+  if (isHintRecording.value) return;
   clearAnswerCountdown();
   if (isSttRunning.value || isRecording.value) return;
    // 자동 답변 타이머로 말하기 시작할 때도 코딩 질문 타이머 정지
@@ -354,6 +361,66 @@ const onSubmitClick = async () => {
     window.alert("제출 처리 중 오류가 발생했습니다.");
   } finally {
     isSubmitting.value = false;
+  }
+};
+
+// 힌트 버튼: 첫 클릭에서 힌트 설명을 녹음, 두 번째 클릭에서 STT + 힌트 생성
+const onHintButtonClick = async () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  const sessionId = route.query.session_id;
+
+  if (hintCount.value >= HINT_LIMIT) {
+    showAntiCheat("sttError", "사용 가능한 힌트가 모두 소진되었습니다.");
+    return;
+  }
+  if (!token || !sessionId) {
+    showAntiCheat("sttError", "세션이나 로그인 정보가 없습니다.");
+    return;
+  }
+
+  // 아직 힌트를 위한 녹음을 시작하지 않은 상태 → 녹음 시작
+  if (!isHintRecording.value) {
+    if (isSttRunning.value || isTtsPlaying.value || isRecording.value) {
+      // 다른 음성 작업이 진행 중이면 무시
+      return;
+    }
+    try {
+      await startRecording();
+      isRecording.value = true;
+      isHintRecording.value = true;
+    } catch (err) {
+      console.error("힌트 녹음 시작 오류:", err);
+      showAntiCheat("micError", "마이크 접근 권한이 필요합니다.");
+    }
+    return;
+  }
+
+  // 이미 힌트 녹음 중인 상태에서 다시 클릭 → 녹음 종료 후 STT + 힌트 요청
+  try {
+    await stopRecording();
+  } catch (err) {
+    console.error("힌트 녹음 종료 오류:", err);
+  } finally {
+    isRecording.value = false;
+    isHintRecording.value = false;
+  }
+
+  if (!audioBlob.value) {
+    showAntiCheat("sttError", "녹음된 음성이 없습니다.");
+    return;
+  }
+
+  isSttRunning.value = true;
+  isHintLoading.value = true;
+  try {
+    const sttText = await transcribeHintAudio();
+    if (!sttText) {
+      return;
+    }
+    await requestHint(sttText);
+  } finally {
+    isSttRunning.value = false;
+    isHintLoading.value = false;
   }
 };
 
@@ -653,6 +720,56 @@ const runSttClient = async () => {
   // 사용자의 발화/분석이 끝난 뒤, 코딩 단계라면 질문 타이머를 다시 시작
   if (currentStage.value === "coding") {
     startCodingQuestionTimer();
+  }
+};
+
+// 힌트용 STT: 현재 녹음된 음성을 텍스트로만 변환
+const transcribeHintAudio = async () => {
+  if (!audioBlob.value) {
+    showAntiCheat("sttError", "녹음된 음성이 없습니다.");
+    return "";
+  }
+
+  const sessionId = route.query.session_id;
+  if (!sessionId) {
+    showAntiCheat("sttError", "session_id가 없습니다. 세션을 다시 시작해 주세요.");
+    return "";
+  }
+
+  try {
+    const sttResp = await fetch(
+      `${BACKEND_BASE}/api/stt/transcribe/?session_id=${encodeURIComponent(
+        sessionId
+      )}`,
+      {
+        method: "POST",
+        body: audioBlob.value,
+      }
+    );
+
+    const sttData = await sttResp.json().catch(() => ({}));
+    if (!sttResp.ok) {
+      console.warn("STT(힌트) 요청 실패", sttResp.status, sttData);
+      showAntiCheat("sttError", sttData?.error || "음성을 인식하지 못했습니다.");
+      return "";
+    }
+
+    const sttText = (sttData?.stt_text || "").trim();
+    console.log("STT(힌트) 결과:", sttData);
+
+    if (!sttText) {
+      showAntiCheat(
+        "sttError",
+        "음성에서 유효한 문장을 인식하지 못했습니다. 다시 한번 말해주세요."
+      );
+      return "";
+    }
+
+    return sttText;
+  } catch (err) {
+    console.error("STT(힌트) 요청 실패:", err);
+    showAntiCheat("sttError", "서버 통신 오류");
+    return "";
   }
 };
 
@@ -1253,6 +1370,12 @@ const fetchRandomProblem = async () => {
     }
 
     problemData.value = data;
+    // 서버 메타에 저장된 힌트 사용 횟수를 복원 (이어하기 시 초기화 방지)
+    if (typeof data.hint_count === "number") {
+      hintCount.value = Math.min(HINT_LIMIT, Math.max(0, data.hint_count));
+    } else {
+      hintCount.value = 0;
+    }
     introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
@@ -1296,8 +1419,8 @@ const fetchRandomProblem = async () => {
   }
 };
 
-// 힌트 요청: session_id, code, language, 문제 정보 함께 전달
-const requestHint = async () => {
+// 힌트 요청: session_id, code, language, 문제 정보 + 사용자의 힌트 요청 발화 함께 전달
+const requestHint = async (hintRequestText = "") => {
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
   if (hintCount.value >= HINT_LIMIT) {
@@ -1324,6 +1447,7 @@ const requestHint = async () => {
         problem_description: problemData.value?.problem || "",
         problem_algorithm_category: problemData.value?.category || "",
         hint_count: hintCount.value,
+        hint_request_text: hintRequestText,
       }),
     });
 
@@ -1771,6 +1895,13 @@ const loadSessionFromApi = async () => {
     }
 
     problemData.value = data;
+
+    // 서버 메타에 저장된 힌트 사용 횟수를 복원 (이어하기 시 초기화 방지)
+    if (typeof data.hint_count === "number") {
+      hintCount.value = Math.min(HINT_LIMIT, Math.max(0, data.hint_count));
+    } else {
+      hintCount.value = 0;
+    }
 
     // 서버 stage/state에 맞춰 단계 설정 (sessionStorage 단계 값은 사용하지 않음)
     const serverStage = String(data.stage || data.state || "intro").toLowerCase();

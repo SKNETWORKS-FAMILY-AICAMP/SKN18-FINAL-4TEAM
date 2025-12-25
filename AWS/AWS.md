@@ -185,6 +185,168 @@
 - Freenom(도메인제공 사이트)가 현재 서비스 중단으로 인해 무료 도메인은 불가능
 
 
+## Param Store(SSM) 등록 - 정상 동작 기준
+
+> REGION=ap-northeast-2, PREFIX=/jobtory/prod
+
+```bash
+REGION=ap-northeast-2
+PREFIX=/jobtory/prod
+
+# Django
+aws ssm put-parameter --name "$PREFIX/DJANGO_SECRET_KEY" --value "<DJANGO_SECRET_KEY>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DJANGO_DEBUG" --value "false" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DJANGO_ALLOWED_HOSTS" --value "jobtory.duckdns.org,15.164.232.11" --type SecureString --overwrite --region $REGION
+
+# CORS/CSRF
+aws ssm put-parameter --name "$PREFIX/CORS_ALLOW_ALL_ORIGINS" --value "false" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/CORS_ALLOWED_ORIGINS" --value "https://jobtory.duckdns.org" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/CORS_ALLOW_CREDENTIALS" --value "false" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/CSRF_TRUSTED_ORIGINS" --value "https://jobtory.duckdns.org" --type SecureString --overwrite --region $REGION
+
+# DB (RDS)
+aws ssm put-parameter --name "$PREFIX/DB_HOST" --value "<RDS_ENDPOINT>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DB_PORT" --value "5432" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DB_NAME" --value "postgres" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DB_USER" --value "<DB_USER>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DB_PASSWORD" --value "<DB_PASSWORD>" --type SecureString --overwrite --region $REGION
+
+# Redis
+aws ssm put-parameter --name "$PREFIX/REDIS_URL" --value "redis://redis:6379/0" --type SecureString --overwrite --region $REGION
+
+# Frontend (Vite)
+aws ssm put-parameter --name "$PREFIX/VITE_API_BASE" --value "https://jobtory.duckdns.org" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/VITE_FRONTEND_BASE" --value "https://jobtory.duckdns.org/" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/VITE_GOOGLE_CLIENT_ID" --value "<GOOGLE_CLIENT_ID>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/VITE_GOOGLE_REDIRECT_URI" --value "https://jobtory.duckdns.org/login" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/VITE_WS_BASE" --value "wss://jobtory.duckdns.org" --type SecureString --overwrite --region $REGION
+
+# Backend Google OAuth
+aws ssm put-parameter --name "$PREFIX/GOOGLE_CLIENT_ID" --value "<GOOGLE_CLIENT_ID>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/GOOGLE_CLIENT_SECRET" --value "<GOOGLE_CLIENT_SECRET>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/GOOGLE_REDIRECT_URI" --value "https://jobtory.duckdns.org/login" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/FRONTEND_BASE_URL" --value "https://jobtory.duckdns.org/" --type SecureString --overwrite --region $REGION
+
+# Email
+aws ssm put-parameter --name "$PREFIX/EMAIL_BACKEND" --value "django.core.mail.backends.smtp.EmailBackend" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/EMAIL_HOST" --value "smtp.gmail.com" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/EMAIL_PORT" --value "587" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/EMAIL_HOST_USER" --value "<EMAIL_USER>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/EMAIL_HOST_PASSWORD" --value "<EMAIL_PASSWORD>" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/EMAIL_USE_TLS" --value "true" --type SecureString --overwrite --region $REGION
+aws ssm put-parameter --name "$PREFIX/DEFAULT_FROM_EMAIL" --value "<EMAIL_USER>" --type SecureString --overwrite --region $REGION
+
+# 기타
+aws ssm put-parameter --name "$PREFIX/OPENAI_API_KEY" --value "<OPENAI_API_KEY>" --type SecureString --overwrite --region $REGION
+```
+
+## SSM -> .env 생성 (정상 동작 기준)
+
+```bash
+cd ~/SKN18-FINAL-4TEAM
+
+aws ssm get-parameters-by-path \
+  --path "/jobtory/prod/" \
+  --with-decryption \
+  --output json \
+  --no-cli-pager > /tmp/ssm.json
+
+python3 - <<'PY' > .env
+import json
+with open("/tmp/ssm.json") as f:
+    data = json.load(f)
+for p in data.get("Parameters", []):
+    print(f"{p['Name'].split('/')[-1]}={p['Value']}")
+PY
+
+# 값 확인
+grep VITE_API_BASE .env
+```
+
+## 배포 재시작 (정상 동작 기준)
+
+```bash
+# 프론트 빌드 (env 반드시 붙여서 실행)
+docker compose --env-file .env -f docker/docker-compose.prod.yml build --no-cache frontend
+
+# 전체 기동
+docker compose --env-file .env -f docker/docker-compose.prod.yml up -d
+```
+
+## 프론트/백엔드 코드 변경 요약 (localhost 제거 포함)
+
+### 1) 프론트: Google Redirect 하드코딩 제거
+- 파일: frontend/vue-app/src/pages/LoginPage.vue
+- 변경 내용
+
+```js
+const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || window.location.origin + "/login";
+```
+
+### 2) 프론트: API_BASE 기본값을 현재 도메인으로 통일
+- 변경 대상
+  - frontend/vue-app/src/hooks/useAuth.js
+  - frontend/vue-app/src/pages/ProfileEditPage.vue
+  - frontend/vue-app/src/pages/ProfileEditPage_final.vue
+  - frontend/vue-app/src/pages/LiveCodingPage.vue
+  - frontend/vue-app/src/pages/LiveCodingSessionPage.vue
+  - frontend/vue-app/src/pages/LiveCodingSettingPage.vue
+  - frontend/vue-app/src/pages/SignUpPersonalPage.vue
+  - frontend/vue-app/src/pages/showreport.vue
+  - frontend/vue-app/src/pages/rendering.vue
+
+- 변경 내용 예시(들어가면 안되는 값이라 저렇게 해놨음)
+
+```js
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
+```
+
+### 3) 프론트: Vite 빌드 시 환경 변수 주입
+- 파일: frontend/vue-app/Dockerfile
+- 내용: ARG/ENV로 VITE_* 전달 후 npm run build
+
+```dockerfile
+ARG VITE_API_BASE
+ARG VITE_GOOGLE_CLIENT_ID
+ARG VITE_FRONTEND_BASE
+ARG VITE_GOOGLE_REDIRECT_URI
+ARG VITE_WS_BASE
+
+ENV VITE_API_BASE=$VITE_API_BASE
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID
+ENV VITE_FRONTEND_BASE=$VITE_FRONTEND_BASE
+ENV VITE_GOOGLE_REDIRECT_URI=$VITE_GOOGLE_REDIRECT_URI
+ENV VITE_WS_BASE=$VITE_WS_BASE
+```
+
+### 4) 백엔드: ALLOWED_HOSTS에 도메인 추가
+- Param Store 값
+
+```
+DJANGO_ALLOWED_HOSTS=jobtory.duckdns.org,15.164.232.11
+```
+
+## 도메인 변경 시 반영 체크리스트
+
+- Param Store
+  - VITE_API_BASE
+  - VITE_FRONTEND_BASE
+  - VITE_GOOGLE_REDIRECT_URI
+  - FRONTEND_BASE_URL
+  - GOOGLE_REDIRECT_URI
+  - CORS_ALLOWED_ORIGINS
+  - CSRF_TRUSTED_ORIGINS
+  - DJANGO_ALLOWED_HOSTS
+
+- Google OAuth 콘솔
+  - 승인된 JavaScript 원본
+  - 승인된 리디렉션 URI
+
+- 배포 재빌드
+  - docker compose --env-file .env -f docker/docker-compose.prod.yml build --no-cache frontend
+  - docker compose --env-file .env -f docker/docker-compose.prod.yml up -d
+
+
 # 추후 진행 상황
 - Route 53 + ALB + Auto Scaling 적용
 - 이를 위해 도메인 구매 금액 및 사이트 선정이 팀원들과 상의 후 선정 필요해 보임
@@ -218,4 +380,5 @@
 - 파람스토어 활용중이므로 VITE_API_BASE, FRONTEND_BASE_URL, GOOGLE_REDIRECT_URI 등 적용되있는 값을 변경된 도메인으로 반영
 
 8. Google OAuth 설정도 변경된 도메인으로 재등록 필요
-- 승인된 JS + Redirection url 변경 도메인으로 교체
+- 승인된 JS + Redirection url 변경 도메인으로 교체# --- 자동 추가: Param Store/배포/코드 변경 정리 (정상 동작 기준) ---
+

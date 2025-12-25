@@ -174,3 +174,48 @@
 
 ### ② EC2 보안 그룹 추가
 <img src="RDS-22.png" width="600"/>
+
+
+--------------------------
+
+
+# 현재 진행 상황
+- Duck DNS + Caddy로 현재 Cerification 모든 동작 작동 확인 완료 
+- 도메인명: https://jobtory.duckdns.org
+- Freenom(도메인제공 사이트)가 현재 서비스 중단으로 인해 무료 도메인은 불가능
+
+
+# 추후 진행 상황
+- Route 53 + ALB + Auto Scaling 적용
+- 이를 위해 도메인 구매 금액 및 사이트 선정이 팀원들과 상의 후 선정 필요해 보임
+
+## 도메인 구매 사이트 
+1. Porkbun: .com/.net 저렴, 숨은 비용 적음, WHOIS 무료
+2. Cloudflare Registrar: 갱신가가 거의 원가(중간 마진 없음)라 장기 운영에 유리. (단, Cloudflare DNS 사용 필요)
+3. Gabia/가비아: .kr/한국 도메인 편하지만 가격은 해외보다 비싼 편
+
+## 추후 계획
+1. 도메인 팀원과 상의 후 구매 선정
+
+2. Route 53 Hosted Zone 생성 
+- 구매처에서 네임서버를 Route 53 NS로 변경
+
+3. ACM 인증서 발급
+* 단 서울 region 으로 발급해야 함
+* ex) jobtory.com, www.jobtory.com .com으로 구매하면 둘다 포함시켜야함
+
+4. ALB 생성 + HTTPS 리스너
+- 443 리스너에 ACM 인증서 연결해야함
+- Target Group을 EC2 혹은 ECS 둘중 바뀌면 해당하는 걸로 연결해야 함
+
+5. EC2에서 직접 HTTPS 종료 제거
+- Caddy는 제거하거나, ALB 뒤에서 80포트만 사용해야함 
+
+6. Auto Scaling Group 구성
+- Launch Template + 스케링 정책 (Min: 12 or Max : 24로 생각중)
+
+7. 환경 변수 업데이트
+- 파람스토어 활용중이므로 VITE_API_BASE, FRONTEND_BASE_URL, GOOGLE_REDIRECT_URI 등 적용되있는 값을 변경된 도메인으로 반영
+
+8. Google OAuth 설정도 변경된 도메인으로 재등록 필요
+- 승인된 JS + Redirection url 변경 도메인으로 교체

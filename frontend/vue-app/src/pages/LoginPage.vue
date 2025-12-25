@@ -234,6 +234,7 @@ const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
 
 // Google 콘솔에 등록한 redirect URI와 정확히 일치하도록 고정
 // 로컬 개발 기준: http://localhost:5174/login
+// AWS 에서는 해당 const redirectUri 를 .env에서 읽게 수정 필요
 const redirectUri = "http://localhost:5174/login";
 
 const buildGoogleAuthUrl = () => {

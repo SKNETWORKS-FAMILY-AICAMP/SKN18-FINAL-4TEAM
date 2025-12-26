@@ -77,6 +77,11 @@ flowchart TD
     QA -->|revise/retry| M
 ```
 
+- Coach Agent 설계
+   - 사용자 정보 조회(load_user_state_node)
+   : 핵심: 정보를 조회하나 없으면 None 처리
+   - 질문 
+
 ####  메모리 설계
 - Redis (short-term, TTL 적용)
    - `chatsession/{sid}/runtime` (Hash/JSON, TTL=세션) : 현재 세션의 상태 스냅샷(user_id, active_intent, evidence_type, stage, retry_count, last_verdict, updated_at).
@@ -92,18 +97,85 @@ flowchart TD
 
 - Postgres (Long-Term)
    - `/user/*` : 구조화된 사실·성과·계획
-      - `/user/profile` : user_id, role(직무), target_company, due_date, skill_level, preferred_langs, created_at, updated_at
-      - `/user/weekly_plan/{week_id}` : user_id, week_id, goals(JSON), routines(list), focus_areas, status(active/done), updated_at
-      - `/user/research_briefs` : user_id, brief_id, topic, summary, actions(list), sources(list), created_at
-      - `/user/next_actions` : user_id, action_id, title, description, due, priority, status(todo/doing/done), created_at, updated_at
-      - `/user/outcome_logs` : user_id, outcome_id, kind(PR/blog/ct 등), summary, link, score(optional), created_at
-      - `/user/coaching_logs` : user_id, coaching_id, artifact_id, findings, recommendations, rubric_scores(JSON), created_at
-      - **코딩테스트 리포트 활용** : outcome_logs/coaching_logs에 점수·오답 패턴·시간 분배를 저장 → weekly_plan/next_actions 생성 시 약점별 액션으로 반영
+      1) `/user/profile` 
+         - `user_id`(PK, FK users.id): 대상 사용자
+         - `role`(str): 직무(예: backend/frontend)
+         - `target_company`(str): 목표 회사
+         - `weekly_hours`(int): 주당 학습/준비 가능 시간
+         - `skill_level`(str): 숙련도
+         - `preferred_langs`(JSON): 선호 언어 리스트
+         - `created_at`, `updated_at`: 생성/업데이트 시각
+      2) `/user/weekly_plan/{week_id}`
+         - `id`(PK)
+         - `user`(FK users.id)
+         - `week_id`(str): 주차 식별자(예: 2025-W01)
+         - `goals`(JSON): 주간 목표 리스트
+         - `routines`(JSON): 요일별 루틴/액션
+         - `focus_areas`(JSON): 집중 영역
+         - `status`(str): active/done 등
+         - `updated_at`: 업데이트 시각
+         - 제약: `(user, week_id)` 유니크
+         
+      3) `/user/research_briefs`
+         - `id`(PK)
+         - `user`(FK users.id)
+         - `brief_id`(str): 브리프 식별자
+         - `topic`(str): 주제
+         - `summary`(text): 요약
+         - `actions`(JSON): 제안 액션 리스트
+         - `sources`(JSON): 참고 소스 리스트
+         - `created_at`: 생성 시각
+         - 제약: `(user, brief_id)` 유니크
+      
+      4) `/user/next_actions` 
+         - `id`(PK)
+         - `user`(FK users.id)
+         - `action_id`(str): 액션 식별자
+         - `title`(str): 액션 제목
+         - `description`(text): 상세 설명
+         - `due`(datetime): 마감/목표 시각
+         - `priority`(str): 우선순위(예: low/medium/high)
+         - `status`(str): todo/doing/done
+         - `created_at`, `updated_at`
+         - 제약: `(user, action_id)` 유니크
+
+      5) `/user/outcome_logs`
+         - `id`(PK)
+         - `user`(FK users.id)
+         - `outcome_id`(str): 결과 식별자(예: session:123)
+         - `kind`(str): 결과 유형(PR/blog/ct 등)
+         - `summary`(text): 결과 요약
+         - `link`(text): 참고 링크
+         - `score`(JSON): 점수/오답 패턴/시간 등
+         - `created_at`: 생성 시각
+         - 제약: `(user, outcome_id)` 유니크
+
+      6) `/user/coaching_logs` 
+         - `id`(PK)
+         - `user`(FK users.id)
+         - `coaching_id`(str): 코칭 식별자
+         - `artifact_id`(str): 연관 아티팩트 ID
+         - `findings`(JSON): 발견/지적 사항
+         - `recommendations`(JSON): 개선 권고
+         - `rubric_scores`(JSON): 루브릭 점수
+         - `created_at`: 생성 시각
+         - 제약: `(user, coaching_id)` 유니크
 
    - `/memories/*` : 요약·특성·패턴
-      - `/memories/traits` : user_id, strengths(list), weaknesses(list), patterns(list), confidence, updated_at
-         - **코딩테스트 리포트 연동** : 반복되는 취약 유형(알고리즘/구현 실수)을 기록해 답변·과제 난이도 조정에 사용
-      - `/memories/preferences` : user_id, tone_pref, detail_level, feedback_style, updated_at
+      1) `/memories/traits`
+         - `user`(PK, FK users.id)
+         - `strengths`(JSON): 강점
+         - `weaknesses`(JSON): 약점
+         - `patterns`(JSON): 반복 패턴
+         - `confidence`(decimal): 확신도
+         - `updated_at`
+
+      2) `/memories/preferences`
+         - `user`(PK, FK users.id)
+         - `tone_pref`(str): 선호 톤
+         - `detail_level`(str): 선호 상세 수준
+         - `feedback_style`(str): 피드백 선호 스타일
+         - `updated_at`
 
 ### 툴 정의 (초안)
 - 공통
@@ -129,5 +201,7 @@ flowchart TD
    - `eval.validate_format(payload)` : JSON/스키마 검사
    - `eval.safety_guard(text)` : 안전/정책 위반 필터
    - `eval.check_relevance(query, answer)` : 의도 대비 관련성 점검
+
+
 
 

@@ -1,5 +1,7 @@
 from django.db import models
 from api.models import User
+from typing import Literal, Optional
+from langchain_core.pydantic_v1 import BaseModel, Field
 
 
 class UserProfile(models.Model):
@@ -64,9 +66,9 @@ class UserNextAction(models.Model):
     description = models.TextField(null=True, blank=True)
     due = models.DateTimeField(null=True, blank=True)
     priority = models.CharField(max_length=20, null=True, blank=True)
-    status = models.CharField(max_length=20, null=True, blank=True)  # todo/doing/done
-    created_at = models.DateTimeField(auto_now_add=True)
-    updated_at = models.DateTimeField(auto_now=True)
+    status = models.CharDateTimeField(auto_now_add=True)
+    updated_at = modelField(max_length=20, null=True, blank=True)  # todo/doing/done
+    created_at = models.s.DateTimeField(auto_now=True)
 
     class Meta:
         db_table = "user_next_actions"
@@ -136,3 +138,12 @@ class MemoriesPreferences(models.Model):
 
     class Meta:
         db_table = "memories_preferences"
+
+class EvaluationVerdict(BaseModel):
+    decision: Literal["PASS", "REJECT"] = Field(..., description="통과 여부")
+    score: int = Field(..., description="0~100 사이의 품질 점수")
+    feedback: Optional[str] = Field(None, description="REJECT일 경우 수정 지침, PASS면 칭찬이나 코멘트")
+    violation: Optional[str] = Field(None, description="위반한 제약조건이 있다면 명시 (예: 시간 초과, 레벨 불일치)")
+
+# 평가자 전용 파서
+evaluator_parser = JsonOutputParser(pydantic_object=EvaluationVerdict)

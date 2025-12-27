@@ -1,6 +1,6 @@
 from interview_engine.state import IntroState
 from langchain_core.messages import HumanMessage, SystemMessage
-from interview_engine.llm import LLM 
+from interview_engine.llm import get_llm 
 from interview_engine.nodes.problem_intro_node import _get_problem_text
 
 def problem_answer_agent(state: IntroState) -> IntroState:
@@ -47,7 +47,11 @@ def problem_answer_agent(state: IntroState) -> IntroState:
     ]
 
     try:
-        response = LLM.invoke(messages_qna)
+        print("[LLM][problem_answer_agent] system_prompt_qna:", system_prompt_qna, flush=True)
+        print("[LLM][problem_answer_agent] human_prompt_qna:", human_prompt_qna, flush=True)
+        
+        model = get_llm("default")
+        response = model.invoke(messages_qna)
         content = (getattr(response, "content", "") or "").strip()
         if not content:
             state["tts_text"] = (

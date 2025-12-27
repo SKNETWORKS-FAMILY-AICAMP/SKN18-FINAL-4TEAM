@@ -3,9 +3,9 @@ import ast
 import difflib
 from typing import List
 
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from interview_engine.llm import get_llm
 from interview_engine.state import CodingState
 
 
@@ -173,7 +173,7 @@ def question_generation_agent(state: CodingState) -> CodingState:
         "- 질문은 반드시 JSON 포맷으로만 반환해야 한다는 규칙을 지켜주세요."
     )
 
-    model = init_chat_model("gpt-5-nano")
+    model = get_llm("question")
     messages = [SystemMessage(content=system_prompt), HumanMessage(content=human_prompt)]
 
     existing_questions = state.get("question") or []
@@ -182,6 +182,8 @@ def question_generation_agent(state: CodingState) -> CodingState:
     state["question"] = existing_questions
 
     try:
+        print("[LLM][question_generation_agent] system_prompt:", system_prompt, flush=True)
+        print("[LLM][question_generation_agent] human_prompt:", human_prompt, flush=True)
         response = model.invoke(messages)
         raw_content = (getattr(response, "content", "") or "").strip()
 

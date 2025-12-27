@@ -1,16 +1,6 @@
 from interview_engine.state import IntroState
 from langchain_core.messages import HumanMessage, SystemMessage
-from interview_engine.llm import LLM 
-
-
-def _get_problem_text(state: IntroState) -> str:
-    """state.problem_data는 문자열만 기대한다."""
-    return str(state.get("problem_data") or "")
-
-
-from interview_engine.state import IntroState
-from langchain_core.messages import HumanMessage, SystemMessage
-from interview_engine.llm import LLM 
+from interview_engine.llm import get_llm 
 
 
 def _get_problem_text(state: IntroState) -> str:
@@ -46,8 +36,7 @@ def problem_intro_agent(state: IntroState) -> IntroState:
 
     human_prompt = (
         f"다음은 문제입니다:\n{problem}\n"
-        "지원자에게 읽어줄 문제 소개 멘트를 3문장으로 작성하세요. "
-        "간단한 인사 후 문제의 핵심 요구사항만 설명하세요."
+        "면접관으로서 간단한 인사 후 문제의 핵심 요구사항만 설명하세요."
     )
 
     messages = [
@@ -56,7 +45,10 @@ def problem_intro_agent(state: IntroState) -> IntroState:
     ]
 
     try:
-        response = LLM.invoke(messages)
+        print("[LLM][problem_intro_agent] system_prompt:", system_prompt, flush=True)
+        print("[LLM][problem_intro_agent] human_prompt:", human_prompt, flush=True)
+        model = get_llm("intro")
+        response = model.invoke(messages)
         raw = (getattr(response, "content", "") or "").strip()
 
         strategy_question = (
@@ -67,7 +59,6 @@ def problem_intro_agent(state: IntroState) -> IntroState:
         state["tts_text"] = intro_text
 
     except Exception:
-        # 실패 시 state 그대로 반환
         return state
 
     return state

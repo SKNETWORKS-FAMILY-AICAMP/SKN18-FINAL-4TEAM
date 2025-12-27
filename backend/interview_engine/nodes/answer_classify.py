@@ -2,7 +2,7 @@ import json
 from typing import Literal
 from langchain_core.messages import SystemMessage, HumanMessage
 from interview_engine.state import IntroState
-from interview_engine.llm import LLM  # 아까 만든 싱글톤 LLM
+from interview_engine.llm import get_llm
 
 AnswerClass = Literal["irrelevant", "strategy", "problem_question"]
 
@@ -48,7 +48,10 @@ def answer_classify_agent(state: IntroState) -> IntroState:
     ]
 
     try:
-        resp = LLM.invoke(messages)
+        print("[LLM][answer_classify_agent] system_prompt:", system_prompt, flush=True)
+        print("[LLM][answer_classify_agent] user_prompt:", user_prompt, flush=True)
+        model = get_llm("classify")
+        resp = model.invoke(messages)
         content = getattr(resp, "content", resp)
 
     except Exception:

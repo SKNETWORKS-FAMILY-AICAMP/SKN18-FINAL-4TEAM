@@ -21,7 +21,7 @@ class STTClient:
         self,
         *,
         model_size: str = "base",  # 호환성 유지용
-        language: str = "auto",
+        language: str = "ko",
         backend: str = "openai",
         device: Optional[str] = None,
         enable_diarization: bool = False,

@@ -1467,11 +1467,35 @@ const requestHint = async (hintRequestText = "") => {
       hintCount.value = Math.min(HINT_LIMIT, hintCount.value + 1);
     }
 
-    // 힌트가 TTS 오디오로 내려오면 바로 재생
-    const ttsChunks = Array.isArray(data?.tts_audio) ? data.tts_audio : [];
-    if (ttsChunks.length) {
+    // 힌트 텍스트가 내려오면 TTS API를 통해 오디오를 생성해 재생
+    const hintText = (data && typeof data.hint_text === "string") ? data.hint_text : "";
+    if (hintText) {
       try {
-        await playTtsChunks(ttsChunks);
+        const ttsResp = await fetch(
+          `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
+            sessionId
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              tts_text: hintText,
+              max_sentences: 2,
+            }),
+          }
+        );
+        const ttsData = await ttsResp.json().catch(() => ({}));
+        if (!ttsResp.ok) {
+          console.warn("hint TTS failed", ttsResp.status, ttsData);
+          return;
+        }
+        const ttsChunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
+        if (ttsChunks.length) {
+          await playTtsChunks(ttsChunks);
+        }
       } catch (err) {
         console.error("failed to play hint TTS", err);
       }

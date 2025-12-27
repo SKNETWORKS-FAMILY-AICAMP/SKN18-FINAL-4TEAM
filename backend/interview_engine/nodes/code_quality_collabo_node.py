@@ -103,7 +103,7 @@ def _extract_rule_prefix(code: str) -> str:
 
 def _compute_quality_from_ruff(issues: List[Dict[str, Any]]) -> List[str]:
     """Ruff 진단을 기반으로 코드 품질 feedback 리스트만 생성"""
-    quality_prefixes = {"F", "E", "W", "B", "C", "S", "UP", "A", "TID", "RUF"}
+    quality_prefixes = {"F", "E", "W", "B", "C", "S", "UP", "A", "TID", "RUF", "N", "D", "Q", "I", "ERA"}
     real_issues: List[Dict[str, Any]] = []
     for issue in issues:
         code = issue.get("code")

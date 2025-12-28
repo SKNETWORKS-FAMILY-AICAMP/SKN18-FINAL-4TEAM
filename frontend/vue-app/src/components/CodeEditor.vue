@@ -19,6 +19,10 @@ const props = defineProps({
   mode: {
     type: String,
     default: "text/x-csrc"
+  },
+  readOnly: {
+    type: Boolean,
+    default: false
   }
 });
 
@@ -37,7 +41,8 @@ onMounted(() => {
     indentUnit: 4,
     tabSize: 4,
     indentWithTabs: false,
-    theme: "default"
+    theme: "default",
+    readOnly: props.readOnly ? "nocursor" : false
   });
 
   editor.setValue(props.modelValue || "");
@@ -76,6 +81,15 @@ watch(
   (val) => {
     if (editor) {
       editor.setOption("mode", val);
+    }
+  }
+);
+
+watch(
+  () => props.readOnly,
+  (val) => {
+    if (editor) {
+      editor.setOption("readOnly", val ? "nocursor" : false);
     }
   }
 );

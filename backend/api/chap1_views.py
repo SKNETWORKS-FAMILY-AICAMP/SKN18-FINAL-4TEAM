@@ -266,6 +266,7 @@ class InterviewIntroEventView(APIView):
         # TTS는 별도 엔드포인트(TTSView)에서 호출하도록 분리
         user_answer_class = (result_state.get("user_answer_class") or "").strip() or None
 
+        if not intro_flow_done_flag:
         # stage는 meta 기준으로 결정 (intro -> coding 단방향)
         stage = meta.get("stage") or "intro"
         coding_intro_text = ""

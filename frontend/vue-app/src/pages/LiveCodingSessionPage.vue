@@ -481,6 +481,12 @@ const stopRecording = () => {
 const endSessionAndReturnToCodingTest = async (reason = "intro_flow_done_without_strategy") => {
   clearCountdown();
   try {
+    // 인트로 단계에서 전략이 아닌 답변이 반복되어 세션이 종료되는 경우,
+    // 홈 화면으로 이동하기 전에 사용자에게 한 번 안내 메시지를 보여준다.
+    if (reason === "intro_flow_done_without_strategy") {
+      window.alert("답변이 적절하지 않아 세션을 종료합니다.");
+    }
+
     const token = localStorage.getItem("jobtory_access_token");
     if (token) {
       await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
@@ -631,6 +637,29 @@ const runSttClient = async () => {
       userAnswerClass !== "strategy" &&
       (!introFlowDone || isFirstNonStrategy);
 
+    // intro 단계에서 첫 번째 비전략 답변(irrelevant / problem_question)에 대해
+    // 피드백 TTS를 들려준 뒤에는, 사용자가 버튼을 다시 누르지 않아도
+    // 자동으로 마이크를 열어 재답변을 받을 수 있도록 플래그를 세팅한다.
+    const shouldAutoReRecord =
+      sessionStage.value === "intro" &&
+      isFirstNonStrategy &&
+      (userAnswerClass === "irrelevant" || userAnswerClass === "problem_question");
+
+    const autoReRecordIfNeeded = async () => {
+      if (!shouldAutoReRecord) return;
+      if (isRecording.value || isSttRunning.value || isHintRecording.value) return;
+      try {
+        await startRecording();
+        isRecording.value = true;
+      } catch (err) {
+        console.error("인트로 재답변 자동 녹음 시작 실패:", err);
+        showAntiCheat(
+          "micError",
+          "마이크 자동 시작에 실패했습니다. 다시 한 번 버튼을 눌러 주세요."
+        );
+      }
+    };
+
     // 코딩 스테이지로 막 전환된 경우, 별도의 인트로 멘트를 한 번 재생
     if (stageFromServer === "coding" && codingIntroText) {
       try {
@@ -680,6 +709,7 @@ const runSttClient = async () => {
               isSttRunning.value = false;
             },
           });
+          await autoReRecordIfNeeded();
         } else if (replyText) {
           // 텍스트만 온 경우에만 TTS API를 호출
           const ttsResp = await fetch(
@@ -710,6 +740,7 @@ const runSttClient = async () => {
                 isSttRunning.value = false;
               },
             });
+            await autoReRecordIfNeeded();
           }
         }
       } catch (err) {
@@ -1569,7 +1600,13 @@ const requestHint = async (hintRequestText = "") => {
         }
         const ttsChunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
         if (ttsChunks.length) {
-          await playTtsChunks(ttsChunks);
+          await playTtsChunks(ttsChunks, {
+            onStart: () => {
+              // 힌트 TTS가 실제로 재생되기 시작하는 시점에
+              // STT 로딩 오버레이를 제거해 코딩 화면이 보이도록 한다.
+              isSttRunning.value = false;
+            },
+          });
         }
       } catch (err) {
         console.error("failed to play hint TTS", err);
@@ -1647,20 +1684,68 @@ const endSessionDueToTimeout = async () => {
   if (hasAutoEnded) return;
   hasAutoEnded = true;
   clearCountdown();
+  // 타임아웃 시에는 세션을 바로 종료하지 않고
+  // 현재 코드를 기준으로 자동 제출 및 리포트 생성을 시작한다.
+  stopCodingQuestionTimer();
+
+  const sessionId = route.query.session_id;
+  const token = localStorage.getItem("jobtory_access_token");
+
+  if (!sessionId || !token) {
+    // 세션이나 토큰 정보가 없으면 기존 동작대로 세션만 종료
+    try {
+      if (token) {
+        await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reason: "timeout" }),
+        }).catch(() => {});
+      }
+    } finally {
+      localStorage.removeItem("jobtory_livecoding_session_id");
+      router.replace({ name: "home", query: { alert: "session_timeout" } });
+    }
+    return;
+  }
 
   try {
-    const token = localStorage.getItem("jobtory_access_token");
-    if (token) {
-      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reason: "timeout" }),
-      }).catch(() => {});
+    // 타임아웃 직전에 현재 코드를 한 번 더 저장
+    await saveCodeSnapshot(code.value);
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/final-eval/start/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("final-eval start failed on timeout", resp.status, data);
+      window.alert(
+        data?.detail ||
+          "제한 시간이 만료되어 세션이 종료되었습니다. 리포트 생성에 실패했습니다."
+      );
+      localStorage.removeItem("jobtory_livecoding_session_id");
+      router.replace({ name: "home", query: { alert: "session_timeout" } });
+      return;
     }
-  } finally {
+
+    // 자동 제출이 시작되면 렌더링 화면으로 이동하여 리포트 생성을 기다린다.
+    router.replace({
+      name: "livecoding-rendering",
+      query: { session_id: sessionId, timeout: "1" },
+    });
+  } catch (e) {
+    console.error("failed to start final eval on timeout", e);
+    window.alert(
+      "제한 시간이 만료되어 세션이 종료되었습니다. 리포트 생성 중 오류가 발생했습니다."
+    );
     localStorage.removeItem("jobtory_livecoding_session_id");
     router.replace({ name: "home", query: { alert: "session_timeout" } });
   }
@@ -2088,10 +2173,40 @@ onMounted(async () => {
   document.addEventListener("paste", pasteListener, { capture: true });
   document.addEventListener("copy", copyListener, { capture: true });
   document.addEventListener("mouseleave", handleMouseLeave);
+  // 브라우저 탭을 완전히 닫거나 새로고침할 때도
+  // 재생 중인 TTS가 남지 않도록 전역 훅을 단다.
+  window.addEventListener("beforeunload", stopAllTts);
 });
 
 onBeforeUnmount(() => {
+  // 코딩 세션 화면을 떠나는 모든 경우(라우트 이동, 새로고침 등)에서
+  // 현재 재생 중인 TTS를 가장 먼저 정리한다.
+  stopAllTts();
+
   void saveCodeSnapshot(code.value);
+  // 현재 남은 시간을 백엔드에 저장하여,
+  // 문제 풀이 화면을 떠났다가 이어하기로 돌아올 때
+  // 이 값부터 다시 카운트다운을 시작할 수 있도록 한다.
+  try {
+    const token = localStorage.getItem("jobtory_access_token");
+    const sessionId =
+      route.query.session_id || localStorage.getItem("jobtory_livecoding_session_id");
+    if (token && sessionId && remainingSeconds.value !== null && remainingSeconds.value !== undefined) {
+      void fetch(`${BACKEND_BASE}/api/livecoding/session/timer/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          remaining_seconds: Number(remainingSeconds.value) || 0,
+        }),
+      }).catch(() => {});
+    }
+  } catch {
+    // 타이머 저장 실패는 치명적이지 않으므로 무시
+  }
   clearCountdown();
   clearIntroGestureHandler();
   if (micCooldownTimer) {
@@ -2108,6 +2223,7 @@ onBeforeUnmount(() => {
     mediapipeInterval = null;
   }
   window.removeEventListener("blur", handleWindowBlur);
+  window.removeEventListener("beforeunload", stopAllTts);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", pasteListener, { capture: true });
   document.removeEventListener("copy", copyListener, { capture: true });

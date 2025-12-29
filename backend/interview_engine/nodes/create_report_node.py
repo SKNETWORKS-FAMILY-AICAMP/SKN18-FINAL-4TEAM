@@ -340,6 +340,30 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         meta = state.get("meta") or {}
         session_id = _safe_str(meta.get("session_id"))
         
+        # ✅ problem_evidence가 비어있으면 직접 가져오기
+        if not code and session_id:
+            print("[DEBUG] problem_evidence에 코드 없음, 직접 Redis에서 가져옴", flush=True)
+            code_key = f"livecoding:{session_id}:code"
+            code_data = cache.get(code_key) or {}
+            latest = code_data.get("latest") or {}
+            code = _safe_str(latest.get("code") or "")
+            print(f"[DEBUG] Redis에서 가져온 코드 길이: {len(code)}", flush=True)
+        
+        if not problem_text and session_id:
+            print("[DEBUG] problem_evidence에 문제 없음, Redis problem_payload에서 가져옴", flush=True)
+            # ✅ checkpoint 대신 problem_payload 사용!
+            problem_key = f"livecoding:{session_id}:problem"
+            problem_payload = cache.get(problem_key) or {}
+            problem_text = _safe_str(problem_payload.get("problem") or "")
+            print(f"[DEBUG] Redis problem_payload에서 가져온 문제 길이: {len(problem_text)}", flush=True)
+            
+            # ✅ 그래도 없으면 checkpoint 시도
+            if not problem_text:
+                print("[DEBUG] problem_payload도 없음, checkpoint에서 시도", flush=True)
+                chap1 = load_chapter_channel_values(session_id, "chapter1")
+                problem_text = _safe_str(chap1.get("problem_data") or "")
+                print(f"[DEBUG] checkpoint에서 가져온 문제 길이: {len(problem_text)}", flush=True)
+        
         # ✅ checkpoint에서 데이터 가져오기
         initial_strategy = ""
         qa_history = []
@@ -476,6 +500,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "prompt_score": round(code_score * 100, 0),  # 프롬프트 점수 (코드 품질 점수 사용)
             "problem_solving_score": round(problem_score * 100, 0),
             "collaboration_score": round(code_score * 100, 0),  # 협업 점수 (코드 품질에 포함)
+            
             "final_score": round(final_score * 100, 0),
             "final_grade": final_grade,
             

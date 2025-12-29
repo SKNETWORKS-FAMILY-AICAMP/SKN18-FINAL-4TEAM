@@ -1,14 +1,16 @@
 <script setup>
-import { ref, reactive } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import axios from 'axios';
+import { useAuth } from '../hooks/useAuth';
 
 // --- 상태 관리 (State) ---
 const weakness = ref('');
 const duration = ref(7); // 기본 7일
 const loading = ref(false);
+const { token, ensureValidSession, BACKEND_BASE } = useAuth();
 
 // FullCalendar 설정 및 데이터 관리
 const calendarOptions = reactive({
@@ -38,6 +40,28 @@ function handleEventClick(info) {
 }
 
 // 2. 계획 생성 요청 (API 호출)
+async function loadLatestPlan() {
+  const ok = await ensureValidSession();
+  if (!ok) {
+    return;
+  }
+
+  try {
+    const response = await axios.get(`${BACKEND_BASE}/api/plans/latest/`, {
+      headers: {
+        Authorization: `Bearer ${token.value}`
+      }
+    });
+    if (response.data?.events) {
+      calendarOptions.events = response.data.events;
+    }
+  } catch (error) {
+    if (error?.response?.status !== 404) {
+      console.error(error);
+    }
+  }
+}
+
 async function generatePlan() {
   if (!weakness.value) {
     alert("약점을 입력해주세요!");
@@ -47,11 +71,25 @@ async function generatePlan() {
   loading.value = true;
   
   try {
+    const ok = await ensureValidSession();
+    if (!ok) {
+      alert("로그인이 필요합니다.");
+      return;
+    }
+
     // Django API 호출 (CORS 설정 필수)
-    const response = await axios.post('http://127.0.0.1:8000/api/generate-plan/', {
-      weakness: weakness.value,
-      duration: duration.value
-    });
+    const response = await axios.post(
+      `${BACKEND_BASE}/api/generate-plan/`,
+      {
+        weakness: weakness.value,
+        duration: duration.value
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token.value}`
+        }
+      }
+    );
 
     // 받은 데이터를 캘린더 옵션에 주입 (반응형으로 즉시 업데이트됨)
     calendarOptions.events = response.data.events;
@@ -65,6 +103,10 @@ async function generatePlan() {
     loading.value = false;
   }
 }
+
+onMounted(() => {
+  void loadLatestPlan();
+});
 </script>
 
 <template>

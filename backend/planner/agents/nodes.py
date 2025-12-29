@@ -22,17 +22,18 @@ def planner_node(state: PlanState):
 
     prompt = ChatPromptTemplate.from_template(
         """
-        당신은 IT 교육 커리큘럼 설계자입니다.
-        약점: '{weakness}' / 기간: {duration}일
+        당신은 IT 전문 커리큘럼 설계자입니다.
+        사용자의 약점: '{weakness}' / 기간: {duration}일
         
         [지침] {strategy}
         
         {duration}일간의 계획을 JSON으로 작성하세요.
-        각 항목은 "day", "topic", "search_query"를 가져야 합니다.
-        "search_query"는 유튜브 검색용 구체적인 키워드(영어/한글 혼용 권장)여야 합니다.
+        각 항목은 "day", "topic", "search_query" 키를 가져야 합니다.
+        "topic"은 간결한 주제, "search_query"는 유튜브 검색용 구체적인 키워드여야 합니다.
+        "search_query"는 영어와 한글을 적절히 섞어서 검색이 잘 되도록 작성하세요.
         
-        [예시]
-        [ {{ "day": 1, "topic": "...", "search_query": "Django ViewSet tutorial" }} ]
+        [반환 형식 예시]
+        [ {{ "day": 1, "topic": "DRF ViewSet 개요", "search_query": "Django ViewSet basics tutorial" }} ]
         
         오직 JSON만 반환하세요.
         """
@@ -45,7 +46,8 @@ def planner_node(state: PlanState):
         content = response.content.strip().replace("```json", "").replace("```", "")
         curriculum = json.loads(content)
     except:
-        curriculum = [{"day": i+1, "topic": "Study", "search_query": f"{state['user_weakness']} tutorial"} for i in range(duration)]
+        # 파싱 실패 시 비상용 더미 데이터
+        curriculum = [{"day": i + 1, "topic": "자율 학습", "search_query": f"{state['user_weakness']} tutorial"} for i in range(duration)]
 
     return {
         "curriculum": curriculum,
@@ -121,7 +123,8 @@ def replanner_node(state: PlanState):
     prompt = ChatPromptTemplate.from_template(
         """
         유튜브 검색에 실패했습니다. 다음 날짜들의 검색어를 '더 단순하고 대중적인 키워드'로 수정하세요.
-        ("tutorial for beginners" 등을 활용)
+        특히 'search_query'를 검색이 잘 되는 영어 문구로 바꾸는 것을 권장합니다.
+        ("tutorial for beginners" 등을 적극 활용)
         
         실패한 날짜들: {target_days}
         실패 내역: {feedback}

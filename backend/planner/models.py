@@ -1,8 +1,8 @@
 from django.db import models
-from django.conf import settings
+from api.models import User
 
 class StudyPlan(models.Model):
-    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, db_column="user_id", to_field="user_id")
     topic = models.CharField(max_length=200)
     duration = models.IntegerField(default=7)
     created_at = models.DateTimeField(auto_now_add=True)

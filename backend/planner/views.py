@@ -1,74 +1,138 @@
 from datetime import date, timedelta
+from django.utils import timezone
 from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework import status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-from django.contrib.auth import get_user_model
 from .agents.graph import agent_app
 from .models import StudyPlan, DailyTask
 
 class GeneratePlanView(APIView):
-    permission_classes = [AllowAny]
+    permission_classes = [IsAuthenticated]
 
     def post(self, request):
-        user_weakness = request.data.get('weakness')
-        duration = int(request.data.get('duration', 7))
-
-        # 임시 유저 처리
-        User = get_user_model()
-        user = request.user if request.user.is_authenticated else User.objects.first()
-        if not user:
-            return Response({"error": "superuser를 먼저 생성해주세요."}, status=500)
-
-        # 1. Agent 실행
         try:
+            user_weakness = request.data.get("weakness")
+            duration = int(request.data.get("duration", 7))
+
+            user = request.user
+            if not user or not user.is_authenticated:
+                return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+            if not user_weakness:
+                return Response({"error": "weakness가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+            # 1. Deep Agent 실행
             inputs = {"user_weakness": user_weakness, "duration": duration}
             result = agent_app.invoke(inputs)
+            
             # 최종 결과 가져오기 (비어있는 날짜는 curriculum 정보로 메꿈)
-            final_schedule = result.get('final_schedule', [])
-            curriculum = result.get('curriculum', [])
-        except Exception as e:
-            return Response({"error": str(e)}, status=500)
+            final_schedule = result.get("final_schedule", [])
+            curriculum = result.get("curriculum", [])
 
-        # 2. DB 저장 및 응답 데이터 생성
-        start_date = date.today()
-        calendar_events = []
-        
-        with transaction.atomic():
-            plan = StudyPlan.objects.create(user=user, topic=user_weakness, duration=duration)
-            tasks_to_create = []
+            # 2. DB 저장 및 응답 데이터 생성
+            start_date = date.today()
+            calendar_events = []
 
-            for i in range(duration):
-                day_num = i + 1
+            with transaction.atomic():
+                plan = StudyPlan.objects.create(user=user, topic=user_weakness, duration=duration)
                 
-                # 결과가 있으면 쓰고, 없으면(최종 실패) Fallback 링크 생성
-                item = final_schedule[i] if i < len(final_schedule) and final_schedule[i] else None
-                
-                if item:
-                    topic = item['topic']
-                    url = item['video_url']
-                    title = item['video_title']
-                else:
-                    # Fallback Logic
-                    topic = curriculum[i]['topic']
-                    title = f"'{topic}' 검색 결과 보기 (영상 못 찾음)"
-                    url = f"https://www.youtube.com/results?search_query={topic}"
+                # tasks_to_create 리스트 삭제 (반복문 안에서 바로 저장하기 위해)
 
-                actual_date = start_date + timedelta(days=i)
+                for i in range(duration):
+                    day_num = i + 1
 
-                tasks_to_create.append(DailyTask(
-                    plan=plan, day=day_num, topic=topic,
-                    video_title=title, video_url=url
-                ))
+                    # 결과가 있으면 쓰고, 없으면(최종 실패) Fallback 링크 생성
+                    item = final_schedule[i] if i < len(final_schedule) and final_schedule[i] else None
 
-                calendar_events.append({
-                    "title": topic,
+                    if item:
+                        topic = item["topic"]
+                        url = item["video_url"]
+                        title = item["video_title"]
+                    else:
+                        # Fallback Logic
+                        topic = curriculum[i]["topic"]
+                        title = f"'{topic}' 검색 결과 보기 (영상 못 찾음)"
+                        url = f"https://www.youtube.com/results?search_query={topic}"
+
+                    actual_date = start_date + timedelta(days=i)
+
+                    # [수정] 객체를 만들고 바로 save() 해야 task.id가 생성됨
+                    task = DailyTask(
+                        plan=plan,
+                        day=day_num,
+                        topic=topic,
+                        video_title=title,
+                        video_url=url,
+                        is_completed=False
+                    )
+                    task.save() # DB 저장 및 ID 생성
+
+                    calendar_events.append(
+                        {
+                            "title": topic,
+                            "start": actual_date.strftime("%Y-%m-%d"),
+                            "url": url,
+                            "extendedProps": {
+                                "day_number": day_num,
+                                "task_id": task.id, # [중요] 프론트엔드 체크박스 기능용 ID
+                                "is_completed": False
+                            },
+                            "backgroundColor": '#e7f5ff',
+                            "borderColor": '#42b883'
+                        }
+                    )
+
+            # bulk_create 삭제됨 (위에서 이미 저장함)
+
+            return Response({"message": "OK", "events": calendar_events}, status=201)
+            
+        except Exception as exc:  # noqa: BLE001
+            print(f"[GeneratePlanView] error: {exc}", flush=True)
+            return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+
+class LatestStudyPlanView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        plan = (
+            StudyPlan.objects.filter(user=user)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+        if not plan:
+            return Response({"error": "저장된 커리큘럼이 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        tasks = DailyTask.objects.filter(plan=plan).order_by("day")
+        base_date = timezone.localdate(plan.created_at) if plan.created_at else date.today()
+
+        events = []
+        for task in tasks:
+            actual_date = base_date + timedelta(days=task.day - 1)
+            events.append(
+                {
+                    "title": task.topic,
                     "start": actual_date.strftime("%Y-%m-%d"),
-                    "url": url,
-                    "extendedProps": {"day_number": day_num}
-                })
+                    "url": task.video_url,
+                    "extendedProps": {"day_number": task.day},
+                }
+            )
 
-            DailyTask.objects.bulk_create(tasks_to_create)
-
-        return Response({"message": "OK", "events": calendar_events}, status=201)
+        return Response(
+            {
+                "plan": {
+                    "id": plan.id,
+                    "topic": plan.topic,
+                    "duration": plan.duration,
+                    "created_at": plan.created_at.isoformat() if plan.created_at else None,
+                },
+                "events": events,
+            },
+            status=status.HTTP_200_OK,
+        )

@@ -6,7 +6,7 @@ from typing import Any, Dict, List
 from django.core.cache import cache
 
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
-from interview_engine.llm import LLM
+from interview_engine.llm import get_llm
 
 
 def _clamp01(x: float) -> float:
@@ -296,7 +296,8 @@ def _llm_collab_score(
     )
 
     try:
-        resp = LLM.invoke(
+        model = get_llm('default')
+        resp = model.invoke(
             [
                 {"role": "system", "content": system_prompt},
                 {"role": "user", "content": human_prompt},

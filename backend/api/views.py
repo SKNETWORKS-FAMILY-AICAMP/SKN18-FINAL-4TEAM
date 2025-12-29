@@ -706,18 +706,38 @@ class LiveCodingHintView(APIView):
         conversation_log = data.get("conversation_log") if isinstance(data.get("conversation_log"), list) else None
         hint_count_raw = data.get("hint_count")
         test_cases_payload = data.get("test_cases")
+        hint_request_text = (data.get("hint_request_text") or "").strip()
+
+        # 메타에 저장된 힌트 사용 횟수(재접속 시 복원용)
+        meta_hint_count_raw = meta.get("hint_count")
+        try:
+            meta_hint_count = int(meta_hint_count_raw) if meta_hint_count_raw is not None else 0
+        except Exception:
+            meta_hint_count = 0
 
         try:
             hint_count = int(hint_count_raw) if hint_count_raw is not None else None
         except Exception:
             hint_count = None
 
-        # 요청에 값이 없으면 로그에서 힌트 횟수를 추정
+        # 최종 기준 힌트 횟수:
+        # - meta에 저장된 값이 있으면 우선 사용
+        # - 없고, 요청에만 값이 있으면 그 값을 사용
+        # - 모두 없으면 대화 로그에서 추정, 그것도 없으면 0
         if hint_count is None:
-            if conversation_log:
-                hint_count = sum(1 for entry in conversation_log if isinstance(entry, dict) and entry.get("type") == "hint")
+            if meta_hint_count:
+                hint_count = meta_hint_count
+            elif conversation_log:
+                hint_count = sum(
+                    1
+                    for entry in conversation_log
+                    if isinstance(entry, dict) and entry.get("type") == "hint"
+                )
             else:
                 hint_count = 0
+        else:
+            # 클라이언트와 메타값이 모두 있을 경우 더 큰 값을 사용해 불일치 최소화
+            hint_count = max(hint_count, meta_hint_count)
 
         problem_lang = None
         if meta.get("problem_id"):
@@ -743,6 +763,20 @@ class LiveCodingHintView(APIView):
                 ]
 
 
+        # 사용자의 초기 전략 답변(문제 접근 방식)이 저장되어 있다면 함께 전달
+        strategy_answer = (meta.get("strategy_answer") or "").strip()
+
+        print(
+            "[HINT][view] request payload:",
+            {
+                "session_id": session_id,
+                "language": language,
+                "code_len": len(code or ""),
+                "hint_request_text": hint_request_text,
+            },
+            flush=True,
+        )
+
         state = {
             "meta": {"session_id": session_id, "user_id": str(user.user_id)},
             "current_user_code": code,
@@ -750,6 +784,11 @@ class LiveCodingHintView(APIView):
             "real_algorithm_category": real_algorithm_category,
             "hint_trigger": hint_trigger,
             "hint_count": hint_count,
+            "user_strategy_answer": strategy_answer,
+            # 힌트 요청 시 사용자가 말한 STT 텍스트
+            "hint_request_text": hint_request_text,
+            # 일부 노드/유틸에서 stt_text를 기대할 수 있으므로 호환용으로도 넣어둔다.
+            "stt_text": hint_request_text,
         }
         if conversation_log is not None:
             state["conversation_log"] = conversation_log
@@ -771,21 +810,21 @@ class LiveCodingHintView(APIView):
             )
 
         hint_text = (result_state.get("hint_text") or "").strip()
-        tts_audio = []
-        if hint_text:
-            try:
-                # 힌트를 바로 읽어줄 수 있도록 오디오 청크도 함께 반환
-                tts_audio = _generate_tts_payload(hint_text, session_id, max_sentences=2)
-            except Exception:
-                tts_audio = []
+        new_hint_count = result_state.get("hint_count", hint_count)
+
+        # 최신 힌트 사용 횟수를 세션 메타에 저장해서 재접속 시 복원 가능하게 함
+        try:
+            meta["hint_count"] = int(new_hint_count)
+        except Exception:
+            meta["hint_count"] = new_hint_count
+        cache.set(meta_key, meta, timeout=60 * 60)
 
         return Response(
             {
                 "hint_text": hint_text,
-                "hint_count": result_state.get("hint_count", hint_count),
+                "hint_count": new_hint_count,
                 "conversation_log": result_state.get("conversation_log"),
                 "hint_trigger": hint_trigger,
-                "tts_audio": tts_audio,
             },
             status=status.HTTP_200_OK,
         )
@@ -870,6 +909,7 @@ class LiveCodingSessionView(APIView):
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": start_at_str,
                 "remaining_seconds": remaining_seconds,
+                "hint_count": int(meta.get("hint_count") or 0),
             },
             status=status.HTTP_200_OK,
         )

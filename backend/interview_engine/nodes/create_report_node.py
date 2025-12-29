@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 from datetime import datetime, timezone
-from interview_engine.llm import LLM
+from interview_engine.llm import get_llm
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from langchain_core.messages import SystemMessage, HumanMessage
 from django.core.cache import cache
@@ -111,7 +111,10 @@ def _generate_problem_solving_evaluation(
             HumanMessage(content=user_prompt)
         ]
         
-        response = LLM.invoke(messages)
+        print("[LLM][_generate_problem_eval_with_llm] system_prompt:", system_prompt, flush=True)
+        print("[LLM][_generate_problem_eval_with_llm] user_prompt:", user_prompt, flush=True)
+        model = get_llm("report")
+        response = model.invoke(messages)
         content = response.content
         
         # 응답 파싱
@@ -237,7 +240,10 @@ def _generate_detailed_feedback_with_llm(
             HumanMessage(content=user_prompt)
         ]
         
-        response = LLM.invoke(messages)
+        print("[LLM][_generate_detailed_feedback_with_llm] system_prompt:", system_prompt, flush=True)
+        print("[LLM][_generate_detailed_feedback_with_llm] user_prompt:", user_prompt, flush=True)
+        model = get_llm("report")
+        response = model.invoke(messages)
         content = response.content
         
         # 응답 파싱

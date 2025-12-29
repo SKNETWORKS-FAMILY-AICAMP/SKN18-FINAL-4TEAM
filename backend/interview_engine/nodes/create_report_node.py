@@ -45,7 +45,7 @@ def _format_qa_history(qa_history: List[Dict]) -> str:
     if not qa_history:
         return "(질문/응답 내역 없음)"
     
-    lines = []
+    lines: List[str] = []
     for i, qa in enumerate(qa_history, 1):
         q = qa.get("question", "")
         a = qa.get("answer", "")
@@ -366,7 +366,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         
         # ✅ checkpoint에서 데이터 가져오기
         initial_strategy = ""
-        qa_history = []
+        qa_history: List[Dict[str, Any]] = []
         
         if session_id:
             try:
@@ -468,12 +468,18 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         if problem_score < 0.2 and "problem_solving_risk" not in flags:
             flags.append("problem_solving_risk")
 
-        # 간단한 마크다운 (옵션)
+        code_collab_score_raw_30 = float(state.get("code_collab_score_30") or 0.0)
+        code_quality_score_raw_35 = float(state.get("code_quality_score_35") or 0.0)
+        collab_rule_20 = float(code_collab_evidence.get("collab_rule_20") or 0.0)
+        collab_llm_score_10 = float(code_collab_evidence.get("collab_llm_score_10") or 0.0)
+
         md = f"""# 코딩 테스트 결과 리포트
 
 ## 요약
 - 최종 점수: **{final_score:.2f}**
 - 최종 등급: **{final_grade}**
+- 코드 품질 원점수: **{code_quality_score_raw_35:.2f}/35**
+- 협업 능력 원점수: **{code_collab_score_raw_30:.2f}/30** (rule {collab_rule_20:.2f}/20 + LLM {collab_llm_score_10:.2f}/10)
 
 ## 강점
 {llm_feedback['strength']}
@@ -500,7 +506,12 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "prompt_score": round(code_score * 100, 0),  # 프롬프트 점수 (코드 품질 점수 사용)
             "problem_solving_score": round(problem_score * 100, 0),
             "collaboration_score": round(code_score * 100, 0),  # 협업 점수 (코드 품질에 포함)
-            
+                        
+            "collaboration_score_raw_30": round(code_collab_score_raw_30, 2),
+            "code_quality_score_raw_35": round(code_quality_score_raw_35, 2),
+            "collaboration_rule_20": round(collab_rule_20, 2),
+            "collaboration_llm_10": round(collab_llm_score_10, 2),
+
             "final_score": round(final_score * 100, 0),
             "final_grade": final_grade,
             

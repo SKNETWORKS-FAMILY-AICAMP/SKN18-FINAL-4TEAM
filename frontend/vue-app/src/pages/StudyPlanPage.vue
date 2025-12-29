@@ -70,8 +70,8 @@ async function generatePlan() {
 <template>
   <div class="app-container">
     <header class="header">
-      <h1>🎓 AI Deep Agent 학습 플래너</h1>
-      <p>당신의 약점을 입력하면 맞춤형 커리큘럼을 짜드립니다.</p>
+      <h1>🎓 AI 학습 플래너</h1>
+      <p>당신의 약점을 바탕으로 맞춤형 커리큘럼을 짜드립니다.</p>
     </header>
 
     <div class="input-section">

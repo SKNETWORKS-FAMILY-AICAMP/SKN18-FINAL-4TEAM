@@ -266,6 +266,16 @@ class InterviewIntroEventView(APIView):
         # TTS는 별도 엔드포인트(TTSView)에서 호출하도록 분리
         user_answer_class = (result_state.get("user_answer_class") or "").strip() or None
 
+        # intro / 전략 답변 분기 흐름이 어느 정도 마무리된 상태인지 여부.
+        # 그래프에서 intro_flow_done을 명시적으로 내려주지 않는 경우가 있어,
+        # intro_non_strategy_count 기반으로 한 번 이상 "전략이 아닌" 답변이 나온 뒤부터는
+        # intro_flow_done=True 로 간주하여 프론트의 2회차 종료 로직이 동작하도록 보정한다.
+        intro_flow_done_flag = bool(result_state.get("intro_flow_done"))
+        if not intro_flow_done_flag:
+            non_strategy_count = int(result_state.get("intro_non_strategy_count") or 0)
+            if user_answer_class and user_answer_class != "strategy" and non_strategy_count >= 1:
+                intro_flow_done_flag = True
+
         # stage는 meta 기준으로 결정 (intro -> coding 단방향)
         stage = meta.get("stage") or "intro"
         coding_intro_text = ""
@@ -317,7 +327,7 @@ class InterviewIntroEventView(APIView):
             "user_question": result_state.get("user_question"),
             "problem_answer": result_state.get("problem_answer"),
             "user_answer_class": user_answer_class,
-            "intro_flow_done": result_state.get("intro_flow_done"),
+            "intro_flow_done": intro_flow_done_flag,
             "stage": stage,
             # 코딩 스테이지로 막 전환될 때만 설정되는 인트로 멘트 텍스트
             "coding_intro_text": coding_intro_text or "",

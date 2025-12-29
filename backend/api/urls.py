@@ -23,13 +23,14 @@ from .views import (
     ProfileView,
     health,
     roadmap,
-    LiveCodingFinalEvalStartView, 
+    LiveCodingFinalEvalStartView,
     LiveCodingFinalEvalStatusView,
     LiveCodingFinalEvalReportView,
     LiveCodingReportListView,
     LiveCodingReportDetailView,
     save_strategy_answer,
 )
+from .timer_views import LiveCodingTimerUpdateView
 
 from .chap1_views import (
     CodingProblemTextInitView,
@@ -69,6 +70,7 @@ urlpatterns = [
     # livecoding 관련 
     path("livecoding/session/", LiveCodingSessionView.as_view(), name="livecoding-session"),
     path("livecoding/session/active/", LiveCodingActiveSessionView.as_view(), name="livecoding-session-active"),
+    path("livecoding/session/timer/", LiveCodingTimerUpdateView.as_view(), name="livecoding-session-timer"),
     path("livecoding/session/end/", LiveCodingEndSessionView.as_view(), name="livecoding-session-end"),
     path(
         "livecoding/session/code/",

@@ -96,6 +96,7 @@
           <CodeEditor
             v-model="code"
             :mode="cmMode"
+            :read-only="sessionStage !== 'coding'"
             @editor-keydown="handleEditorKeydown"
             @editor-copy="handleCopy"
           />
@@ -609,6 +610,8 @@ const runSttClient = async () => {
     const stageFromServer = (eventData?.stage || "").trim().toLowerCase();
     const codingIntroText = (eventData?.coding_intro_text || "").trim();
     if (stageFromServer) {
+      // 서버에서 내려준 stage를 sessionStage/currentStage 모두에 반영
+      sessionStage.value = stageFromServer;
       currentStage.value = stageFromServer;
     }
 
@@ -914,6 +917,21 @@ const normalizeTtsChunks = (payload) => {
   return [];
 };
 
+// 인트로용 고정 인사 멘트들
+const INTRO_GREETINGS = [
+  "안녕하세요. 오늘 라이브 코딩 테스트를 함께 진행할 면접관입니다. 지금 화면에 보이는 문제를 천천히 살펴보시고, 곧 핵심 내용을 간단히 정리해서 안내해 드리겠습니다.",
+  "안녕하세요. 저는 이번 라이브 코딩 세션을 맡은 면접관입니다. 화면의 문제를 먼저 훑어봐 주시면, 잠시 후 어떤 내용을 요구하는지 핵심만 콕 집어서 설명해 드리겠습니다.",
+  "안녕하세요. 라이브 코딩 테스트를 진행할 면접관입니다. 우선 화면에 보이는 문제를 한 번 읽어보시고, 이 문제의 중요한 부분을 곧 요약해서 설명해 드리겠습니다.",
+  "안녕하세요. 오늘 코딩 테스트를 도와드릴 면접관입니다. 화면의 문제를 편하게 읽어보시고 계시면, 조금 뒤에 문제의 목적과 핵심 포인트를 짧게 정리해 드리겠습니다.",
+  "안녕하세요. 지금부터 라이브 코딩 테스트를 함께 할 면접관입니다. 우선 화면에 나온 문제를 눈으로 익혀 두시고, 곧 어떤 문제인지 한 번에 이해하실 수 있도록 핵심만 추려서 안내해 드리겠습니다."
+];
+
+const getRandomIntroGreeting = () => {
+  if (!INTRO_GREETINGS.length) return "";
+  const idx = Math.floor(Math.random() * INTRO_GREETINGS.length);
+  return INTRO_GREETINGS[idx] || "";
+};
+
 const fetchIntroTtsAudio = async () => {
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
@@ -1013,49 +1031,106 @@ const confirmReloadIntro = async () => {
 
 const playIntroTtsFromSession = async () => {
   if (isTtsPlaying.value) {
-    isIntroPreparing.value = false;
     return;
   }
   if (sessionStage.value !== "intro") {
-    isIntroPreparing.value = false;
     return;
   }
 
+  // 인트로용 고정 인사 TTS가 준비되기 전까지 로딩 오버레이를 유지한다.
   isIntroPreparing.value = true;
 
   const sessionId = route.query.session_id;
-  // stage가 intro이면 이전 재생 여부와 관계없이 항상 재생을 시도한다.
+  const token = localStorage.getItem("jobtory_access_token");
 
-  const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
-  const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
+  // 메인 인트로 오디오를 가져오는 작업을 미리 시작해 두고,
+  // 그 사이에 고정 인사 멘트를 먼저 재생한다.
+  const loadIntroChunks = async () => {
+    // stage가 intro이면 이전 재생 여부와 관계없이 항상 재생을 시도한다.
+    const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
+    const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
 
-  let chunks;
-  if (audio) {
-    try {
-      chunks = JSON.parse(audio);
-    } catch (e) {
-      console.error("intro TTS audio JSON 파싱 실패:", e);
-      chunks = null;
+    let chunks;
+    if (audio) {
+      try {
+        chunks = JSON.parse(audio);
+      } catch (e) {
+        console.error("intro TTS audio JSON 파싱 실패:", e);
+        chunks = null;
+      }
     }
-  }
 
-  chunks = normalizeTtsChunks(chunks);
-  if (!chunks.length) {
-    const fetched = await fetchIntroTtsAudio();
-    if (Array.isArray(fetched) && fetched.length) {
-      chunks = fetched;
-    } else {
-      isIntroPreparing.value = false;
-      window.alert("인트로 오디오가 준비되지 않았습니다. 다시 시작해 주세요.");
-      return;
+    chunks = normalizeTtsChunks(chunks);
+    if (!chunks.length) {
+      const fetched = await fetchIntroTtsAudio();
+      if (Array.isArray(fetched) && fetched.length) {
+        chunks = fetched;
+      } else {
+        return null;
+      }
     }
-  }
+    return chunks;
+  };
+
+  const introChunksPromise = loadIntroChunks();
 
   introPlayBlocked.value = false;
   isTtsPlaying.value = true;
-  isIntroPreparing.value = false;
-  startCountdownOnce(); // 로딩 오버레이가 사라지고 음성이 재생될 때 타이머 시작
+
   try {
+    // 1) 짧은 인사 멘트를 먼저 TTS로 재생 (체감 레이턴시 감소)
+    const greetingText = getRandomIntroGreeting();
+    if (greetingText && token && sessionId) {
+      try {
+        const greetResp = await fetch(
+          `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
+            sessionId
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${token}`,
+            },
+            body: JSON.stringify({
+              tts_text: greetingText,
+              max_sentences: 1,
+            }),
+          }
+        );
+        const greetData = await greetResp.json().catch(() => ({}));
+        if (greetResp.ok) {
+          const greetChunks = normalizeTtsChunks(greetData.tts_text);
+          if (greetChunks.length) {
+            // 고정 인사 오디오가 준비된 시점에 로딩 오버레이를 제거하고
+            // 이때부터 코딩 세션 타이머를 카운트다운한다.
+            isIntroPreparing.value = false;
+            startCountdownOnce();
+            await playTtsChunks(greetChunks);
+          } else {
+            // 인사 텍스트가 없으면 로딩만 제거
+            isIntroPreparing.value = false;
+          }
+        } else {
+          // 실패한 경우에도 무한 로딩을 막기 위해 오버레이를 제거
+          isIntroPreparing.value = false;
+        }
+      } catch (e) {
+        console.warn("intro greeting TTS 재생 실패:", e);
+        isIntroPreparing.value = false;
+      }
+    } else {
+      // 인사 멘트를 재생하지 못하는 경우에도 오버레이를 제거
+      isIntroPreparing.value = false;
+    }
+
+    // 2) 메인 인트로 오디오가 준비될 때까지 대기 후 재생
+    let chunks = await introChunksPromise;
+    if (!chunks || !chunks.length) {
+      window.alert("인트로 오디오가 준비되지 않았습니다. 다시 시작해 주세요.");
+      return;
+    }
+
     const completed = await playTtsChunks(chunks, { throwOnError: true });
     if (completed && sessionStage.value === "intro") {
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
@@ -1467,11 +1542,35 @@ const requestHint = async (hintRequestText = "") => {
       hintCount.value = Math.min(HINT_LIMIT, hintCount.value + 1);
     }
 
-    // 힌트가 TTS 오디오로 내려오면 바로 재생
-    const ttsChunks = Array.isArray(data?.tts_audio) ? data.tts_audio : [];
-    if (ttsChunks.length) {
+    // 힌트 텍스트가 내려오면 TTS API를 통해 오디오를 생성해 재생
+    const hintText = (data && typeof data.hint_text === "string") ? data.hint_text : "";
+    if (hintText) {
       try {
-        await playTtsChunks(ttsChunks);
+        const ttsResp = await fetch(
+          `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
+            sessionId
+          )}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({
+              tts_text: hintText,
+              max_sentences: 2,
+            }),
+          }
+        );
+        const ttsData = await ttsResp.json().catch(() => ({}));
+        if (!ttsResp.ok) {
+          console.warn("hint TTS failed", ttsResp.status, ttsData);
+          return;
+        }
+        const ttsChunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
+        if (ttsChunks.length) {
+          await playTtsChunks(ttsChunks);
+        }
       } catch (err) {
         console.error("failed to play hint TTS", err);
       }

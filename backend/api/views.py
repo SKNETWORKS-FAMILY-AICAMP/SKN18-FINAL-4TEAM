@@ -763,6 +763,17 @@ class LiveCodingHintView(APIView):
         # 사용자의 초기 전략 답변(문제 접근 방식)이 저장되어 있다면 함께 전달
         strategy_answer = (meta.get("strategy_answer") or "").strip()
 
+        print(
+            "[HINT][view] request payload:",
+            {
+                "session_id": session_id,
+                "language": language,
+                "code_len": len(code or ""),
+                "hint_request_text": hint_request_text,
+            },
+            flush=True,
+        )
+
         state = {
             "meta": {"session_id": session_id, "user_id": str(user.user_id)},
             "current_user_code": code,
@@ -771,7 +782,10 @@ class LiveCodingHintView(APIView):
             "hint_trigger": hint_trigger,
             "hint_count": hint_count,
             "user_strategy_answer": strategy_answer,
+            # 힌트 요청 시 사용자가 말한 STT 텍스트
             "hint_request_text": hint_request_text,
+            # 일부 노드/유틸에서 stt_text를 기대할 수 있으므로 호환용으로도 넣어둔다.
+            "stt_text": hint_request_text,
         }
         if conversation_log is not None:
             state["conversation_log"] = conversation_log
@@ -802,21 +816,12 @@ class LiveCodingHintView(APIView):
             meta["hint_count"] = new_hint_count
         cache.set(meta_key, meta, timeout=60 * 60)
 
-        tts_audio = []
-        if hint_text:
-            try:
-                # 힌트를 바로 읽어줄 수 있도록 오디오 청크도 함께 반환
-                tts_audio = _generate_tts_payload(hint_text, session_id, max_sentences=2)
-            except Exception:
-                tts_audio = []
-
         return Response(
             {
                 "hint_text": hint_text,
                 "hint_count": new_hint_count,
                 "conversation_log": result_state.get("conversation_log"),
                 "hint_trigger": hint_trigger,
-                "tts_audio": tts_audio,
             },
             status=status.HTTP_200_OK,
         )

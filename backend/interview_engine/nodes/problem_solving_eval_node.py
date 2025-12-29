@@ -372,8 +372,8 @@ def _evaluate_strategy_hybrid(
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=user_prompt)
             ]
-            
-            response = LLM.invoke(messages)
+            model = get_llm('default')
+            response = model.invoke(messages)
             content = response.content.strip()
             
             if "```json" in content:

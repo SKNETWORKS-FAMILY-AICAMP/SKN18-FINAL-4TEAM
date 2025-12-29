@@ -1,7 +1,7 @@
 # backend/interview_engine/nodes/problem_solving_eval_node.py
 from __future__ import annotations
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
-from interview_engine.llm import get_llm
+from interview_engine.llm import LLM
 from langchain_core.messages import SystemMessage, HumanMessage
 from typing import Any, Dict, List, Tuple
 import re
@@ -9,18 +9,6 @@ import json
 
 from django.core.cache import cache
 from django.db import connection
-
-
-def _clamp01(x: float) -> float:
-    try:
-        x = float(x)
-    except Exception:
-        return 0.0
-    if x < 0.0:
-        return 0.0
-    if x > 1.0:
-        return 1.0
-    return x
 
 
 def _safe_str(x: Any) -> str:
@@ -69,11 +57,14 @@ def _evaluate_test_cases_with_llm(
 {user_code[:2000]}
 ```
 
+## 함수명
+평가 대상 함수: `{function_name}()`
+
 ## 테스트 케이스
 {test_cases_str}
 
 ## 평가 요청
-위 코드가 각 테스트 케이스에 대해 올바른 출력을 생성하는지 판단하여 JSON으로 응답하세요:
+위 코드의 `{function_name}()` 함수가 각 테스트 케이스에 대해 올바른 출력을 생성하는지 판단하여 JSON으로 응답하세요:
 
 {{
   "results": [
@@ -89,8 +80,8 @@ def _evaluate_test_cases_with_llm(
             SystemMessage(content=system_prompt),
             HumanMessage(content=user_prompt)
         ]
-        model = get_llm('default')
-        response = model.invoke(messages)
+        
+        response = LLM.invoke(messages)
         content = response.content.strip()
         
         # JSON 추출
@@ -230,11 +221,11 @@ def _evaluate_strategy_hybrid(
     char_count = len(strategy_text.strip())
     
     # 길이 점수 (최대 1.5점)
-    if char_count >= 100:
+    if char_count >= 200:
         rule_strategy_score += 1.5
-    elif char_count >= 50:
+    elif char_count >= 100:
         rule_strategy_score += 1.0
-    elif char_count >= 20:
+    elif char_count >= 50:
         rule_strategy_score += 0.5
     
     # 복잡도 언급 (1.0점)
@@ -342,13 +333,17 @@ def _evaluate_strategy_hybrid(
     if use_llm:
         try:
             system_prompt = """당신은 코딩 면접 평가 전문가입니다.
-전략과 코드를 비교하여 점수를 보정하세요.
+문제, 전략, 코드를 종합적으로 분석하여 점수를 보정하세요.
 
 **평가 기준:**
-- 전략 품질 (0~4점): 문제 이해도, 알고리즘 언급, 구체성
-- 일치도 (0~4점): 전략과 코드의 알고리즘/자료구조 일치 여부"""
+- 전략 품질 (0~4점): 문제에 적합한 알고리즘 제시, 구체성
+- 일치도 (0~4점): 전략과 코드의 알고리즘/자료구조 일치 여부
+- 문제 적합성: 제시한 알고리즘이 문제 특성에 맞는지"""
 
-            user_prompt = f"""## 전략 (룰베이스 점수: {rule_strategy_score:.1f}/4)
+            user_prompt = f"""## 문제
+{problem_text[:500] if problem_text else "문제 정보 없음"}
+
+## 전략 (룰베이스 점수: {rule_strategy_score:.1f}/4)
 {strategy_text[:400]}
 
 ## 코드 (일치 룰베이스: {rule_consistency_score:.1f}/4)
@@ -356,24 +351,25 @@ def _evaluate_strategy_hybrid(
 {code[:1000]}
 ```
 
-룰베이스 점수를 참고하여 보정된 점수를 JSON으로 제시:
+문제를 고려하여 룰베이스 점수를 보정하세요. JSON으로 제시:
 
 {{
   "strategy_score": 2.5,
   "consistency_score": 1.5,
-  "reason": "완전탐색 의도를 코드로 구현했으나 최적화 부족"
+  "reason": "문제에 적합한 완전탐색을 제시하고 구현함"
 }}
 
 **주의:** 
 - 룰베이스 점수에서 ±1.0 이내로만 보정
-- 명백한 오류가 아니면 룰베이스 점수 유지"""
+- 명백한 오류가 아니면 룰베이스 점수 유지
+- 문제 특성과 전략의 적합성 고려"""
 
             messages = [
                 SystemMessage(content=system_prompt),
                 HumanMessage(content=user_prompt)
             ]
-            model = get_llm('default')
-            response = model.invoke(messages)
+            
+            response = LLM.invoke(messages)
             content = response.content.strip()
             
             if "```json" in content:
@@ -551,22 +547,44 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     
     if problem_id and code:
         try:
-            # function_name 조회
-            with connection.cursor() as cursor:
-                cursor.execute("""
-                    SELECT function_name
-                    FROM coding_problem_language
-                    WHERE problem_id = %s AND language = %s
-                    LIMIT 1
-                """, [problem_id, language])
-                row = cursor.fetchone()
-                function_name = row[0] if row else "solution"
+            # ✅ 1순위: Redis problem_payload에서 function_name 가져오기
+            problem_key = f"livecoding:{session_id}:problem"
+            problem_payload = cache.get(problem_key) or {}
+            function_name = problem_payload.get("function_name")
+            
+            if function_name:
+                print(f"[DEBUG] Redis에서 function_name 가져옴: {function_name}", flush=True)
+            
+            # ✅ 2순위: DB 조회
+            if not function_name:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT function_name
+                        FROM coding_problem_language
+                        WHERE problem_id = %s AND language = %s
+                        LIMIT 1
+                    """, [problem_id, language])
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        function_name = row[0]
+                        print(f"[DEBUG] DB에서 function_name 가져옴: {function_name}", flush=True)
+            
+            # ✅ 3순위: 코드에서 자동 추출
+            if not function_name:
+                import re
+                match = re.search(r'def\s+(\w+)\s*\(', code)
+                if match:
+                    function_name = match.group(1)
+                    print(f"[DEBUG] 코드에서 function_name 추출: {function_name}", flush=True)
+                else:
+                    function_name = "solution"
+                    print(f"[WARNING] function_name을 찾을 수 없어 기본값 사용: {function_name}", flush=True)
             
             # 테스트 케이스 가져오기
             test_cases = _get_test_cases_from_db(problem_id)
             
             if test_cases:
-                print(f"[INFO] LLM으로 {len(test_cases[:10])}개 테스트 케이스 평가 시작...")
+                print(f"[INFO] LLM으로 {len(test_cases[:10])}개 테스트 케이스 평가 시작... (함수명: {function_name})")
                 # ✅ LLM으로 평가!
                 test_results = _evaluate_test_cases_with_llm(
                     user_code=code,
@@ -591,7 +609,7 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         starter_code=starter_code,
         strategy_text=strategy_text,
         test_results=test_results,
-        problem_text=problem_text  # ✅ 추가!
+        problem_text=problem_text
     )
     
     # ========== State 업데이트 (0~1 스케일로 변환) ==========

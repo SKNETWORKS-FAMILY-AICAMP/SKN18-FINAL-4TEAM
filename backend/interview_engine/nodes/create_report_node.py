@@ -346,6 +346,79 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         meta = state.get("meta") or {}
         session_id = _safe_str(meta.get("session_id"))
         
+        # ✅ 카테고리/난이도 초기화
+        problem_category = "미분류"
+        problem_difficulty = "미정"
+        
+        # ✅ problem_evidence가 비어있으면 직접 가져오기
+        if not code and session_id:
+            print("[DEBUG] problem_evidence에 코드 없음, 직접 Redis에서 가져옴", flush=True)
+            code_key = f"livecoding:{session_id}:code"
+            code_data = cache.get(code_key) or {}
+            latest = code_data.get("latest") or {}
+            code = _safe_str(latest.get("code") or "")
+            print(f"[DEBUG] Redis에서 가져온 코드 길이: {len(code)}", flush=True)
+        
+        if not problem_text and session_id:
+            print("[DEBUG] problem_evidence에 문제 없음, Redis problem_payload에서 가져옴", flush=True)
+            # ✅ checkpoint 대신 problem_payload 사용!
+            problem_key = f"livecoding:{session_id}:problem"
+            problem_payload = cache.get(problem_key) or {}
+            problem_text = _safe_str(problem_payload.get("problem") or "")
+            print(f"[DEBUG] Redis problem_payload에서 가져온 문제 길이: {len(problem_text)}", flush=True)
+            
+            # ✅ 카테고리/난이도도 같이 가져오기!
+            if "category" in problem_payload:
+                problem_category = problem_payload.get("category") or "미분류"
+                print(f"[DEBUG] Redis에서 카테고리 가져옴: {problem_category}", flush=True)
+            
+            if "difficulty" in problem_payload:
+                problem_difficulty = problem_payload.get("difficulty") or "미정"
+                print(f"[DEBUG] Redis에서 난이도 가져옴: {problem_difficulty}", flush=True)
+            
+            # ✅ 그래도 없으면 checkpoint 시도
+            if not problem_text:
+                print("[DEBUG] problem_payload도 없음, checkpoint에서 시도", flush=True)
+                chap1 = load_chapter_channel_values(session_id, "chapter1")
+                problem_text = _safe_str(chap1.get("problem_data") or "")
+                print(f"[DEBUG] checkpoint에서 가져온 문제 길이: {len(problem_text)}", flush=True)
+        
+        # ✅ 2순위: 여전히 "미분류"/"미정"이면 meta에서 problem_id 가져와서 DB 조회
+        if (problem_category == "미분류" or problem_difficulty == "미정"):
+            # meta에서 problem_id 가져오기
+            problem_id = meta.get("problem_id")
+            
+            # Redis meta에도 있을 수 있음
+            if not problem_id and session_id:
+                try:
+                    meta_key = f"livecoding:{session_id}:meta"
+                    cached_meta = cache.get(meta_key) or {}
+                    problem_id = cached_meta.get("problem_id")
+                    print(f"[DEBUG] Redis meta에서 problem_id 가져옴: {problem_id}", flush=True)
+                except Exception as e:
+                    print(f"[WARNING] Redis meta 조회 실패: {e}", flush=True)
+            
+            # DB 조회
+            if problem_id:
+                try:
+                    from django.db import connection
+                    with connection.cursor() as cursor:
+                        cursor.execute("""
+                            SELECT category, difficulty
+                            FROM coding_problem
+                            WHERE problem_id = %s
+                            LIMIT 1
+                        """, [problem_id])
+                        row = cursor.fetchone()
+                        if row:
+                            if problem_category == "미분류":
+                                problem_category = row[0] or "미분류"
+                            if problem_difficulty == "미정":
+                                problem_difficulty = row[1] or "미정"
+                            print(f"[DEBUG] DB에서 가져온 정보: 카테고리={problem_category}, 난이도={problem_difficulty}", flush=True)
+                except Exception as e:
+                    print(f"[WARNING] DB 조회 실패: {e}", flush=True)
+                    
         # ✅ problem_evidence가 비어있으면 직접 가져오기
         if not code and session_id:
             print("[DEBUG] problem_evidence에 코드 없음, 직접 Redis에서 가져옴", flush=True)
@@ -369,7 +442,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 chap1 = load_chapter_channel_values(session_id, "chapter1")
                 problem_text = _safe_str(chap1.get("problem_data") or "")
                 print(f"[DEBUG] checkpoint에서 가져온 문제 길이: {len(problem_text)}", flush=True)
-        
+
         # ✅ checkpoint에서 데이터 가져오기
         initial_strategy = ""
         qa_history: List[Dict[str, Any]] = []
@@ -527,6 +600,9 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "comprehensive_evaluation": llm_feedback["comprehensive_evaluation"],
             "annotated_code": llm_feedback["annotated_code"],
             "cheating_warning": llm_feedback["cheating_warning"],
+
+            "problem_category": problem_category,
+            "problem_difficulty": problem_difficulty,
 
             # 문제 해결 능력 평가 추가
             "problem_solving_evaluation": {

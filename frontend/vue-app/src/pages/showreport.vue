@@ -43,12 +43,12 @@
 
             <div class="score-grid">
               <div class="score-item">
-                <div class="score-label">프로 점수</div>
-                <div class="score-value">{{ promptScoreText }}점</div>
-              </div>
-              <div class="score-item">
                 <div class="score-label">문제 해결 능력</div>
                 <div class="score-value">{{ problemSolvingScoreText }}점</div>
+              </div>
+              <div class="score-item">
+                <div class="score-label">코드 품질</div>
+                <div class="score-value">{{ codeQualityScoreText }}점</div>
               </div>
               <div class="score-item">
                 <div class="score-label">협업 능력</div>
@@ -99,10 +99,23 @@
 
             <div class="problem-description-box">
               <h3>📋 문제 설명</h3>
-              <div class="problem-text">
-                {{ extractProblemDescription(graphOutput.problem_text || '문제 정보를 불러오는 중입니다.') }}
+              
+              <!-- 카테고리/난이도 정보 -->
+              <div class="problem-meta">
+                <div class="meta-item">
+                  <span class="meta-label">카테고리</span>
+                  <span class="meta-value">{{ problemCategory }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">난이도</span>
+                  <span class="meta-value" :class="difficultyClass">{{ problemDifficulty }}</span>
+                </div>
               </div>
-            </div>
+
+              <div class="problem-text">
+                  {{ extractProblemDescription(graphOutput.problem_text || '문제 정보를 불러오는 중입니다.') }}
+                </div>
+              </div>
             
             <!-- 초기 전략 답변 -->
             <div class="ps-section">
@@ -243,7 +256,7 @@ const problemText = ref("");
 const latestCode = ref("");
 
 // ✅ 세부 점수들
-const promptScore = ref(null);
+const codeQualityScore = ref(null);
 const problemSolvingScore = ref(null);
 const collaborationScore = ref(null);
 
@@ -263,6 +276,13 @@ const improvementTextHtml = computed(() => {
   const s = (improvementText.value || "").trim();
   if (!s) return "";
   return s.replace(/(^|\n)\s*-\s*/g, "$1- ").replace(/\n/g, "<br>");
+});
+
+const codeQualityScoreText = computed(() => {
+  if (codeQualityScore.value === null || codeQualityScore.value === undefined) return "-";
+  const n = Number(codeQualityScore.value);
+  if (Number.isNaN(n)) return String(codeQualityScore.value);
+  return n.toFixed(0);
 });
 
 // 만약 한 줄로 쭉 들어오고 "- ... - ..." 형태라면, 항목마다 줄바꿈
@@ -296,6 +316,17 @@ const consistencyText = ref("");
 const consistencyFeedback = ref("");
 const qaHistory = ref([]);
 
+const problemCategory = ref("");
+const problemDifficulty = ref("");
+
+const difficultyClass = computed(() => {
+  const diff = problemDifficulty.value.toLowerCase();
+  if (diff.includes("쉬움") || diff.includes("easy")) return "difficulty-easy";
+  if (diff.includes("중간") || diff.includes("medium")) return "difficulty-medium";
+  if (diff.includes("어려움") || diff.includes("hard")) return "difficulty-hard";
+  return "";
+});
+
 // ✅ LangGraph 최종 output 전체 저장
 const graphOutput = ref({});
 
@@ -305,13 +336,6 @@ const finalScoreText = computed(() => {
   if (finalScore.value === null || finalScore.value === undefined) return "-";
   const n = Number(finalScore.value);
   if (Number.isNaN(n)) return String(finalScore.value);
-  return n.toFixed(0);
-});
-
-const promptScoreText = computed(() => {
-  if (promptScore.value === null || promptScore.value === undefined) return "-";
-  const n = Number(promptScore.value);
-  if (Number.isNaN(n)) return String(promptScore.value);
   return n.toFixed(0);
 });
 
@@ -395,7 +419,7 @@ const fetchReport = async () => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = await resp.json().catch(() => ({}));
+    const data = await resp.json().catch(() => ({}));  // ✅ 여기서 선언됨!
 
     if (resp.status === 401) {
       router.replace({ name: "login" });
@@ -422,10 +446,10 @@ const fetchReport = async () => {
     // LangGraph output에서 상세 점수와 피드백 추출
     const output = data.graph_output || {};
     
-    // 점수 추출
-    promptScore.value = output.prompt_score ?? null;
+    // ✅ 점수 추출 (수정됨)
+    codeQualityScore.value = output.code_quality_score_raw_35 ?? null;  // 35점 만점
     problemSolvingScore.value = output.problem_solving_score ?? null;
-    collaborationScore.value = output.collaboration_score ?? null;
+    collaborationScore.value = output.collaboration_score_raw_30 ?? null;  // 30점 만점
     
     // 피드백 추출
     strengthText.value = output.strength || "데이터를 불러오는 중 문제가 발생했습니다.";
@@ -433,6 +457,10 @@ const fetchReport = async () => {
     cheatingWarningText.value = output.cheating_warning || "";
     comprehensiveEvaluationText.value = output.comprehensive_evaluation || "종합 평가 데이터를 불러오는 중입니다.";
     annotatedCode.value = output.annotated_code || latestCode.value || "# 코드를 불러올 수 없습니다.";
+    
+    // ✅ 카테고리/난이도 추출 (output에서!)
+    problemCategory.value = output.problem_category || "미분류";
+    problemDifficulty.value = output.problem_difficulty || "미정";
     
     // ✅ 문제 해결 능력 평가 데이터 추출
     const psEval = output.problem_solving_evaluation || {};
@@ -1093,5 +1121,44 @@ const extractProblemDescription = (fullText) => {
 .pdf-dark .desc,
 .pdf-dark .label {
   color: rgba(230, 237, 243, 0.75) !important;
+}
+
+/* 문제 메타 정보 */
+.problem-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.meta-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.meta-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.meta-value.difficulty-easy {
+  color: #4ade80;
+}
+
+.meta-value.difficulty-medium {
+  color: #fbbf24;
+}
+
+.meta-value.difficulty-hard {
+  color: #f87171;
 }
 </style>

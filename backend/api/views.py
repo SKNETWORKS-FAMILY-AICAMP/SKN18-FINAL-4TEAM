@@ -1707,6 +1707,33 @@ def save_strategy_answer(request):
         
         print(f"[save_strategy] 저장 완료: {strategy_answer[:50]}...", flush=True)
         
+        # ✅ checkpoint에도 저장 (추가)
+        try:
+            from langgraph.checkpoint.postgres import PostgresSaver
+            from interview_engine.graph import get_checkpointer
+            
+            checkpointer = get_checkpointer()
+            
+            # 현재 checkpoint 가져오기
+            config = {"configurable": {"thread_id": session_id}}
+            checkpoint = checkpointer.get(config)
+            
+            if checkpoint:
+                # chapter1 채널에 저장
+                channel_values = checkpoint.get("channel_values") or {}
+                chapter1 = channel_values.get("chapter1") or {}
+                chapter1["user_strategy_answer"] = strategy_answer
+                channel_values["chapter1"] = chapter1
+                
+                # checkpoint 업데이트
+                checkpoint["channel_values"] = channel_values
+                checkpointer.put(config, checkpoint)
+                
+                print(f"[save_strategy] checkpoint 저장 완료", flush=True)
+        except Exception as e:
+            # checkpoint 저장 실패해도 Redis는 성공했으므로 계속 진행
+            print(f"[save_strategy] checkpoint 저장 실패 (무시): {e}", flush=True)
+
         return Response({
             "success": True,
             "message": "Strategy answer saved",

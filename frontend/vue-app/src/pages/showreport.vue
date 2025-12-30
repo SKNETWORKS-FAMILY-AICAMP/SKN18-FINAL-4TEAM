@@ -86,6 +86,20 @@
                 <div class="feedback-text">{{ cheatingWarningText }}</div>
               </div>
             </div>
+
+            <!-- 부정행위 기록 (점수 반영 없음) -->
+            <div v-if="antiCheatSummary" class="feedback-box warning">
+              <div class="feedback-icon">📌</div>
+              <div class="feedback-content">
+                <div class="feedback-title">부정행위 기록</div>
+                <div class="feedback-text">
+                  {{ formatAntiCheatLine("캠 기반", antiCheatSummary.camera) }}
+                </div>
+                <div class="feedback-text">
+                  {{ formatAntiCheatLine("타이핑/화면 이탈", antiCheatSummary.typing) }}
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 종합 평가 섹션 -->
@@ -306,6 +320,7 @@ const improvementTextHtml2 = computed(() => {
 const cheatingWarningText = ref("");
 const comprehensiveEvaluationText = ref("");
 const annotatedCode = ref("");
+const antiCheatSummary = ref(null);
 
 // ✅ 문제 해결 능력 평가 관련
 const initialStrategyAnswer = ref("");
@@ -357,6 +372,13 @@ const hasCheatingWarning = computed(() => {
   return cheatingWarningText.value && cheatingWarningText.value.trim().length > 0;
 });
 
+const formatAntiCheatLine = (label, payload) => {
+  if (!payload) return `${label}: -`;
+  const count = Number(payload.count || 0);
+  const level = payload.level || "-";
+  return `${label}: ${count}회 (${level})`;
+};
+
 // 문제 이해도 클래스
 const problemUnderstandingClass = computed(() => {
   const text = problemUnderstandingText.value.toLowerCase();
@@ -377,17 +399,17 @@ const approachValidityClass = computed(() => {
 // 일관성 상태
 const consistencyClass = computed(() => {
   const text = consistencyText.value.toLowerCase();
-  if (text.includes("일치") || text.includes("동일")) return "consistency-match";
-  if (text.includes("개선") || text.includes("발전")) return "consistency-improved";
   if (text.includes("불일치") || text.includes("변경")) return "consistency-mismatch";
+  if (text.includes("개선") || text.includes("발전")) return "consistency-improved";
+  if (text.includes("일치") || text.includes("동일")) return "consistency-match";
   return "";
 });
 
 const consistencyBadge = computed(() => {
   const text = consistencyText.value.toLowerCase();
-  if (text.includes("일치") || text.includes("동일")) return "✓ 일치";
-  if (text.includes("개선") || text.includes("발전")) return "↑ 개선";
   if (text.includes("불일치") || text.includes("변경")) return "≠ 불일치";
+  if (text.includes("개선") || text.includes("발전")) return "↑ 개선";
+  if (text.includes("일치") || text.includes("동일")) return "✓ 일치";
   return "?";
 });
 
@@ -447,9 +469,9 @@ const fetchReport = async () => {
     const output = data.graph_output || {};
     
     // ✅ 점수 추출 (수정됨)
-    codeQualityScore.value = output.code_quality_score_raw_35 ?? null;  // 35점 만점
-    problemSolvingScore.value = output.problem_solving_score ?? null;
-    collaborationScore.value = output.collaboration_score_raw_30 ?? null;  // 30점 만점
+    codeQualityScore.value = output.code_quality_score ?? null;  // 100점 환산
+    problemSolvingScore.value = output.problem_solving_score ?? null;  // 100점 환산
+    collaborationScore.value = output.collaboration_score ?? null;  // 100점 환산
     
     // 피드백 추출
     strengthText.value = output.strength || "데이터를 불러오는 중 문제가 발생했습니다.";
@@ -457,6 +479,7 @@ const fetchReport = async () => {
     cheatingWarningText.value = output.cheating_warning || "";
     comprehensiveEvaluationText.value = output.comprehensive_evaluation || "종합 평가 데이터를 불러오는 중입니다.";
     annotatedCode.value = output.annotated_code || latestCode.value || "# 코드를 불러올 수 없습니다.";
+    antiCheatSummary.value = output.anti_cheat_summary || null;
     
     // ✅ 카테고리/난이도 추출 (output에서!)
     problemCategory.value = output.problem_category || "미분류";

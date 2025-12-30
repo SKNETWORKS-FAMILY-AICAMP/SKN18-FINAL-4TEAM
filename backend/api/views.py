@@ -1710,6 +1710,7 @@ class LiveCodingFinalEvalReportView(APIView):
                 values["graph_output"] = graph_output
                 print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
         try:
+            now_local = timezone.localtime()
             defaults = {
                 "user": user,
                 "report_md": report_md,
@@ -1726,14 +1727,14 @@ class LiveCodingFinalEvalReportView(APIView):
                 "step": values.get("step"),
                 "status": values.get("status"),
                 "error": values.get("error"),
-                "updated_at": timezone.now(),
+                "updated_at": now_local,
             }
             report_obj, created = LivecodingReport.objects.update_or_create(
                 session_id=session_id,
                 defaults=defaults,
             )
             if created and not report_obj.created_at:
-                report_obj.created_at = timezone.now()
+                report_obj.created_at = now_local
                 report_obj.save(update_fields=["created_at"])
         except Exception as e:
             # 저장 실패는 조회 응답을 막지 않음

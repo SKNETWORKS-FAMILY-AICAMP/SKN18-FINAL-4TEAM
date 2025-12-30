@@ -1,20 +1,16 @@
 from __future__ import annotations
 
+import ast
+import json
 import re
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
+import redis
 from django.core.cache import cache
+from langgraph.checkpoint.redis import RedisSaver
 
-from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
-from interview_engine.llm import get_llm
-
-
-def _clamp01(x: float) -> float:
-    try:
-        x = float(x)
-    except Exception:
-        return 0.0
-    return 0.0 if x < 0.0 else 1.0 if x > 1.0 else x
+from interview_engine.llm import get_llm  # noqa: F401  # (필요 시 사용)
+from interview_engine.utils.checkpoint_reader import _redis_url, load_chapter_channel_values
 
 
 def _safe_str(x: Any) -> str:
@@ -48,7 +44,7 @@ def _extract_prefix(line: str) -> str:
 
 
 def _pull_feedback(container: Any, key: str) -> List[str]:
-    """container와 container.get('meta') 둘 다에서 찾는다."""
+    """container와 container.get('meta') 둘 다에서 key를 찾는다."""
     if not isinstance(container, dict):
         return []
     direct = _coerce_list(container.get(key))
@@ -58,6 +54,22 @@ def _pull_feedback(container: Any, key: str) -> List[str]:
     if isinstance(meta_part, dict):
         return _coerce_list(meta_part.get(key))
     return []
+
+
+def _pull_error(container: Any) -> str:
+    if not isinstance(container, dict):
+        return ""
+    for key in ("ruff_error", "code_quality_error", "collaboration_error"):
+        val = container.get(key)
+        if val:
+            return _safe_str(val)
+    meta_part = container.get("meta")
+    if isinstance(meta_part, dict):
+        for key in ("ruff_error", "code_quality_error", "collaboration_error"):
+            val = meta_part.get(key)
+            if val:
+                return _safe_str(val)
+    return ""
 
 
 def _count_prefixes(lines: List[str]) -> Dict[str, int]:
@@ -70,8 +82,10 @@ def _count_prefixes(lines: List[str]) -> Dict[str, int]:
     return counts
 
 
-def _has_entrypoint_solution(code: str) -> bool:
-    return bool(re.search(r"^\s*def\s+solution\s*\(", code or "", flags=re.M))
+def _has_entrypoint_solution(code: str, function_name: str = "solution") -> bool:
+    name = function_name or "solution"
+    pattern = rf"^\s*def\s+{re.escape(name)}\s*\("
+    return bool(re.search(pattern, code or "", flags=re.M))
 
 
 def _has_placeholder(code: str) -> bool:
@@ -152,14 +166,22 @@ def _score_maintainability_9(prefix_cnt: Dict[str, int], fn_len_ev: Dict[str, An
 
     max_fn = int(fn_len_ev.get("max_fn_lines") or 0)
     fn_len_pen = 0
-    if max_fn >= 80:
+    if max_fn >= 100:
         fn_len_pen = 3
-    elif max_fn >= 50:
+    elif max_fn >= 75:
         fn_len_pen = 2
-    elif max_fn >= 35:
+    elif max_fn >= 50:
         fn_len_pen = 1
 
-    maintain_issues = (2.0 * c) + (1.5 * ruf) + (1.2 * b) + (0.6 * a) + (0.4 * i) + (0.2 * tid) + fn_len_pen
+    maintain_issues = (
+        (2.0 * c)
+        + (1.5 * ruf)
+        + (1.2 * b)
+        + (0.6 * a)
+        + (0.4 * i)
+        + (0.2 * tid)
+        + fn_len_pen
+    )
 
     P = 9.0
     if maintain_issues <= 0:
@@ -188,25 +210,33 @@ def _score_maintainability_9(prefix_cnt: Dict[str, int], fn_len_ev: Dict[str, An
             "fn_len_pen": fn_len_pen,
         },
         "feedback": [
-            f"- 유지보수 이슈량: {maintain_issues:.2f} → {score:.2f}/9 (2*C + 1.5*RUF + 1.2*B + 0.6*A + 0.4*I + 0.2*TID + fn_len_pen)"
+            (
+                "- 유지보수 이슈량: "
+                f"{maintain_issues:.2f} → {score:.2f}/9 "
+                "(2*C + 1.5*RUF + 1.2*B + 0.6*A + 0.4*I + 0.2*TID + fn_len_pen)"
+            )
         ],
     }
 
 
-def _score_completeness_9(prefix_cnt: Dict[str, int], code: str) -> Dict[str, Any]:
+def _score_completeness_9(
+    prefix_cnt: Dict[str, int],
+    code: str,
+    function_name: str = "solution",
+) -> Dict[str, Any]:
     f = prefix_cnt.get("F", 0)
     b = prefix_cnt.get("B", 0)
     s = prefix_cnt.get("S", 0)
     ruf = prefix_cnt.get("RUF", 0)
 
-    has_solution = _has_entrypoint_solution(code)
+    has_solution = _has_entrypoint_solution(code, function_name)
     has_placeholder = _has_placeholder(code)
 
     comp_issues = (2.5 * f) + (1.3 * b) + (2.0 * s) + (1.0 * ruf)
     if not has_solution:
         comp_issues += 4.0
     if has_placeholder:
-        comp_issues += 3.0
+        comp_issues += 9.0
 
     P = 9.0
     if comp_issues <= 0:
@@ -233,7 +263,11 @@ def _score_completeness_9(prefix_cnt: Dict[str, int], code: str) -> Dict[str, An
             "placeholder": has_placeholder,
         },
         "feedback": [
-            f"- 완성도 이슈량: {comp_issues:.2f} → {score:.2f}/9 (2.5*F + 1.3*B + 2.0*S + 1.0*RUF + solution/placeholder 보정)"
+            (
+                "- 완성도 이슈량: "
+                f"{comp_issues:.2f} → {score:.2f}/9 "
+                "(2.5*F + 1.3*B + 2.0*S + 1.0*RUF + solution/placeholder 보정)"
+            )
         ],
     }
 
@@ -254,67 +288,224 @@ def _pick_top_feedback(lines: List[str], limit: int = 12) -> List[str]:
     return out
 
 
-def _llm_collab_score(
-    conversation_log: List[Any],
-    question_cnt: Any,
+# -------- 협업 전용 스코어(communication/hint/feedback) --------
+def _score_collab_comm_12(prefix_cnt: Dict[str, int]) -> Dict[str, Any]:
+    # N/D/I/Q/ERA만 사용
+    n = prefix_cnt.get("N", 0)
+    d = prefix_cnt.get("D", 0)
+    i = prefix_cnt.get("I", 0)
+    q = prefix_cnt.get("Q", 0)
+    era = prefix_cnt.get("ERA", 0)
+
+    comm_issues = n + d + i + q + era
+    P = 12.0
+    if comm_issues <= 0:
+        score = P
+    elif comm_issues <= 2:
+        score = 0.85 * P
+    elif comm_issues <= 5:
+        score = 0.65 * P
+    elif comm_issues <= 10:
+        score = 0.40 * P
+    else:
+        score = 0.15 * P
+    score = float(round(score, 2))
+    return {
+        "score": score,
+        "issues": round(comm_issues, 2),
+        "evidence": {"N": n, "D": d, "I": i, "Q": q, "ERA": era},
+        "feedback": [f"- 의사소통 이슈량: {comm_issues:.2f} → {score:.2f}/12 (N/D/I/Q/ERA)"],
+    }
+
+
+def _score_collab_feedback_9(improvement_ratio: float) -> Dict[str, Any]:
+    """
+    피드백 수용(9점): 힌트/질문 이후 코드 개선율을 사용.
+    improvement_ratio는 0~1 범위 권장.
+      - 0.8 이상: 9점
+      - 0.5 이상: 7점
+      - 0.2 이상: 5점
+      - 그 미만: 3점
+    """
+    try:
+        r = float(improvement_ratio)
+    except Exception:
+        r = 0.0
+    if r >= 0.8:
+        score = 9.0
+    elif r >= 0.5:
+        score = 7.0
+    elif r >= 0.2:
+        score = 5.0
+    else:
+        score = 3.0
+    return {
+        "score": float(round(score, 2)),
+        "issues": round(1.0 - r, 2),  # 낮을수록 개선 적음
+        "evidence": {"improvement_ratio": round(r, 4)},
+        "feedback": [f"- 피드백 수용: 개선율={r:.2f} → {score:.2f}/9"],
+    }
+
+
+def _score_collab_hint_count_9(
     hint_count: Any,
-    code_excerpt: str,
+    change_ratio: float | None = None,
 ) -> Dict[str, Any]:
     """
-    대화/힌트 메타를 LLM으로 평가해 0~10점 협업 점수 반환.
+    힌트 품질 9점 = (A*0.6 + B*0.4)*9
+      - A(타이밍 60%): hint_count <=3 =>1.0, 초과=>0.6
+      - B(빈도 40%): 1회=1.0, 2회=0.8, 3회=0.5, 0회=0.5, 그 이상=0.4
+      - change_ratio가 주어지면(0~1) 힌트 요청 전후 코드 변화량을 가중(멀티플라이어 0.5~1.0)
     """
     try:
-        q_cnt = int(question_cnt or 0)
+        hc = int(hint_count if hint_count is not None else 0)
     except Exception:
-        q_cnt = 0
+        hc = 0
+
+    a_factor = 1.0 if hc <= 3 else 0.6
+    if hc <= 0:
+        b_factor = 0.5
+    elif hc == 1:
+        b_factor = 1.0
+    elif hc == 2:
+        b_factor = 0.8
+    elif hc == 3:
+        b_factor = 0.5
+    else:
+        b_factor = 0.4
+
+    combined = (a_factor * 0.6) + (b_factor * 0.4)
+
+    # 코드 변화량이 없는데 힌트를 요청한 경우 감점 (0.5~1.0 배)
+    if change_ratio is None:
+        multiplier = 1.0
+    else:
+        try:
+            cr = float(change_ratio)
+        except Exception:
+            cr = 0.0
+        cr = max(0.0, min(1.0, cr))
+        multiplier = 0.5 + 0.5 * cr
+
+    score = float(round(combined * multiplier * 9.0, 2))
+
+    return {
+        "score": score,
+        "issues": float(hc),
+        "evidence": {
+            "hint_count": hc,
+            "timing_factor": a_factor,
+            "freq_factor": b_factor,
+            "combined_factor": round(combined, 4),
+            "change_ratio": None
+            if change_ratio is None
+            else round(max(0.0, min(1.0, float(change_ratio))), 4),
+            "multiplier": round(multiplier, 3),
+        },
+        "feedback": [
+            (
+                "- 힌트 품질: "
+                f"hint_count={hc}, timing={a_factor:.2f}, "
+                f"freq={b_factor:.2f}, change_mult={multiplier:.2f} → {score:.2f}/9"
+            )
+        ],
+    }
+
+
+def _load_latest_feedback(session_id: str, chapter: str, field: str) -> Tuple[List[str], str]:
+    """
+    LangGraph 체크포인트에서 특정 feedback 필드를 로드.
+    - thread_id = "{session_id}:{chapter}"
+    - checkpoint_ns = "__empty__" 고정
+    1) RedisSaver latest → list_checkpoints 역순 스캔
+    2) 실패 시 Redis JSON 키 직접 조회 (checkpoint_latest → checkpoint:* 스캔)
+    """
+    thread_id = f"{session_id}:{chapter}"
+    ns = "__empty__"
+
+    # 1) LangGraph RedisSaver
+    saver = None
     try:
-        h_cnt = int(hint_count or 0)
+        saver = RedisSaver.from_conn_string(_redis_url())
     except Exception:
-        h_cnt = 0
+        saver = None
 
-    conv_text = conversation_log if isinstance(conversation_log, list) else []
-    # 코드 일부만 전달 (너무 길지 않게)
-    code_excerpt = (code_excerpt or "").strip()
-    if len(code_excerpt) > 1200:
-        code_excerpt = code_excerpt[:1200] + "\n... (truncated)"
+    if saver:
+        # 최신 checkpoint 우선
+        try:
+            tup = saver.get_tuple(thread_id=thread_id, checkpoint_ns=ns)
+            if tup and getattr(tup, "checkpoint", None):
+                cv = (tup.checkpoint or {}).get("channel_values") or {}
+                fb = _coerce_list(cv.get(field))
+                if fb:
+                    return fb, f"checkpoint_latest:{chapter}"
+        except Exception:
+            pass
 
-    system_prompt = (
-        "당신은 라이브코딩 인터뷰의 협업/커뮤니케이션 평가자입니다. "
-        "대화 로그와 질문/힌트 사용 메타를 바탕으로 협업 성숙도를 0~10점으로 채점하고, 짧은 근거를 제시하세요. "
-        "출력은 JSON 문자열로 반환합니다."
-    )
-    human_prompt = (
-        f"[메타]\n"
-        f"- question_cnt: {q_cnt}\n"
-        f"- hint_count: {h_cnt}\n\n"
-        f"[대화 로그]\n{conv_text}\n\n"
-        f"[코드 발췌]\n{code_excerpt}\n\n"
-        "요구사항:\n"
-        "1) 협업/소통/힌트 활용/피드백 수용을 종합해 0~10점으로 평가.\n"
-        "2) JSON 객체로만 답변: {\"score\": <0~10 number>, \"feedback\": \"짧은 근거\"}\n"
-        "3) 점수는 소수 한 자리까지.\n"
-    )
+        # 과거 checkpoint 역순 스캔
+        try:
+            if hasattr(saver, "list_checkpoints"):
+                ckpts = saver.list_checkpoints(thread_id=thread_id, checkpoint_ns=ns) or []
+                for ck in reversed(ckpts):
+                    ckid = getattr(ck, "checkpoint_id", "") or ""
+                    try:
+                        tup = (
+                            saver.get_tuple(
+                                thread_id=thread_id,
+                                checkpoint_ns=ns,
+                                checkpoint_id=ckid,
+                            )
+                            if ckid
+                            else ck
+                        )
+                    except Exception:
+                        tup = ck
+                    cv = {}
+                    if tup and getattr(tup, "checkpoint", None):
+                        cv = (tup.checkpoint or {}).get("channel_values") or {}
+                    fb = _coerce_list(cv.get(field))
+                    if fb:
+                        return fb, f"checkpoint:{chapter}:{ckid or 'scan'}"
+        except Exception:
+            pass
 
+    # 2) Redis JSON 직접 조회
     try:
-        model = get_llm('default')
-        resp = model.invoke(
-            [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": human_prompt},
-            ]
-        )
-        raw = (getattr(resp, "content", "") or "").strip()
-        import json
+        rcli = redis.from_url(_redis_url())
+        latest_key = f"checkpoint_latest:{session_id}:{chapter}:{ns}"
+        ck_ref = rcli.get(latest_key)
+        if ck_ref:
+            ck_ref = ck_ref.decode() if isinstance(ck_ref, (bytes, bytearray)) else str(ck_ref)
+            try:
+                raw = rcli.execute_command("JSON.GET", ck_ref, ".")
+                if raw:
+                    data = json.loads(raw)
+                    cv = (data.get("checkpoint") or {}).get("channel_values") or {}
+                    fb = _coerce_list(cv.get(field))
+                    if fb:
+                        return fb, f"redis_json_latest:{chapter}"
+            except Exception:
+                pass
 
-        data = json.loads(raw)
-        score = float(data.get("score", 0.0) or 0.0)
-        fb = str(data.get("feedback") or "").strip()
+        pattern = f"checkpoint:{session_id}:{chapter}:{ns}:*"
+        keys = rcli.keys(pattern)
+        for k in sorted(keys, reverse=True):
+            try:
+                raw = rcli.execute_command("JSON.GET", k, ".")
+                if not raw:
+                    continue
+                data = json.loads(raw)
+                cv = (data.get("checkpoint") or {}).get("channel_values") or {}
+                fb = _coerce_list(cv.get(field))
+                if fb:
+                    k_str = k.decode() if isinstance(k, (bytes, bytearray)) else str(k)
+                    return fb, f"redis_json:{k_str}"
+            except Exception:
+                continue
     except Exception:
-        score = 0.0
-        fb = "LLM 평가 실패로 0점 처리"
+        pass
 
-    score = max(0.0, min(10.0, score))
-    return {"score": score, "feedback": fb}
+    return [], "missing"
 
 
 def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -334,7 +525,6 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         state["status"] = "error"
         state["step"] = "error"
         state["error"] = "meta.session_id가 없습니다."
-        state["code_collab_score"] = 0.0
         state["code_collab_feedback"] = "- session_id 누락"
         state["code_collab_evidence"] = {}
         return state
@@ -344,6 +534,26 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     cache_meta = cache.get(meta_key) or {}
     chap2 = load_chapter_channel_values(session_id, "chapter2")
     chap2_hint = load_chapter_channel_values(session_id, "chapter2_hint")
+
+    # ---- Ruff 오류 확인 (오류면 강한 감점: 0점 처리)
+    ruff_error = (
+        _pull_error(state)
+        or _pull_error(cache_meta)
+        or _pull_error(chap2)
+        or _pull_error(chap2_hint)
+    )
+    if ruff_error:
+        state["code_collab_score"] = 0.0
+        state["code_collab_score_30"] = 0.0
+        state["code_quality_score_35"] = 0.0
+        state["code_collab_feedback"] = f"### Ruff 실행 실패로 코드 품질/협업 점수를 0점 처리\n- 오류: {ruff_error}"
+        state["code_collab_evidence"] = {
+            "ruff_error": ruff_error,
+            "quality_feedback_count": 0,
+            "collaboration_feedback_count": 0,
+        }
+        state["status"] = "done"
+        return state
 
     quality_fb: List[str] = []
     collab_fb: List[str] = []
@@ -368,7 +578,7 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         if collab_fb:
             collab_source.append("cache_meta")
 
-    # 3) checkpoints
+    # 3) checkpoints (단일 챕터 값)
     if not quality_fb:
         quality_fb = _pull_feedback(chap2, "code_quality_feedback")
         if quality_fb:
@@ -387,13 +597,71 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         if collab_fb:
             collab_source.append("checkpoint_chapter2_hint")
 
+    # 4) LangGraph checkpoint 스캔 (chapter2 → chapter2_hint 순서)
+    if not quality_fb:
+        quality_fb, q_src = _load_latest_feedback(session_id, "chapter2", "code_quality_feedback")
+        if quality_fb:
+            quality_source.append(q_src)
+    if not quality_fb:
+        quality_fb, q_src2 = _load_latest_feedback(
+            session_id,
+            "chapter2_hint",
+            "code_quality_feedback",
+        )
+        if quality_fb:
+            quality_source.append(q_src2)
+
+    if not collab_fb:
+        collab_fb, c_src = _load_latest_feedback(
+            session_id,
+            "chapter2",
+            "collaboration_feedback",
+        )
+        if collab_fb:
+            collab_source.append(c_src)
+    if not collab_fb:
+        collab_fb, c_src2 = _load_latest_feedback(
+            session_id,
+            "chapter2_hint",
+            "collaboration_feedback",
+        )
+        if collab_fb:
+            collab_source.append(c_src2)
+
     # ---- 코드 스냅샷 (완성도 보조 신호: solution/placeholder/함수길이)
     code_key = f"livecoding:{session_id}:code"
     code_data = cache.get(code_key) or {}
-    latest = (code_data.get("latest") or {})
+    latest = code_data.get("latest") or {}
     cache_code = _safe_str(latest.get("code") or "").strip()
     ckpt_code = _safe_str(chap2.get("code") or "").strip()
     code = cache_code or ckpt_code
+    function_name = ""
+    problem = cache.get(f"livecoding:{session_id}:problem") or {}
+    if isinstance(problem, dict):
+        function_name = _safe_str(problem.get("function_name") or "")
+    if not function_name:
+        function_name = "solution"
+
+    # ---- ruff issues empty + parse fail => hard fail
+    if not ruff_error and not quality_fb and not collab_fb and code:
+        try:
+            ast.parse(code)
+        except Exception as exc:
+            ruff_error = _safe_str(exc)
+            state["code_collab_score"] = 0.0
+            state["code_collab_score_30"] = 0.0
+            state["code_quality_score_35"] = 0.0
+            state["code_collab_feedback"] = (
+                "### 코드 파싱 실패로 코드 품질/협업 점수를 0점 처리\n"
+                f"- 오류: {ruff_error}"
+            )
+            state["code_collab_evidence"] = {
+                "ruff_error": ruff_error,
+                "quality_feedback_count": 0,
+                "collaboration_feedback_count": 0,
+            }
+            state["status"] = "done"
+            return state
 
     # ---- prefix 카운트 분리
     quality_prefix_counts = _count_prefixes(quality_fb)
@@ -403,7 +671,8 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     q_read = _score_readability_12(quality_prefix_counts)
     q_fn_len = _count_function_lengths(code)
     q_maint = _score_maintainability_9(quality_prefix_counts, q_fn_len)
-    q_comp = _score_completeness_9(quality_prefix_counts, code)
+    q_comp = _score_completeness_9(quality_prefix_counts, code, function_name)
+    has_placeholder = _has_placeholder(code)
 
     fatal_q = quality_prefix_counts.get("F", 0) + quality_prefix_counts.get("S", 0)
     big_c_q = quality_prefix_counts.get("C", 0)
@@ -416,43 +685,123 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     else:
         bonus_q = 1.0
 
-    quality_total_35 = float(round(q_read["score"] + q_maint["score"] + q_comp["score"] + bonus_q, 2))
-    quality_score01 = _clamp01(quality_total_35 / 35.0)
-
-    # ---- 협업 스코어(30점) - collaboration prefix 사용 (보너스 없음)
-    c_read = _score_readability_12(collab_prefix_counts)  # 의사소통 12
-    c_fn_len = _count_function_lengths(code)
-    c_maint = _score_maintainability_9(collab_prefix_counts, c_fn_len)  # 힌트 품질 9 (근사)
-    c_comp = _score_completeness_9(collab_prefix_counts, code)  # 피드백 수용 9 (근사)
-
-    collab_rule_total_30 = float(round(c_read["score"] + c_maint["score"] + c_comp["score"], 2))
-    # rule 기반을 20점 만점으로 스케일
-    collab_rule_20 = collab_rule_total_30 * (20.0 / 30.0)
-
-    # LLM 기반 협업 평가(10점 만점)
-    llm_result = _llm_collab_score(
-        conversation_log=chap2_hint.get("conversation_log") if isinstance(chap2_hint, dict) else [],
-        question_cnt=(chap2.get("question_cnt") if isinstance(chap2, dict) else None),
-        hint_count=(chap2_hint.get("hint_count") if isinstance(chap2_hint, dict) else None),
-        code_excerpt=code,
+    quality_total_35 = float(
+        round(q_read["score"] + q_maint["score"] + q_comp["score"] + bonus_q, 2),
     )
-    collab_llm_10 = llm_result.get("score", 0.0)
+    if has_placeholder:
+        quality_total_35 = 0.0
+        bonus_q = 0.0
 
-    collab_total_30 = float(round(collab_rule_20 + collab_llm_10, 2))
-    collab_score01 = _clamp01(collab_total_30 / 30.0)
+    # ---- 협업 스코어(30점) - collaboration prefix 전용 스코어 사용 (보너스 없음)
+    c_comm = _score_collab_comm_12(collab_prefix_counts)  # 의사소통 12
+
+    # 힌트 품질은 hint_count 기반
+    hint_count = chap2_hint.get("hint_count") if isinstance(chap2_hint, dict) else None
+
+    # 코드 변화량(힌트 직후 코드 vs 최신 코드)이 있으면 멀티플라이어로 반영
+    hint_code = (
+        _safe_str(chap2_hint.get("current_user_code") or "")
+        if isinstance(chap2_hint, dict)
+        else ""
+    )
+    latest_code = code  # 이미 최신 스냅샷으로 확보
+    change_ratio = None
+    if hint_code:
+        try:
+            change_ratio = 0.0 if hint_code.strip() == latest_code.strip() else 1.0
+        except Exception:
+            change_ratio = 0.0
+    c_hint = _score_collab_hint_count_9(hint_count, change_ratio)
+
+    # 피드백 수용: 힌트 직후 코드 vs 최신 코드의 개선율(길이/함수/placeholder)
+    def _code_metrics(txt: str) -> Dict[str, float]:
+        lines = (txt or "").splitlines()
+        fn_stats = _count_function_lengths(txt)
+        has_ph = _has_placeholder(txt)
+        return {
+            "line_count": len(lines),
+            "max_fn_lines": fn_stats.get("max_fn_lines") or 0,
+            "fn_count": fn_stats.get("fn_count") or 0,
+            "placeholder": 1 if has_ph else 0,
+        }
+
+    m_before = _code_metrics(hint_code) if hint_code else _code_metrics(latest_code)
+    m_after = _code_metrics(latest_code)
+
+    def _ratio(before: float, after: float, higher_is_better: bool) -> float:
+        try:
+            b = float(before)
+            a = float(after)
+        except Exception:
+            return 0.0
+        if b <= 0 and a <= 0:
+            return 1.0
+        if b <= 0:
+            return 0.0
+        diff = (b - a) if higher_is_better else (a - b)
+        return max(0.0, min(1.0, diff / max(1.0, abs(b))))
+
+    # 개선율: 라인 수 감소, max 함수 길이 감소, 함수 개수 증가, placeholder 제거 여부
+    r_line = _ratio(m_before["line_count"], m_after["line_count"], True)
+    r_fnlen = _ratio(m_before["max_fn_lines"], m_after["max_fn_lines"], True)
+    r_fncount = _ratio(m_before["fn_count"], m_after["fn_count"], False)
+    r_placeholder = (
+        1.0
+        if (m_before["placeholder"] == 1 and m_after["placeholder"] == 0)
+        else 0.0
+        if m_before["placeholder"]
+        else 1.0
+    )
+
+    improvement_ratio = max(
+        0.0,
+        min(
+            1.0,
+            (0.25 * r_line)
+            + (0.25 * r_fnlen)
+            + (0.25 * r_fncount)
+            + (0.25 * r_placeholder),
+        ),
+    )
+
+    c_fb = _score_collab_feedback_9(improvement_ratio)  # 피드백 수용 9
+
+    collab_rule_total_30 = float(
+        round(c_comm["score"] + c_hint["score"] + c_fb["score"], 2),
+    )
+    collab_total_30 = collab_rule_total_30  # 협업은 rule-based 30점만 사용
+    if has_placeholder:
+        collab_total_30 = 0.0
 
     # ---- 피드백 메시지
     fb_lines: List[str] = []
     fb_lines.append("### 코드 품질 평가 (rule-based, 35점 만점)")
-    fb_lines.append(f"- 총점: **{quality_total_35:.2f}/35** (score01={quality_score01:.2f})")
-    fb_lines.append(f"- 구성: 가독성 {q_read['score']:.2f}/12, 유지보수성 {q_maint['score']:.2f}/9, 완성도 {q_comp['score']:.2f}/9, 보너스 {bonus_q:.2f}/5")
+    if has_placeholder:
+        fb_lines.append("- 제출 코드에 placeholder(pass/TODO/...)가 포함되어 0점 처리")
+    fb_lines.append(f"- 총점: **{quality_total_35:.2f}/35**")
+    fb_lines.append(
+        (
+            "- 구성: "
+            f"가독성 {q_read['score']:.2f}/12, "
+            f"유지보수성 {q_maint['score']:.2f}/9, "
+            f"완성도 {q_comp['score']:.2f}/9, "
+            f"보너스 {bonus_q:.2f}/5"
+        ),
+    )
     fb_lines.append("")
     fb_lines.append(f"#### 1) 가독성 (readability issues={q_read['issues']:.2f})")
     fb_lines.extend(q_read["feedback"])
     fb_lines.append("")
     fb_lines.append(f"#### 2) 유지보수성 (maintainability issues={q_maint['issues']:.2f})")
     fb_lines.extend(q_maint["feedback"])
-    fb_lines.append(f"- 함수 길이: fn_count={q_fn_len.get('fn_count')}, max_fn_lines={q_fn_len.get('max_fn_lines')}, avg_fn_lines={q_fn_len.get('avg_fn_lines')}")
+    fb_lines.append(
+        (
+            "- 함수 길이: "
+            f"fn_count={q_fn_len.get('fn_count')}, "
+            f"max_fn_lines={q_fn_len.get('max_fn_lines')}, "
+            f"avg_fn_lines={q_fn_len.get('avg_fn_lines')}"
+        ),
+    )
     fb_lines.append("")
     fb_lines.append(f"#### 3) 완성도 (completeness issues={q_comp['issues']:.2f})")
     fb_lines.extend(q_comp["feedback"])
@@ -461,23 +810,26 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     fb_lines.append(f"- fatal(F+S)={fatal_q}, C={big_c_q} → bonus={bonus_q:.2f}")
     fb_lines.append("")
 
-    fb_lines.append("### 협업 능력 평가 (rule-based 20점 + LLM 10점 = 30점)")
-    fb_lines.append(f"- 총점: **{collab_total_30:.2f}/30** (score01={collab_score01:.2f})")
-    fb_lines.append(f"- 구성: rule 기반 20점(의사소통 {c_read['score']:.2f}/12, 힌트 품질 {c_maint['score']:.2f}/9, 피드백 수용 {c_comp['score']:.2f}/9 → 환산 {collab_rule_20:.2f}/20) + LLM {collab_llm_10:.2f}/10")
+    fb_lines.append("### 협업 능력 평가 (rule-based 30점)")
+    fb_lines.append(f"- 총점: **{collab_total_30:.2f}/30**")
+    fb_lines.append(
+        (
+            "- 구성: "
+            f"의사소통 {c_comm['score']:.2f}/12, "
+            f"힌트 품질 {c_hint['score']:.2f}/9, "
+            f"피드백 수용 {c_fb['score']:.2f}/9 (보너스/LLM 없음)"
+        ),
+    )
     fb_lines.append("")
-    fb_lines.append(f"#### 1) 의사소통 (readability issues={c_read['issues']:.2f})")
-    fb_lines.extend(c_read["feedback"])
+    fb_lines.append(f"#### 1) 의사소통 (comm issues={c_comm['issues']:.2f})")
+    fb_lines.extend(c_comm["feedback"])
     fb_lines.append("")
-    fb_lines.append(f"#### 2) 힌트 품질 (maintainability issues={c_maint['issues']:.2f})")
-    fb_lines.extend(c_maint["feedback"])
-    fb_lines.append(f"- 함수 길이: fn_count={c_fn_len.get('fn_count')}, max_fn_lines={c_fn_len.get('max_fn_lines')}, avg_fn_lines={c_fn_len.get('avg_fn_lines')}")
+    fb_lines.append(f"#### 2) 힌트 품질 (hint issues={c_hint['issues']:.2f})")
+    fb_lines.extend(c_hint["feedback"])
     fb_lines.append("")
-    fb_lines.append(f"#### 3) 피드백 수용 (completeness issues={c_comp['issues']:.2f})")
-    fb_lines.extend(c_comp["feedback"])
+    fb_lines.append(f"#### 3) 피드백 수용 (feedback issues={c_fb['issues']:.2f})")
+    fb_lines.extend(c_fb["feedback"])
     fb_lines.append("")
-    fb_lines.append(f"#### 4) LLM 협업 평가 (10점)")
-    fb_lines.append(f"- 점수: {collab_llm_10:.2f}/10")
-    fb_lines.append(f"- 근거: {llm_result.get('feedback')}")
 
     fb_lines.append("### 코드 품질 피드백 원본")
     fb_lines.extend(_pick_top_feedback(quality_fb, limit=50) or ["- (없음)"])
@@ -485,12 +837,9 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     fb_lines.append("### 협업/커뮤니케이션 피드백 원본")
     fb_lines.extend(_pick_top_feedback(collab_fb, limit=50) or ["- (없음)"])
 
-    # collab 점수를 code_collab_score로 사용 (0~1), 원점수도 보관
-    state["code_collab_score"] = round(collab_score01, 4)
-    state["code_collab_score_30"] = collab_total_30  # 협업 능력 원점수(30점)
-    # 품질 35점 결과는 이름에 quality를 명시
+    # ---- state 저장 (정규화 점수 없이 원점수만)
+    state["code_collab_score_30"] = collab_total_30
     state["code_quality_score_35"] = quality_total_35
-    state["code_quality_score01_from_feedback"] = round(quality_score01, 4)
     state["code_collab_feedback"] = "\n".join(fb_lines).strip()
     state["code_collab_evidence"] = {
         "quality_prefix_counts": quality_prefix_counts,
@@ -499,12 +848,9 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "quality_maintainability": q_maint["evidence"],
         "quality_completeness": q_comp["evidence"],
         "quality_bonus": bonus_q,
-        "collab_readability": c_read["evidence"],
-        "collab_maintainability": c_maint["evidence"],
-        "collab_completeness": c_comp["evidence"],
-        "collab_llm_score_10": collab_llm_10,
-        "collab_rule_20": collab_rule_20,
-        "collab_llm_feedback": llm_result.get("feedback"),
+        "collab_comm": c_comm["evidence"],
+        "collab_hint": c_hint["evidence"],
+        "collab_feedback": c_fb["evidence"],
         "quality_source": quality_source,
         "collaboration_source": collab_source,
         "quality_feedback_count": len(quality_fb),

@@ -774,6 +774,9 @@ const transcribeHintAudio = async () => {
 /* -----------------------------
   🔊 TTS
 ------------------------------ */
+// 코딩 세션 페이지가 아닐 때는 어떤 TTS도 재생하지 않는다.
+const isCodingSessionRouteActive = () => router.currentRoute.value?.name === "coding-session";
+
 // 현재 재생 중인 TTS 오디오들을 추적해서 화면을 떠날 때 모두 중단할 수 있도록 한다.
 const activeTtsAudios = new Set();
 // 진행 중인 TTS 요청(스트리밍 fetch)을 중단하기 위한 AbortController들
@@ -837,9 +840,10 @@ const stopAllTts = () => {
 const playSingleTtsChunk = async (chunk) => {
   if (!chunk?.audio) return true;
   const myGeneration = ttsStopGeneration;
+  if (!isCodingSessionRouteActive()) return false;
   const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
   try {
-    if (myGeneration !== ttsStopGeneration) return false;
+    if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return false;
     activeTtsAudios.add(audio);
     await audio.play();
   } catch (err) {
@@ -876,23 +880,35 @@ const playSingleTtsChunk = async (chunk) => {
 const fetchTtsChunksBatch = async ({ token, sessionId, text, maxSentences }) => {
   const ttsText = typeof text === "string" ? text.trim() : "";
   if (!ttsText) return [];
+  if (!isCodingSessionRouteActive()) return [];
   const url = `${TTS_BATCH_ENDPOINT}?session_id=${encodeURIComponent(sessionId)}`;
-  const resp = await fetch(url, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify(
-      maxSentences ? { tts_text: ttsText, max_sentences: maxSentences } : { tts_text: ttsText }
-    ),
-  });
-  const data = await resp.json().catch(() => ({}));
-  if (!resp.ok) {
-    console.warn("TTS batch 요청 실패", resp.status, data);
-    return [];
+  const controller = new AbortController();
+  activeTtsControllers.add(controller);
+  try {
+    const resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(
+        maxSentences ? { tts_text: ttsText, max_sentences: maxSentences } : { tts_text: ttsText }
+      ),
+      signal: controller.signal,
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("TTS batch 요청 실패", resp.status, data);
+      return [];
+    }
+    if (!isCodingSessionRouteActive()) return [];
+    return normalizeTtsChunks(data?.tts_text);
+  } catch (err) {
+    if (err?.name === "AbortError") return [];
+    throw err;
+  } finally {
+    activeTtsControllers.delete(controller);
   }
-  return normalizeTtsChunks(data?.tts_text);
 };
 
 async function* parseNdjsonStream(stream) {
@@ -937,6 +953,7 @@ const fetchAndPlayTtsStream = async ({
   const myGeneration = ttsStopGeneration;
   const ttsText = typeof text === "string" ? text.trim() : "";
   if (!ttsText) return false;
+  if (!isCodingSessionRouteActive()) return false;
 
   const url = `${TTS_STREAM_ENDPOINT}?session_id=${encodeURIComponent(sessionId)}`;
   const controller = new AbortController();
@@ -990,7 +1007,7 @@ const fetchAndPlayTtsStream = async ({
 
   try {
     for await (const msg of parseNdjsonStream(resp.body)) {
-      if (myGeneration !== ttsStopGeneration) {
+      if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) {
         canceled = true;
         break;
       }
@@ -1009,7 +1026,7 @@ const fetchAndPlayTtsStream = async ({
         }
       }
       chain = chain.then(async () => {
-        if (myGeneration !== ttsStopGeneration) {
+        if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) {
           canceled = true;
           return false;
         }
@@ -1044,9 +1061,10 @@ const fetchAndPlayTtsStream = async ({
 
 const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart: null }) => {
   const myGeneration = ttsStopGeneration;
+  if (!isCodingSessionRouteActive()) return false;
   let started = false;
   for (const chunk of chunks) {
-    if (myGeneration !== ttsStopGeneration) return false;
+    if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return false;
     if (!chunk?.audio) continue;
     const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
     try {
@@ -1100,6 +1118,7 @@ const fetchAndPlayTts = async ({
   collectChunks,
 }) => {
   const myGeneration = ttsStopGeneration;
+  if (!isCodingSessionRouteActive()) return false;
   try {
     const ok = await fetchAndPlayTtsStream({
       token,
@@ -1159,6 +1178,7 @@ const playWarningBeep = async (durationMs = 400, freq = 880) => {
 const playInlineTts = async (text = "") => {
   const trimmed = text.trim();
   if (!trimmed || typeof window === "undefined") return false;
+  if (!isCodingSessionRouteActive()) return false;
   try {
     if (!("speechSynthesis" in window)) return false;
     const synth = window.speechSynthesis;
@@ -1309,12 +1329,14 @@ const confirmReloadIntro = async () => {
 };
 
 const playIntroTtsFromSession = async () => {
+  const myGeneration = ttsStopGeneration;
   if (isTtsPlaying.value) {
     return;
   }
   if (sessionStage.value !== "intro") {
     return;
   }
+  if (!isCodingSessionRouteActive()) return;
 
   // 인트로용 고정 인사 TTS가 준비되기 전까지 로딩 오버레이를 유지한다.
   isIntroPreparing.value = true;
@@ -1365,6 +1387,7 @@ const playIntroTtsFromSession = async () => {
             startCountdownOnce();
           },
         });
+        if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return;
         if (!ok) {
           isIntroPreparing.value = false;
         }
@@ -1377,12 +1400,15 @@ const playIntroTtsFromSession = async () => {
       isIntroPreparing.value = false;
     }
 
+    if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return;
+
     // 2) 메인 인트로 오디오가 준비될 때까지 대기 후 재생
     let completed = false;
     if (cachedIntroChunks.length) {
       completed = await playTtsChunks(cachedIntroChunks, { throwOnError: true });
     } else {
       const introText = await introTextPromise;
+      if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return;
       if (!introText) {
         window.alert("인트로 오디오가 준비되지 않았습니다. 다시 시작해 주세요.");
         return;
@@ -1397,6 +1423,7 @@ const playIntroTtsFromSession = async () => {
         maxSentences: 30,
         collectChunks: (c) => collected.push(c),
       });
+      if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return;
       if (completed && collected.length && sessionId) {
         try {
           sessionStorage.setItem(INTRO_AUDIO_KEY(sessionId), JSON.stringify(collected));
@@ -1437,6 +1464,8 @@ const requestCodingQuestion = async () => {
   if (currentStage.value !== "coding") return;
   if (isRecording.value || isSttRunning.value) return;
   if (isQuestionPolling.value) return;
+  const myGeneration = ttsStopGeneration;
+  if (!isCodingSessionRouteActive()) return;
 
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
@@ -1456,6 +1485,7 @@ const requestCodingQuestion = async () => {
       }
     );
     const data = await resp.json().catch(() => ({}));
+    if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return;
 
     if (!resp.ok || data.skipped) {
       // 질문을 건너뛴 경우 조용히 반환

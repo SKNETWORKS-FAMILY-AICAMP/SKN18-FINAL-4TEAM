@@ -23,21 +23,35 @@ def _clamp01(x: float) -> float:
 
 def _grade_from_score(score01: float) -> str:
     s = _clamp01(score01)
-    if s >= 0.90:
+    if s >= 0.95:
         return "A+"
-    if s >= 0.80:
+    if s >= 0.90:
         return "A"
-    if s >= 0.70:
+    if s >= 0.85:
+        return "B+"
+    if s >= 0.80:
         return "B"
-    if s >= 0.60:
+    if s >= 0.75:
+        return "C+"
+    if s >= 0.70:
         return "C"
-    if s >= 0.50:
+    if s >= 0.60:
         return "D"
     return "F"
 
 
 def _safe_str(x: Any) -> str:
     return "" if x is None else str(x)
+
+
+def _level_from_count(count: int) -> str:
+    if count >= 20:
+        return "확실"
+    if count >= 10:
+        return "의심"
+    if count >= 5:
+        return "주의"
+    return "정상"
 
 
 def _format_qa_history(qa_history: List[Dict]) -> str:
@@ -310,7 +324,6 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
     print("[create_report_node] ENTER", flush=True)
     try:
         # 점수 추출
-        code_score = _clamp01(state.get("code_collab_score") or 0.0)
         code_feedback = _safe_str(state.get("code_collab_feedback") or "")
 
         problem_score = _clamp01(
@@ -330,13 +343,24 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         problem_evidence = dict(state.get("problem_evidence") or {})
         code_collab_evidence = dict(state.get("code_collab_evidence") or {})
 
-        # 가중치
-        w_code = float(state.get("weight_code") or 0.4)
-        w_prob = float(state.get("weight_problem") or 0.6)
-        w_sum = (w_code + w_prob) if (w_code + w_prob) > 0 else 1.0
+        # 35/30/35 기준 원점수 합산으로 최종 점수 계산
+        code_quality_score_raw_35 = float(state.get("code_quality_score_35") or 0.0)
+        code_collab_score_raw_30 = float(state.get("code_collab_score_30") or 0.0)
+        problem_score_raw_35 = round(problem_score * 35.0, 2)
 
-        final_score = _clamp01((w_code * code_score + w_prob * problem_score) / w_sum)
-        final_grade = _grade_from_score(final_score)
+        code_quality_score_raw_35 = max(0.0, min(35.0, code_quality_score_raw_35))
+        code_collab_score_raw_30 = max(0.0, min(30.0, code_collab_score_raw_30))
+        problem_score_raw_35 = max(0.0, min(35.0, problem_score_raw_35))
+
+        final_score_raw_100 = round(
+            code_quality_score_raw_35 + code_collab_score_raw_30 + problem_score_raw_35,
+            2,
+        )
+        code_quality_percent = round((code_quality_score_raw_35 / 35.0) * 100.0, 2)
+        code_collab_percent = round((code_collab_score_raw_30 / 30.0) * 100.0, 2)
+        problem_score_percent = round((problem_score_raw_35 / 35.0) * 100.0, 2)
+        final_score01 = _clamp01(final_score_raw_100 / 100.0)
+        final_grade = _grade_from_score(final_score01)
 
         # 코드와 문제 텍스트 추출
         code = _safe_str(problem_evidence.get("submitted_code") or "")
@@ -502,23 +526,14 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     
             except Exception as e:
                 print(f"[Data Load Error] {e}", flush=True)
-                
-            #     # QA 히스토리 구성
-            #     for q, a in zip(questions, answers):
-            #         if q and a:  # 둘 다 있을 때만 추가
-            #             qa_history.append({"question": q, "answer": a})
-                        
-            #     print(f"[create_report_node] 전략답변: {len(initial_strategy)}자, QA: {len(qa_history)}개", flush=True)
-            # except Exception as e:
-            #     print(f"[create_report_node] checkpoint 데이터 로드 실패: {e}", flush=True)
         
         # ✅ LLM을 사용한 상세 피드백 생성
         print("[create_report_node] LLM 피드백 생성 시작...", flush=True)
         llm_feedback = _generate_detailed_feedback_with_llm(
             code=code,
             problem_text=problem_text,
-            code_score=code_score,
-            problem_score=problem_score,
+            code_score=code_collab_percent,
+            problem_score=problem_score_percent,
             code_feedback=code_feedback,
             problem_feedback=problem_feedback,
             evidence={
@@ -540,22 +555,41 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
         # flags
         flags: List[str] = list(state.get("final_flags") or [])
-        if final_score < 0.3 and "low_score" not in flags:
+        if final_score01 < 0.3 and "low_score" not in flags:
             flags.append("low_score")
-        if code_score < 0.2 and "code_quality_risk" not in flags:
+        if code_quality_percent < 20.0 and "code_quality_risk" not in flags:
             flags.append("code_quality_risk")
-        if problem_score < 0.2 and "problem_solving_risk" not in flags:
+        if problem_score_percent < 20.0 and "problem_solving_risk" not in flags:
             flags.append("problem_solving_risk")
 
-        code_collab_score_raw_30 = float(state.get("code_collab_score_30") or 0.0)
-        code_quality_score_raw_35 = float(state.get("code_quality_score_35") or 0.0)
         collab_rule_20 = float(code_collab_evidence.get("collab_rule_20") or 0.0)
         collab_llm_score_10 = float(code_collab_evidence.get("collab_llm_score_10") or 0.0)
+
+        anti_cheat_summary: Dict[str, Any] = {}
+        if session_id:
+            event_key = f"livecoding:{session_id}:anti-cheat-events"
+            event_payload = cache.get(event_key) or {}
+            typing = event_payload.get("typing") or {}
+            camera = event_payload.get("camera") or {}
+            typing_count = sum(int(v or 0) for v in typing.values())
+            camera_count = sum(int(v or 0) for v in camera.values())
+            anti_cheat_summary = {
+                "typing": {
+                    "count": typing_count,
+                    "level": _level_from_count(typing_count),
+                    "details": typing,
+                },
+                "camera": {
+                    "count": camera_count,
+                    "level": _level_from_count(camera_count),
+                    "details": camera,
+                },
+            }
 
         md = f"""# 코딩 테스트 결과 리포트
 
 ## 요약
-- 최종 점수: **{final_score:.2f}**
+- 최종 점수: **{final_score_raw_100:.2f}**
 - 최종 등급: **{final_grade}**
 - 코드 품질 원점수: **{code_quality_score_raw_35:.2f}/35**
 - 협업 능력 원점수: **{code_collab_score_raw_30:.2f}/30** (rule {collab_rule_20:.2f}/20 + LLM {collab_llm_score_10:.2f}/10)
@@ -566,12 +600,16 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
 ## 개선점
 {llm_feedback['improvement']}
 
+## 부정행위 기록 (참고용, 점수 반영 없음)
+- 캠 기반: {anti_cheat_summary.get('camera', {}).get('count', 0)}회 ({anti_cheat_summary.get('camera', {}).get('level', '정상')})
+- 타이핑/화면 이탈: {anti_cheat_summary.get('typing', {}).get('count', 0)}회 ({anti_cheat_summary.get('typing', {}).get('level', '정상')})
+
 ## 종합 평가
 {llm_feedback['comprehensive_evaluation']}
 """
 
         # ✅ FinalEvalState에 모든 필드 저장
-        state["final_score"] = round(final_score * 100, 0)  # 100점 만점으로 변환
+        state["final_score"] = round(final_score_raw_100, 0)
         state["final_grade"] = final_grade
         state["final_report_markdown"] = md
         state["final_flags"] = flags
@@ -582,16 +620,18 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # ✅ graph_output에 프론트엔드가 필요한 모든 필드 포함
         state["graph_output"] = {
             # 점수들 (100점 만점)
-            "prompt_score": round(code_score * 100, 0),  # 프롬프트 점수 (코드 품질 점수 사용)
-            "problem_solving_score": round(problem_score * 100, 0),
-            "collaboration_score": round(code_score * 100, 0),  # 협업 점수 (코드 품질에 포함)
+            "prompt_score": round(code_quality_percent, 0),  # 프롬프트 점수 (코드 품질 점수 사용)
+            "problem_solving_score": round(problem_score_percent, 2),
+            "collaboration_score": round(code_collab_percent, 2),
+            "code_quality_score": round(code_quality_percent, 2),
                         
             "collaboration_score_raw_30": round(code_collab_score_raw_30, 2),
             "code_quality_score_raw_35": round(code_quality_score_raw_35, 2),
+            "problem_solving_score_raw_35": round(problem_score_raw_35, 2),
             "collaboration_rule_20": round(collab_rule_20, 2),
             "collaboration_llm_10": round(collab_llm_score_10, 2),
 
-            "final_score": round(final_score * 100, 0),
+            "final_score": round(final_score_raw_100, 0),
             "final_grade": final_grade,
             
             # LLM 생성 피드백
@@ -600,6 +640,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "comprehensive_evaluation": llm_feedback["comprehensive_evaluation"],
             "annotated_code": llm_feedback["annotated_code"],
             "cheating_warning": llm_feedback["cheating_warning"],
+            "anti_cheat_summary": anti_cheat_summary,
 
             "problem_category": problem_category,
             "problem_difficulty": problem_difficulty,
@@ -630,7 +671,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         state["status"] = "done"
         state["error"] = None
 
-        print(f"[create_report_node] 완료 - 최종점수: {final_score:.2f}, 등급: {final_grade}", flush=True)
+        print(f"[create_report_node] 완료 - 최종점수: {final_score_raw_100:.2f}, 등급: {final_grade}", flush=True)
         return state
 
     except Exception as e:

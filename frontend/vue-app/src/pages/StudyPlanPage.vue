@@ -34,58 +34,13 @@ const calendarOptions = reactive({
 
 const isVideoOpen = ref(false);
 const activeVideo = ref(null);
+const reflectionDifficulty = ref(3);
+const lectureNote = ref('');
+const reflectionSaving = ref(false);
 
 const isActiveCompleted = computed(() => {
   return Boolean(activeVideo.value?.extendedProps?.is_completed);
 });
-
-async function toggleCompletion() {
-  if (!activeVideo.value) {
-    return;
-  }
-
-  const ok = await ensureValidSession();
-  if (!ok) {
-    alert("로그인이 필요합니다.");
-    return;
-  }
-
-  const taskId = activeVideo.value?.extendedProps?.task_id;
-  if (!taskId) {
-    alert("저장할 수 있는 작업이 없습니다.");
-    return;
-  }
-
-  const nextValue = !isActiveCompleted.value;
-
-  try {
-    const response = await axios.patch(
-      `${BACKEND_BASE}/api/tasks/complete/`,
-      {
-        task_id: taskId,
-        is_completed: nextValue
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token.value}`
-        }
-      }
-    );
-
-    const updatedValue = response.data?.is_completed ?? nextValue;
-    if (typeof activeVideo.value.setExtendedProp === 'function') {
-      activeVideo.value.setExtendedProp('is_completed', updatedValue);
-    } else {
-      activeVideo.value.extendedProps = {
-        ...(activeVideo.value.extendedProps || {}),
-        is_completed: updatedValue
-      };
-    }
-  } catch (error) {
-    console.error(error);
-    alert("완료 상태 저장에 실패했습니다.");
-  }
-}
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return '';
@@ -105,12 +60,70 @@ function getYouTubeEmbedUrl(url) {
 
 function openVideoModal(event) {
   activeVideo.value = event;
+  reflectionDifficulty.value = event?.extendedProps?.reflection_difficulty ?? 3;
+  lectureNote.value = event?.extendedProps?.lecture_note ?? '';
   isVideoOpen.value = true;
 }
 
 function closeVideoModal() {
   isVideoOpen.value = false;
   activeVideo.value = null;
+}
+
+async function saveReflection() {
+  if (!activeVideo.value) {
+    return;
+  }
+
+  const ok = await ensureValidSession();
+  if (!ok) {
+    alert("로그인이 필요합니다.");
+    return;
+  }
+
+  const taskId = activeVideo.value?.extendedProps?.task_id;
+  if (!taskId) {
+    alert("저장할 수 있는 작업이 없습니다.");
+    return;
+  }
+
+  reflectionSaving.value = true;
+  try {
+    const response = await axios.patch(
+      `${BACKEND_BASE}/api/tasks/reflection/`,
+      {
+        task_id: taskId,
+        difficulty: reflectionDifficulty.value,
+        lecture_note: lectureNote.value
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token.value}`
+        }
+      }
+    );
+
+    const updatedDifficulty = response.data?.difficulty ?? reflectionDifficulty.value;
+    const updatedComment = response.data?.lecture_note ?? lectureNote.value;
+    const updatedCompleted = response.data?.is_completed ?? true;
+    if (typeof activeVideo.value.setExtendedProp === 'function') {
+      activeVideo.value.setExtendedProp('reflection_difficulty', updatedDifficulty);
+      activeVideo.value.setExtendedProp('lecture_note', updatedComment);
+      activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
+    } else {
+      activeVideo.value.extendedProps = {
+        ...(activeVideo.value.extendedProps || {}),
+        reflection_difficulty: updatedDifficulty,
+        lecture_note: updatedComment,
+        is_completed: updatedCompleted
+      };
+    }
+  } catch (error) {
+    console.error(error);
+    alert("회고 저장에 실패했습니다.");
+  } finally {
+    reflectionSaving.value = false;
+  }
 }
 
 // --- 함수 구현 ---
@@ -236,9 +249,6 @@ onMounted(() => {
           <span :class="['video-badge', isActiveCompleted ? 'video-badge--done' : 'video-badge--todo']">
             {{ isActiveCompleted ? '학습 완료' : '학습 진행 중' }}
           </span>
-          <button type="button" class="video-toggle" @click="toggleCompletion">
-            {{ isActiveCompleted ? '완료 취소' : '완료로 표시' }}
-          </button>
         </div>
         <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
         <div class="video-frame">
@@ -252,6 +262,40 @@ onMounted(() => {
             ></iframe>
             <div v-else class="video-empty">유효한 유튜브 링크가 없습니다.</div>
           </div>
+        <div class="reflection-block">
+          <div class="reflection-fields">
+            <label class="reflection-label">
+              난이도
+              <div class="reflection-slider">
+                <input
+                  v-model.number="reflectionDifficulty"
+                  type="range"
+                  min="1"
+                  max="5"
+                  step="1"
+                  class="reflection-range"
+                  aria-label="난이도 선택"
+                />
+                <div class="reflection-range-value">{{ reflectionDifficulty }}</div>
+              </div>
+            </label>
+            <label class="reflection-label">
+              공부한 내용
+              <textarea
+                v-model="lectureNote"
+                class="reflection-input"
+                rows="3"
+                maxlength="200"
+                placeholder="오늘 배운 내용을 적어주세요. 추후 AI코치가 피드백을 제공해드립니다."
+              ></textarea>
+            </label>
+          </div>
+          <div class="reflection-actions">
+            <button type="button" class="reflection-save" :disabled="reflectionSaving" @click="saveReflection">
+              {{ reflectionSaving ? "저장 중..." : "회고 저장" }}
+            </button>
+          </div>
+        </div>
         </div>
       </div>
     </Teleport>
@@ -371,6 +415,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
+  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 :global(.video-header) {
@@ -380,8 +425,8 @@ onMounted(() => {
 }
 
 :global(.video-title) {
-  font-size: 1.2rem;
-  font-weight: 700;
+  font-size: 1.35rem;
+  font-weight: 800;
   color: #1f2933;
 }
 
@@ -389,13 +434,14 @@ onMounted(() => {
   background: none;
   border: none;
   color: #6b7280;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
 }
 
 :global(.video-meta) {
   color: #6b4f3f;
-  font-size: 0.95rem;
+  font-size: 1rem;
+  font-weight: 600;
 }
 
 :global(.video-status) {
@@ -408,10 +454,10 @@ onMounted(() => {
 :global(.video-badge) {
   display: inline-flex;
   align-items: center;
-  padding: 6px 10px;
+  padding: 6px 12px;
   border-radius: 999px;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: 0.9rem;
+  font-weight: 700;
 }
 
 :global(.video-badge--todo) {
@@ -424,19 +470,6 @@ onMounted(() => {
   color: #2c3e50;
 }
 
-:global(.video-toggle) {
-  border: 1px solid #d2d6dc;
-  background: #fff;
-  color: #2c3e50;
-  font-weight: 600;
-  border-radius: 10px;
-  padding: 6px 12px;
-  cursor: pointer;
-}
-
-:global(.video-toggle:hover) {
-  background: #f3f4f6;
-}
 
 :global(.video-frame) {
   width: 100%;
@@ -450,6 +483,81 @@ onMounted(() => {
   width: 100%;
   height: 100%;
   border: none;
+}
+
+:global(.reflection-block) {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:global(.reflection-title) {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #2c3e50;
+}
+
+:global(.reflection-fields) {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+:global(.reflection-label) {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2f2a1f;
+}
+
+:global(.reflection-slider) {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+:global(.reflection-range) {
+  width: 140px;
+  accent-color: #1f6f54;
+  height: 6px;
+}
+
+:global(.reflection-range-value) {
+  min-width: 28px;
+  text-align: center;
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+:global(.reflection-input) {
+  border: 1px solid #d2d6dc;
+  border-radius: 12px;
+  padding: 12px 14px;
+  font-size: 1rem;
+  resize: vertical;
+}
+
+:global(.reflection-actions) {
+  display: flex;
+  justify-content: flex-end;
+}
+
+:global(.reflection-save) {
+  border: none;
+  background: #1f6f54;
+  color: #fff;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+}
+
+:global(.reflection-save:disabled) {
+  background: #94a3b8;
+  cursor: not-allowed;
 }
 
 :global(.video-empty) {

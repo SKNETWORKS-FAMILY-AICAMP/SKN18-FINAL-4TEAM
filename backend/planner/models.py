@@ -14,3 +14,5 @@ class DailyTask(models.Model):
     video_title = models.CharField(max_length=255, null=True, blank=True)
     video_url = models.URLField(null=True, blank=True)
     is_completed = models.BooleanField(default=False)
+    reflection_difficulty = models.PositiveSmallIntegerField(null=True, blank=True)
+    lecture_note = models.CharField(max_length=200, blank=True, default="")

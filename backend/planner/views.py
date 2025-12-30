@@ -77,7 +77,9 @@ class GeneratePlanView(APIView):
                             "extendedProps": {
                                 "day_number": day_num,
                                 "task_id": task.id, # [중요] 프론트엔드 체크박스 기능용 ID
-                                "is_completed": False
+                                "is_completed": False,
+                                "reflection_difficulty": None,
+                                "lecture_note": ""
                             },
                             "backgroundColor": '#e7f5ff',
                             "borderColor": '#42b883'
@@ -124,6 +126,8 @@ class LatestStudyPlanView(APIView):
                         "day_number": task.day,
                         "task_id": task.id,
                         "is_completed": task.is_completed,
+                        "reflection_difficulty": task.reflection_difficulty,
+                        "lecture_note": task.lecture_note,
                     },
                 }
             )
@@ -170,5 +174,55 @@ class StudyTaskCompletionView(APIView):
 
         return Response(
             {"task_id": task.id, "is_completed": task.is_completed},
+            status=status.HTTP_200_OK,
+        )
+
+
+class StudyTaskReflectionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        task_id = request.data.get("task_id")
+        difficulty = request.data.get("difficulty")
+        lecture_note = request.data.get("lecture_note", "")
+
+        if task_id is None:
+            return Response({"error": "task_id는 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if difficulty is None:
+            return Response({"error": "difficulty는 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            difficulty = int(difficulty)
+        except (TypeError, ValueError):
+            return Response({"error": "difficulty는 숫자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if difficulty < 1 or difficulty > 5:
+            return Response({"error": "difficulty는 1~5 사이여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        lecture_note = (lecture_note or "").strip()
+        if len(lecture_note) > 200:
+            return Response({"error": "lecture_note는 200자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        task = DailyTask.objects.filter(id=task_id, plan__user=user).first()
+        if not task:
+            return Response({"error": "작업을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        task.reflection_difficulty = difficulty
+        task.lecture_note = lecture_note
+        task.is_completed = True
+        task.save(update_fields=["reflection_difficulty", "lecture_note", "is_completed"])
+
+        return Response(
+            {
+                "task_id": task.id,
+                "difficulty": task.reflection_difficulty,
+                "lecture_note": task.lecture_note,
+                "is_completed": task.is_completed,
+            },
             status=status.HTTP_200_OK,
         )

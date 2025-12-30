@@ -140,17 +140,29 @@ def _generate_problem_solving_evaluation(
             "consistency_feedback": "",
         }
         
+        def _extract_label(text: str) -> str:
+            if not text:
+                return "평가 중"
+            t = text.strip()
+            if "우수" in t:
+                return "우수"
+            if "양호" in t:
+                return "양호"
+            if "부족" in t:
+                return "부족"
+            return t[:50]
+
         sections = content.split("###")
         for section in sections:
             section = section.strip()
             if section.upper().startswith("PROBLEM_UNDERSTANDING"):
                 text = section.replace("PROBLEM_UNDERSTANDING", "", 1).strip()
-                result["problem_understanding"] = text[:50]  # 첫 50자만
+                result["problem_understanding"] = _extract_label(text)
             elif section.upper().startswith("UNDERSTANDING_FEEDBACK"):
                 result["understanding_feedback"] = section.replace("UNDERSTANDING_FEEDBACK", "", 1).strip()
             elif section.upper().startswith("APPROACH_VALIDITY"):
                 text = section.replace("APPROACH_VALIDITY", "", 1).strip()
-                result["approach_validity"] = text[:50]
+                result["approach_validity"] = _extract_label(text)
             elif section.upper().startswith("CONSISTENCY_STATUS"):
                 text = section.replace("CONSISTENCY_STATUS", "", 1).strip()
                 result["consistency_status"] = text[:50]

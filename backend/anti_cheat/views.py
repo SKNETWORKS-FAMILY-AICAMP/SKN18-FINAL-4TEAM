@@ -49,6 +49,7 @@ class CheatAnalysisView(APIView):
         # 세션 ID가 있으면 간단한 부정행위 카운터를 Redis(캐시)에 기록합니다.
         if session_id:
             base_key = f"livecoding:{session_id}:anti-cheat"
+            event_key = f"livecoding:{session_id}:anti-cheat-events"
 
             if data.get("is_cheating"):
                 # base_key 하나에 dict 형태로 누적 저장
@@ -68,6 +69,12 @@ class CheatAnalysisView(APIView):
                     {"cheat_count": cheat_count, "reasons": reasons},
                     timeout=60 * 60,
                 )
+                # report용 camera 카운트도 함께 누적
+                event_payload = cache.get(event_key) or {}
+                camera = event_payload.get("camera") or {}
+                camera["mediapipe"] = int(camera.get("mediapipe", 0)) + 1
+                event_payload["camera"] = camera
+                cache.set(event_key, event_payload, timeout=60 * 60)
    
 
         return Response(data, status=status.HTTP_200_OK)

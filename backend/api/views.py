@@ -6,7 +6,7 @@ import time
 import threading
 from django.conf import settings
 from django.core.mail import send_mail
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
@@ -28,6 +28,8 @@ from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
 from .interview_utils import _generate_tts_payload, get_cached_graph
+
+from tts_client import generate_interview_audio
 
 from .models import (
     AuthIdentity,
@@ -118,6 +120,70 @@ class TTSView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class TTSStreamView(APIView):
+    """
+    텍스트를 받아 문장 단위로 TTS를 생성해 스트리밍으로 반환합니다.
+
+    - POST /api/tts/intro/stream/?session_id=...
+      body: {"tts_text": "..."} 또는 {"text": "..."}
+      response: NDJSON (각 줄이 1개 청크 JSON)
+        {"text":"...","audio":"<base64>","sentence_number":1,"is_first":true,"generation_time":0.0}
+    """
+
+    def post(self, request):
+        data = request.data or {}
+        text = (data.get("tts_text") or data.get("text") or "")
+        if not isinstance(text, str):
+            return Response(
+                {"detail": "tts_text(또는 text) 필드는 문자열이어야 합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        text = text.strip()
+        max_sentences = data.get("max_sentences")
+
+        if not text:
+            return Response(
+                {"detail": "tts_text(또는 text) 필드를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session_id = (
+            request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+            or (request.data.get("session_id") if hasattr(request, "data") else None)
+        )
+
+        config = {"configurable": {}}
+        if session_id:
+            config["configurable"]["thread_id"] = session_id
+        if isinstance(max_sentences, int) and max_sentences > 0:
+            config["configurable"]["max_sentences"] = max_sentences
+        if not config["configurable"]:
+            config = None
+
+        def iter_ndjson():
+            try:
+                for chunk in generate_interview_audio(text, config=config):
+                    payload = {
+                        "text": chunk.get("text", ""),
+                        "audio": chunk.get("audio_base64"),
+                        "sentence_number": chunk.get("sentence_number"),
+                        "is_first": chunk.get("is_first"),
+                        "generation_time": chunk.get("generation_time"),
+                    }
+                    if chunk.get("error"):
+                        payload["error"] = chunk.get("error")
+                    yield (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+            except Exception as exc:  # noqa: BLE001
+                payload = {"error": str(exc)}
+                yield (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+
+        resp = StreamingHttpResponse(iter_ndjson(), content_type="application/x-ndjson; charset=utf-8")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp
 
 class SignupView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -489,7 +555,8 @@ class LiveCodingStartView(APIView):
         if missing:
             return Response({"detail": f"problem_data 필드 누락: {', '.join(missing)}"}, status=400)
         session_id = secrets.token_hex(16)
-        start_at = timezone.now() # Redis(캐시)에 저장할 세션 메타 정보
+        start_at = timezone.now()  # Redis(캐시)에 저장할 세션 메타 정보
+        time_limit_seconds = int(problem_data.get("time_limit_seconds") or 40 * 60)
         meta = {
             "stage": "intro",
             "user_id": user.user_id,
@@ -499,6 +566,8 @@ class LiveCodingStartView(APIView):
             "starter_code": problem_data["starter_code"], 
             "time_limit_seconds": int(problem_data.get("time_limit_seconds") or 40 * 60),
             "start_at": start_at.isoformat(),
+            # remaining_seconds / timer_paused 는 사용자가 실제로
+            # 문제 화면을 떠날 때에만 TimerUpdateView를 통해 설정한다.
         }
         problem_payload  = {
                 "problem_id": problem_data["problem_id"],
@@ -512,9 +581,11 @@ class LiveCodingStartView(APIView):
             
         }
 
-        cache.set(f"livecoding:{session_id}:meta", meta, timeout=60*60)
-        cache.set(f"livecoding:{session_id}:problem", problem_payload, timeout=60*60)
-        cache.set(f"livecoding:user:{user.user_id}:current_session", session_id, timeout=60*60)
+        # 라이브 코딩 세션 관련 캐시는 TTL을 두지 않고,
+        # 사용자가 명시적으로 세션을 종료/제출/새로 시작할 때 정리한다.
+        cache.set(f"livecoding:{session_id}:meta", meta)
+        cache.set(f"livecoding:{session_id}:problem", problem_payload)
+        cache.set(f"livecoding:user:{user.user_id}:current_session", session_id)
         return Response(
             {
                 "session_id": session_id,
@@ -879,19 +950,27 @@ class LiveCodingSessionView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
-        start_at_str = meta.get("start_at")
         time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
-        remaining_seconds = time_limit_seconds
-
-        if start_at_str:
+        # 클라이언트가 remaining_seconds를 명시적으로 저장해 둔 값이 있다면
+        # 그 값을 우선 사용하고, 없는 경우에만 start_at 기준으로 경과 시간을 계산한다.
+        stored_remaining = meta.get("remaining_seconds")
+        if stored_remaining is not None:
             try:
-                start_at_dt = datetime.fromisoformat(start_at_str)
-                if timezone.is_naive(start_at_dt):
-                    start_at_dt = timezone.make_aware(start_at_dt, timezone=timezone.utc)
-                elapsed = max(0, int((timezone.now() - start_at_dt).total_seconds()))
-                remaining_seconds = max(0, time_limit_seconds - elapsed)
-            except Exception:
+                remaining_seconds = max(0, int(stored_remaining))
+            except (TypeError, ValueError):
                 remaining_seconds = time_limit_seconds
+        else:
+            start_at_str = meta.get("start_at")
+            remaining_seconds = time_limit_seconds
+            if start_at_str:
+                try:
+                    start_at_dt = datetime.fromisoformat(start_at_str)
+                    if timezone.is_naive(start_at_dt):
+                        start_at_dt = timezone.make_aware(start_at_dt, timezone=timezone.utc)
+                    elapsed = max(0, int((timezone.now() - start_at_dt).total_seconds()))
+                    remaining_seconds = max(0, time_limit_seconds - elapsed)
+                except Exception:
+                    remaining_seconds = time_limit_seconds
 
         return Response(
             {
@@ -907,7 +986,7 @@ class LiveCodingSessionView(APIView):
                 "starter_code": problem.get("starter_code"),
                 "test_cases": problem.get("test_cases") or [],
                 "time_limit_seconds": time_limit_seconds,
-                "start_at": start_at_str,
+                "start_at": meta.get("start_at"),
                 "remaining_seconds": remaining_seconds,
                 "hint_count": int(meta.get("hint_count") or 0),
             },
@@ -982,19 +1061,25 @@ class LiveCodingActiveSessionView(APIView):
             for tc in (problem.test_cases.all() if hasattr(problem, "test_cases") else [])
         ]
 
-        start_at_str = meta.get("start_at")
         time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
-        remaining_seconds = time_limit_seconds
-
-        if start_at_str:
+        stored_remaining = meta.get("remaining_seconds")
+        if stored_remaining is not None:
             try:
-                start_at_dt = datetime.fromisoformat(start_at_str)
-                if timezone.is_naive(start_at_dt):
-                    start_at_dt = timezone.make_aware(start_at_dt, timezone=timezone.utc)
-                elapsed = max(0, int((timezone.now() - start_at_dt).total_seconds()))
-                remaining_seconds = max(0, time_limit_seconds - elapsed)
-            except Exception:
+                remaining_seconds = max(0, int(stored_remaining))
+            except (TypeError, ValueError):
                 remaining_seconds = time_limit_seconds
+        else:
+            start_at_str = meta.get("start_at")
+            remaining_seconds = time_limit_seconds
+            if start_at_str:
+                try:
+                    start_at_dt = datetime.fromisoformat(start_at_str)
+                    if timezone.is_naive(start_at_dt):
+                        start_at_dt = timezone.make_aware(start_at_dt, timezone=timezone.utc)
+                    elapsed = max(0, int((timezone.now() - start_at_dt).total_seconds()))
+                    remaining_seconds = max(0, time_limit_seconds - elapsed)
+                except Exception:
+                    remaining_seconds = time_limit_seconds
 
         return Response(
             {
@@ -1010,7 +1095,7 @@ class LiveCodingActiveSessionView(APIView):
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
                 "time_limit_seconds": time_limit_seconds,
-                "start_at": start_at_str,
+                "start_at": meta.get("start_at"),
                 "remaining_seconds": remaining_seconds,
             },
             status=status.HTTP_200_OK,
@@ -1045,17 +1130,37 @@ class LiveCodingEndSessionView(APIView):
 
         meta_key = f"livecoding:{session_id}:meta"
         code_key = f"livecoding:{session_id}:code"
+        problem_key = f"livecoding:{session_id}:problem"
 
-        # 메타/코드/매핑 제거
+        # 메타/코드/문제/매핑 제거
         cache.delete(meta_key)
         cache.delete(code_key)
+        cache.delete(problem_key)
         cache.delete(mapping_key)
 
-        # STT 버퍼도 함께 정리
+        # STT 버퍼 및 LangGraph 체크포인트도 함께 정리
         try:
             clear_utterances(str(session_id))
         except Exception:
             # 정리 실패는 치명적이지 않으므로 무시
+            pass
+
+        try:
+            from .interview_utils import get_checkpointer
+
+            cp = get_checkpointer()
+            if cp is not None:
+                # chapter1 / chapter2 / chapter2_hint / chapter3 에 대한 thread 상태 삭제
+                for chapter in ("chapter1", "chapter2", "chapter2_hint", "chapter3"):
+                    thread_id = f"{session_id}:{chapter}"
+                    for ns in ("__empty__", "default"):
+                        try:
+                            if hasattr(cp, "delete_state"):
+                                cp.delete_state(thread_id=thread_id, checkpoint_ns=ns)
+                        except Exception:
+                            continue
+        except Exception:
+            # 체크포인트 정리 실패는 치명적이지 않음
             pass
 
         return Response(status=status.HTTP_204_NO_CONTENT)
@@ -1228,9 +1333,7 @@ class CodingQuestionView(APIView):
 
         latest_code = latest.get("code") or ""
         # 언어는 코드 스냅샷에 없으면 문제/메타 순으로 fallback
-        language = (
-            problem.get("language")
-        ).lower()
+        language = (problem.get("language") or meta.get("language") or "python").strip().lower()
 
         last_question_text = (code_data.get("last_question_text") or "").strip()
 
@@ -1590,6 +1693,47 @@ class LiveCodingFinalEvalReportView(APIView):
         except Exception as e:
             # 저장 실패는 조회 응답을 막지 않음
             print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
+
+        # 리포트가 정상적으로 생성/저장된 이후에는
+        # 해당 세션과 관련된 Redis 캐시/체크포인트를 모두 정리해
+        # 이어하기가 노출되지 않도록 한다.
+        try:
+            mapping_key = f"livecoding:user:{user.user_id}:current_session"
+            meta_key = f"livecoding:{session_id}:meta"
+            code_key = f"livecoding:{session_id}:code"
+            problem_key = f"livecoding:{session_id}:problem"
+
+            current_sid = cache.get(mapping_key)
+            if str(current_sid) == str(session_id):
+                cache.delete(mapping_key)
+            cache.delete(meta_key)
+            cache.delete(code_key)
+            cache.delete(problem_key)
+
+            # STT 버퍼 및 LangGraph 체크포인트도 함께 정리
+            try:
+                clear_utterances(str(session_id))
+            except Exception:
+                pass
+
+            try:
+                from .interview_utils import get_checkpointer
+
+                cp = get_checkpointer()
+                if cp is not None:
+                    for chapter in ("chapter1", "chapter2", "chapter2_hint", "chapter3"):
+                        thread_id = f"{session_id}:{chapter}"
+                        for ns in ("__empty__", "default"):
+                            try:
+                                if hasattr(cp, "delete_state"):
+                                    cp.delete_state(thread_id=thread_id, checkpoint_ns=ns)
+                            except Exception:
+                                continue
+            except Exception:
+                pass
+        except Exception as e:  # noqa: BLE001
+            # 정리 실패는 리포트 조회 자체를 막지 않음
+            print(f"[report_api] failed to clear session caches: {e}", flush=True)
         return Response(
             {
                 "status": "done",

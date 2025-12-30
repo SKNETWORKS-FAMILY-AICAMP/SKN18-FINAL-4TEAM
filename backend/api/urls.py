@@ -23,13 +23,14 @@ from .views import (
     ProfileView,
     health,
     roadmap,
-    LiveCodingFinalEvalStartView, 
+    LiveCodingFinalEvalStartView,
     LiveCodingFinalEvalStatusView,
     LiveCodingFinalEvalReportView,
     LiveCodingReportListView,
     LiveCodingReportDetailView,
     save_strategy_answer,
 )
+from .timer_views import LiveCodingTimerUpdateView
 
 from .deep_views import DeepAgentReportView, UserReportsPayloadView
 
@@ -63,6 +64,11 @@ urlpatterns = [
         TTSView.as_view(),
         name="tts-intro",
     ),
+    path(
+        "tts/intro/stream/",
+        views.TTSStreamView.as_view(),
+        name="tts-intro-stream",
+    ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
     path("interview/event/",InterviewIntroEventView.as_view(),name="interview-event",),
@@ -71,6 +77,7 @@ urlpatterns = [
     # livecoding 관련 
     path("livecoding/session/", LiveCodingSessionView.as_view(), name="livecoding-session"),
     path("livecoding/session/active/", LiveCodingActiveSessionView.as_view(), name="livecoding-session-active"),
+    path("livecoding/session/timer/", LiveCodingTimerUpdateView.as_view(), name="livecoding-session-timer"),
     path("livecoding/session/end/", LiveCodingEndSessionView.as_view(), name="livecoding-session-end"),
     path(
         "livecoding/session/code/",

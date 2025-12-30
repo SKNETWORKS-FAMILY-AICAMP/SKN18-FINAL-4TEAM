@@ -1844,6 +1844,24 @@ const showAntiCheat = (stateKey, detail) => {
   }, 7000);
 };
 
+const sendAntiCheatEvent = async (eventType) => {
+  const sessionId = route.query.session_id;
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!sessionId || !token) return;
+  try {
+    await fetch(`${BACKEND_BASE}/api/livecoding/anti-cheat/event/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ session_id: sessionId, event_type: eventType }),
+    });
+  } catch (err) {
+    console.error("anti-cheat event failed", err);
+  }
+};
+
 const registerOffscreenInfraction = (stateKey, baseDetail) => {
   if (!isAntiCheatReady.value) return;
   const now = Date.now();
@@ -1855,6 +1873,7 @@ const registerOffscreenInfraction = (stateKey, baseDetail) => {
   offscreenCount.value += 1;
   const withCount = `${baseDetail} (누적 ${offscreenCount.value}/${OFFSCREEN_LIMIT})`;
   showAntiCheat(stateKey, withCount);
+  void sendAntiCheatEvent("typing_offscreen");
 
   if (offscreenCount.value >= OFFSCREEN_LIMIT) {
     void forceEndSession("anti-cheat: offscreen threshold exceeded");
@@ -1900,6 +1919,7 @@ const handleWindowBlur = () => {
 const handlePaste = () => {
   if (!isAntiCheatReady.value) return;
   showAntiCheat("pasteDetected", "외부 붙여넣기 시도가 차단되었습니다.");
+  void sendAntiCheatEvent("typing_paste");
 };
 
 const handleCopy = () => {
@@ -1908,6 +1928,7 @@ const handleCopy = () => {
   if (now - lastCopyAlert < COPY_COOLDOWN_MS) return;
   lastCopyAlert = now;
   showAntiCheat("copyDetected", "복사 동작이 차단되었습니다.");
+  void sendAntiCheatEvent("typing_copy");
 };
 
 const sendFrameForMediapipe = async () => {
@@ -1960,6 +1981,7 @@ const sendFrameForMediapipe = async () => {
         const detail =
           data.reason || "카메라 분석 결과 의심스러운 행동이 감지되었습니다.";
         showAntiCheat("mediapipeCheat", detail);
+        void sendAntiCheatEvent("camera_mediapipe");
       }
     } catch (err) {
       console.error("mediapipe analyze request failed:", err);
@@ -2011,6 +2033,7 @@ const startWebcamMonitor = () => {
       if (lastCameraStatus !== "blocked") {
         showAntiCheat("cameraBlocked", cameraError.value);
         lastCameraStatus = "blocked";
+        void sendAntiCheatEvent("camera_blocked");
       }
     } else {
       lastCameraStatus = "ok";

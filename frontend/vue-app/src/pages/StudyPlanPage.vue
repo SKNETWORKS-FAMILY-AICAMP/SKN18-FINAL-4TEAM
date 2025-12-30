@@ -242,7 +242,9 @@ onMounted(() => {
         <div class="video-backdrop"></div>
         <div class="video-sheet">
         <div class="video-header">
-          <div class="video-title">세부 계획</div>
+          <div class="video-title">
+            세부 계획<span v-if="activeVideo?.extendedProps?.day_number"> · {{ activeVideo.extendedProps.day_number }}일차</span>
+          </div>
           <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
         </div>
         <div class="video-status">
@@ -292,7 +294,7 @@ onMounted(() => {
           </div>
           <div class="reflection-actions">
             <button type="button" class="reflection-save" :disabled="reflectionSaving" @click="saveReflection">
-              {{ reflectionSaving ? "저장 중..." : "회고 저장" }}
+              {{ reflectionSaving ? "저장 중..." : "학습내용 저장" }}
             </button>
           </div>
         </div>
@@ -314,7 +316,7 @@ onMounted(() => {
   max-width: 1000px;
   margin: 0 auto;
   padding: 40px 20px;
-  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, sans-serif;
+  font-family: "SF Pro", sans-serif;
   color: #333;
 }
 
@@ -415,7 +417,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 12px;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "SF Pro", sans-serif;
 }
 
 :global(.video-header) {
@@ -440,8 +442,8 @@ onMounted(() => {
 
 :global(.video-meta) {
   color: #6b4f3f;
-  font-size: 1rem;
-  font-weight: 600;
+  font-size: 2.5rem;
+  font-weight: 700;
 }
 
 :global(.video-status) {
@@ -538,6 +540,7 @@ onMounted(() => {
   padding: 12px 14px;
   font-size: 1rem;
   resize: vertical;
+  font-family: "SF Pro", sans-serif;
 }
 
 :global(.reflection-actions) {

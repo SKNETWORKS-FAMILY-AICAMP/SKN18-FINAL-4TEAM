@@ -17,6 +17,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
 
 from .email_utils import send_verification_code, verify_code
 from .throttling import (
@@ -1267,9 +1268,8 @@ class CodingQuestionView(APIView):
 
         latest_code = latest.get("code") or ""
         # 언어는 코드 스냅샷에 없으면 문제/메타 순으로 fallback
-        language = (
-            problem.get("language")
-        ).lower()
+        language = (problem.get("language") or meta.get("language") or "python").strip().lower()
+
 
         last_question_text = (code_data.get("last_question_text") or "").strip()
 
@@ -1513,6 +1513,31 @@ class LiveCodingFinalEvalReportView(APIView):
         meta_key = f"livecoding:{session_id}:meta"
         meta = cache.get(meta_key)
         if not meta:
+            # 캐시가 정리된 경우 DB에 저장된 리포트로 fallback
+            report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
+            if report:
+                return Response(
+                    {
+                        "status": report.status or "done",
+                        "step": report.step or "saved",
+                        "final_report_markdown": report.report_md or "",
+                        "final_score": report.final_score,
+                        "final_grade": report.final_grade,
+                        "final_flags": report.final_flags or [],
+                        "graph_output": report.graph_output or {},
+                        "problem_eval_score": report.problem_eval_score,
+                        "problem_eval_feedback": report.problem_eval_feedback,
+                        "code_collab_score": report.code_collab_score,
+                        "code_collab_feedback": report.code_collab_feedback,
+                        "problem_evidence": report.problem_evidence,
+                        "code_collab_evidence": report.code_collab_evidence,
+                        "error": report.error,
+                        "pdf_path": report.pdf_path,
+                        "created_at": report.created_at.isoformat() if report.created_at else None,
+                        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                    },
+                    status=status.HTTP_200_OK,
+                )
             return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
         if str(meta.get("user_id")) != str(user.user_id):
             return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
@@ -1591,6 +1616,23 @@ class LiveCodingFinalEvalReportView(APIView):
                             or code_data.get("problem")
                         )
 
+                # 4) DB에서 problem_id로 조회
+                if not problem_text:
+                    try:
+                        problem_id = None
+                        if isinstance(meta, dict):
+                            problem_id = meta.get("problem_id")
+                        if not problem_id:
+                            cached_meta = cache.get(meta_key) or {}
+                            if isinstance(cached_meta, dict):
+                                problem_id = cached_meta.get("problem_id")
+                        if problem_id:
+                            problem_row = CodingProblem.objects.filter(problem_id=problem_id).first()
+                            if problem_row:
+                                problem_text = problem_row.problem
+                    except Exception as e:
+                        print(f"[✗ 리포트 API] DB problem 조회 실패: {e}", flush=True)
+
                 if problem_text:
                     graph_output["problem_text"] = problem_text
                     values["graph_output"] = graph_output  # ✅ 중요: values에 다시 박아줘야 return에서도 유지됨
@@ -1603,8 +1645,6 @@ class LiveCodingFinalEvalReportView(APIView):
                 values["graph_output"] = graph_output
                 print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
         try:
-            from api.models import LivecodingReport  # 지연 import로 순환참조 회피
-
             defaults = {
                 "user": user,
                 "report_md": report_md,
@@ -1621,11 +1661,15 @@ class LiveCodingFinalEvalReportView(APIView):
                 "step": values.get("step"),
                 "status": values.get("status"),
                 "error": values.get("error"),
+                "updated_at": timezone.now(),
             }
-            LivecodingReport.objects.update_or_create(
+            report_obj, created = LivecodingReport.objects.update_or_create(
                 session_id=session_id,
                 defaults=defaults,
             )
+            if created and not report_obj.created_at:
+                report_obj.created_at = timezone.now()
+                report_obj.save(update_fields=["created_at"])
         except Exception as e:
             # 저장 실패는 조회 응답을 막지 않음
             print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
@@ -1683,6 +1727,64 @@ class LiveCodingFinalEvalReportView(APIView):
             status=status.HTTP_200_OK,
         )
 
+
+class LiveCodingAntiCheatEventView(APIView):
+    """
+    프론트엔드에서 감지한 부정행위 이벤트 카운트 기록
+    - POST /api/livecoding/anti-cheat/event/
+      body: {"session_id": "...", "event_type": "..."}
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        data = request.data or {}
+        session_id = data.get("session_id")
+        event_type = (data.get("event_type") or "").strip()
+        if not session_id or not event_type:
+            return Response({"detail": "session_id와 event_type이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        allowed = {
+            "typing_paste",
+            "typing_copy",
+            "typing_offscreen",
+            "camera_blocked",
+            "camera_mediapipe",
+        }
+        if event_type not in allowed:
+            return Response({"detail": "지원하지 않는 event_type입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        key = f"livecoding:{session_id}:anti-cheat-events"
+        payload = cache.get(key) or {}
+        typing = payload.get("typing") or {}
+        camera = payload.get("camera") or {}
+
+        if event_type.startswith("typing_"):
+            label = event_type.replace("typing_", "", 1)
+            typing[label] = int(typing.get(label, 0)) + 1
+        else:
+            label = event_type.replace("camera_", "", 1)
+            camera[label] = int(camera.get(label, 0)) + 1
+
+        payload["typing"] = typing
+        payload["camera"] = camera
+        payload["updated_at"] = timezone.now().isoformat()
+        cache.set(key, payload, timeout=60 * 60)
+
+        return Response({"ok": True, "counts": payload}, status=status.HTTP_200_OK)
 
 
 class LiveCodingReportListView(APIView):

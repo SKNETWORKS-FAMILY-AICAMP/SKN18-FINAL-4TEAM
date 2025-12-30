@@ -1,7 +1,7 @@
 # backend/interview_engine/nodes/problem_solving_eval_node.py
 from __future__ import annotations
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
-from interview_engine.llm import LLM
+from interview_engine.llm import get_llm
 from langchain_core.messages import SystemMessage, HumanMessage
 from typing import Any, Dict, List, Tuple
 import re
@@ -81,7 +81,8 @@ def _evaluate_test_cases_with_llm(
             HumanMessage(content=user_prompt)
         ]
         
-        response = LLM.invoke(messages)
+        model = get_llm("solve")
+        response = model.invoke(messages)
         content = response.content.strip()
         
         # JSON 추출
@@ -483,7 +484,8 @@ def _evaluate_strategy_hybrid(
                 HumanMessage(content=user_prompt)
             ]
             
-            response = LLM.invoke(messages)
+            model = get_llm("solve")
+            response = model.invoke(messages)
             content = response.content.strip()
             
             if "```json" in content:

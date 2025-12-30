@@ -673,6 +673,17 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     q_maint = _score_maintainability_9(quality_prefix_counts, q_fn_len)
     q_comp = _score_completeness_9(quality_prefix_counts, code, function_name)
     has_placeholder = _has_placeholder(code)
+    is_starter_like = False
+    try:
+        starter_code = _safe_str(cache_meta.get("starter_code") or "")
+        if not starter_code and isinstance(problem, dict):
+            starter_code = _safe_str(problem.get("starter_code") or "")
+        if starter_code:
+            c_norm = re.sub(r"\s+", "", code or "")
+            s_norm = re.sub(r"\s+", "", starter_code or "")
+            is_starter_like = bool(c_norm and s_norm and c_norm == s_norm)
+    except Exception:
+        is_starter_like = False
 
     fatal_q = quality_prefix_counts.get("F", 0) + quality_prefix_counts.get("S", 0)
     big_c_q = quality_prefix_counts.get("C", 0)
@@ -688,7 +699,7 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     quality_total_35 = float(
         round(q_read["score"] + q_maint["score"] + q_comp["score"] + bonus_q, 2),
     )
-    if has_placeholder:
+    if has_placeholder or is_starter_like:
         quality_total_35 = 0.0
         bonus_q = 0.0
 
@@ -770,14 +781,14 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         round(c_comm["score"] + c_hint["score"] + c_fb["score"], 2),
     )
     collab_total_30 = collab_rule_total_30  # 협업은 rule-based 30점만 사용
-    if has_placeholder:
+    if has_placeholder or is_starter_like:
         collab_total_30 = 0.0
 
     # ---- 피드백 메시지
     fb_lines: List[str] = []
     fb_lines.append("### 코드 품질 평가 (rule-based, 35점 만점)")
-    if has_placeholder:
-        fb_lines.append("- 제출 코드에 placeholder(pass/TODO/...)가 포함되어 0점 처리")
+    if has_placeholder or is_starter_like:
+        fb_lines.append("- 제출 코드가 starter_code와 동일하거나 placeholder(pass/TODO/...)가 포함되어 0점 처리")
     fb_lines.append(f"- 총점: **{quality_total_35:.2f}/35**")
     fb_lines.append(
         (

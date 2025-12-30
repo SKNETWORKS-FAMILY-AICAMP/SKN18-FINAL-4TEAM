@@ -485,12 +485,20 @@ const fetchReport = async () => {
     problemCategory.value = output.problem_category || "미분류";
     problemDifficulty.value = output.problem_difficulty || "미정";
     
+    const normalizeEvalLabel = (value) => {
+      if (!value) return "평가 중";
+      if (value.includes("우수")) return "우수";
+      if (value.includes("양호")) return "양호";
+      if (value.includes("부족")) return "부족";
+      return value;
+    };
+
     // ✅ 문제 해결 능력 평가 데이터 추출
     const psEval = output.problem_solving_evaluation || {};
     initialStrategyAnswer.value = psEval.initial_strategy || "초기 전략 답변이 기록되지 않았습니다.";
-    problemUnderstandingText.value = psEval.problem_understanding || "평가 중";
+    problemUnderstandingText.value = normalizeEvalLabel(psEval.problem_understanding);
     problemUnderstandingFeedback.value = psEval.understanding_feedback || "";
-    approachValidityText.value = psEval.approach_validity || "평가 중";
+    approachValidityText.value = normalizeEvalLabel(psEval.approach_validity);
     consistencyText.value = psEval.consistency_status || "분석 중";
     consistencyFeedback.value = psEval.consistency_feedback || "";
     qaHistory.value = psEval.qa_history || [];

@@ -11,16 +11,21 @@
           <span>MENU</span>
           <span class="chevron" :class="{ rotate: isMenuOpen }">&#9662;</span>
         </button>
-        <div class="dropdown-menu" v-show="isMenuOpen">
-          <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
-            ABOUT US
-          </RouterLink>
-          <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
-            LIVE CODING
-          </RouterLink>
-        </div>
+        
+        <Transition name="dropdown">
+          <div class="dropdown-menu" v-show="isMenuOpen">
+            <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+              ABOUT US
+            </RouterLink>
+            <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+              LIVE CODING
+            </RouterLink>
+          </div>
+        </Transition>
       </div>
+
       <h1 class="nav-logo">JOBTORY</h1>
+
       <div class="nav-dropdown">
         <button
           class="nav-pill"
@@ -31,31 +36,34 @@
           <span>{{ isAuthenticated ? userName : "Dropdown" }}</span>
           <span class="chevron" :class="{ rotate: isDropdownOpen }">&#9662;</span>
         </button>
-        <div class="dropdown-menu" v-show="isDropdownOpen">
-          <template v-if="isAuthenticated">
-            <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeDropdown">
-              MYPAGE
-            </RouterLink>
-            <button
-              type="button"
-              class="dropdown-link dropdown-button"
-              :class="{ 'dropdown-button--loading': isLoggingOut }"
-              :disabled="isLoggingOut"
-              @click="handleLogout"
-            >
-              <span v-if="isLoggingOut" class="spinner" aria-hidden="true"></span>
-              <span>{{ isLoggingOut ? "LOGOUT" : "LOGOUT" }}</span>
-            </button>
-          </template>
-          <template v-else>
-            <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeDropdown">
-              LOGIN
-            </RouterLink>
-            <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeDropdown">
-              SIGN-IN
-            </RouterLink>
-          </template>
-        </div>
+        
+        <Transition name="dropdown">
+          <div class="dropdown-menu right-align" v-show="isDropdownOpen">
+            <template v-if="isAuthenticated">
+              <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeDropdown">
+                MYPAGE
+              </RouterLink>
+              <button
+                type="button"
+                class="dropdown-link dropdown-button"
+                :class="{ 'dropdown-button--loading': isLoggingOut }"
+                :disabled="isLoggingOut"
+                @click="handleLogout"
+              >
+                <span v-if="isLoggingOut" class="spinner" aria-hidden="true"></span>
+                <span>{{ isLoggingOut ? "LOGOUT" : "LOGOUT" }}</span>
+              </button>
+            </template>
+            <template v-else>
+              <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeDropdown">
+                LOGIN
+              </RouterLink>
+              <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeDropdown">
+                SIGN-IN
+              </RouterLink>
+            </template>
+          </div>
+        </Transition>
       </div>
     </header>
 
@@ -268,7 +276,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   overflow-x: hidden;
 }
 
-/* Header Styles (이전 버전 유지) */
+/* Header Styles */
 .landing-header {
   display: flex;
   align-items: center;
@@ -308,6 +316,8 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .nav-pill .chevron { font-size: 12px; }
 .chevron.rotate { transform: rotate(180deg); }
 .nav-dropdown { position: relative; }
+
+/* ▼▼▼ [변경된 드롭다운 스타일: 검정 배경 + 흰색 텍스트] ▼▼▼ */
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -317,21 +327,34 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   flex-direction: column;
   min-width: 160px;
   padding: 8px 0;
-  background: #ffffff;
-  border: 1px solid #e5e7eb;
+  
+  /* 검정 배경 및 테두리 수정 */
+  background: #111827; 
+  border: 1px solid #374151;
   border-radius: 12px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
   z-index: 100;
 }
+
+.dropdown-menu.right-align {
+  left: auto; 
+  right: 0;
+}
+
 .dropdown-link {
   padding: 10px 14px;
-  color: #111827;
+  color: #f9fafb; /* 흰색 텍스트 */
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700; /* 좀 더 굵게 */
   text-decoration: none;
   border-radius: 8px;
+  transition: background 0.2s;
 }
-.dropdown-link:hover { background: #f3f4f6; }
+
+.dropdown-link:hover {
+  background: #374151; /* 호버 시 진한 회색 */
+}
+
 .dropdown-button {
   width: 100%;
   text-align: left;
@@ -340,21 +363,51 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   cursor: pointer;
   font: inherit;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 700;
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  color: #f9fafb; /* 버튼 텍스트도 흰색 */
 }
+
+/* 스피너 색상도 흰색으로 변경 */
+.dropdown-button--loading .spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff; /* 흰색 테두리 */
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+/* ▲▲▲ [변경 완료] ▲▲▲ */
+
 .dropdown-button:disabled { opacity: 0.7; cursor: not-allowed; }
 
-/* Hero Section (모눈종이 + 이미지 둥둥 효과) */
+/* Dropdown Animation */
+.dropdown-enter-active,
+.dropdown-leave-active {
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  transform-origin: top center;
+}
+.dropdown-enter-from,
+.dropdown-leave-to {
+  opacity: 0;
+  transform: translateY(-10px) scaleY(0.95);
+}
+.dropdown-enter-to,
+.dropdown-leave-from {
+  opacity: 1;
+  transform: translateY(0) scaleY(1);
+}
+
+/* Hero Section */
 .hero {
   position: relative;
   padding: 100px 56px 150px;
   overflow: hidden;
 }
 
-/* [NEW] 배경 그리드 패턴 스타일 (유지) */
+/* Grid Background */
 .hero-bg-grid {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -433,8 +486,6 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   box-shadow: 0 22px 40px rgba(15, 23, 42, 0.4);
   object-fit: cover;
 }
-
-/* [복구] 둥둥 떠다니는 애니메이션 */
 .floating-anim {
   animation: float 6s ease-in-out infinite;
 }
@@ -444,7 +495,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   100% { transform: translateY(0px); }
 }
 
-/* Insights Section (이전 버전 디자인 유지) */
+/* Insights Section */
 .insights {
   background: #1f252d;
   color: #f9fafb;
@@ -553,7 +604,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   transition: transform 0.3s ease;
 }
 
-/* Spotlight Effect (이전 버전 유지) */
+/* Spotlight Effect */
 .spotlight-card {
   position: relative;
   overflow: hidden;
@@ -580,13 +631,13 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .spotlight-card:hover .spotlight-overlay { opacity: 1; }
 .spotlight-card:hover .card-image-content { transform: scale(1.05); }
 
-/* Card Colors (파스텔톤 유지) */
+/* Card Colors */
 .card-one { background: #f9c5d5; }
 .card-two { background: #f7d56f; }
 .card-three { background: #bfacf9; }
 
 
-/* --- [NEW] Footer Marquee Section (유지) --- */
+/* Footer Marquee Section */
 .footer-marquee {
   background: #caa3b1;
   padding: 80px 0;
@@ -643,7 +694,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   background: #111827;
 }
 
-/* Mobile Styles (이전 버전 기준) */
+/* Mobile Styles */
 @media (max-width: 768px) {
   .landing-header { padding: 16px 20px; }
   .nav-logo { font-size: 24px; position: static; transform: none; width: auto; height: auto; }

@@ -6,7 +6,7 @@ import time
 import threading
 from django.conf import settings
 from django.core.mail import send_mail
-from django.http import JsonResponse
+from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
@@ -29,6 +29,8 @@ from .stt_buffer import clear_utterances
 from .google_oauth import GoogleOAuthError, exchange_code_for_tokens, fetch_userinfo
 from .jwt_utils import create_access_token
 from .interview_utils import _generate_tts_payload, get_cached_graph
+
+from tts_client import generate_interview_audio
 
 from .models import (
     AuthIdentity,
@@ -119,6 +121,70 @@ class TTSView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class TTSStreamView(APIView):
+    """
+    텍스트를 받아 문장 단위로 TTS를 생성해 스트리밍으로 반환합니다.
+
+    - POST /api/tts/intro/stream/?session_id=...
+      body: {"tts_text": "..."} 또는 {"text": "..."}
+      response: NDJSON (각 줄이 1개 청크 JSON)
+        {"text":"...","audio":"<base64>","sentence_number":1,"is_first":true,"generation_time":0.0}
+    """
+
+    def post(self, request):
+        data = request.data or {}
+        text = (data.get("tts_text") or data.get("text") or "")
+        if not isinstance(text, str):
+            return Response(
+                {"detail": "tts_text(또는 text) 필드는 문자열이어야 합니다."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        text = text.strip()
+        max_sentences = data.get("max_sentences")
+
+        if not text:
+            return Response(
+                {"detail": "tts_text(또는 text) 필드를 전달해 주세요."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        session_id = (
+            request.query_params.get("session_id")
+            or request.headers.get("X-Session-Id")
+            or (request.data.get("session_id") if hasattr(request, "data") else None)
+        )
+
+        config = {"configurable": {}}
+        if session_id:
+            config["configurable"]["thread_id"] = session_id
+        if isinstance(max_sentences, int) and max_sentences > 0:
+            config["configurable"]["max_sentences"] = max_sentences
+        if not config["configurable"]:
+            config = None
+
+        def iter_ndjson():
+            try:
+                for chunk in generate_interview_audio(text, config=config):
+                    payload = {
+                        "text": chunk.get("text", ""),
+                        "audio": chunk.get("audio_base64"),
+                        "sentence_number": chunk.get("sentence_number"),
+                        "is_first": chunk.get("is_first"),
+                        "generation_time": chunk.get("generation_time"),
+                    }
+                    if chunk.get("error"):
+                        payload["error"] = chunk.get("error")
+                    yield (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+            except Exception as exc:  # noqa: BLE001
+                payload = {"error": str(exc)}
+                yield (json.dumps(payload, ensure_ascii=False) + "\n").encode("utf-8")
+
+        resp = StreamingHttpResponse(iter_ndjson(), content_type="application/x-ndjson; charset=utf-8")
+        resp["Cache-Control"] = "no-cache"
+        resp["X-Accel-Buffering"] = "no"
+        return resp
 
 class SignupView(APIView):
     permission_classes = [permissions.AllowAny]
@@ -1269,7 +1335,6 @@ class CodingQuestionView(APIView):
         latest_code = latest.get("code") or ""
         # 언어는 코드 스냅샷에 없으면 문제/메타 순으로 fallback
         language = (problem.get("language") or meta.get("language") or "python").strip().lower()
-
 
         last_question_text = (code_data.get("last_question_text") or "").strip()
 

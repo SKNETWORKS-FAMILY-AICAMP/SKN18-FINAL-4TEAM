@@ -63,6 +63,11 @@ urlpatterns = [
         TTSView.as_view(),
         name="tts-intro",
     ),
+    path(
+        "tts/intro/stream/",
+        views.TTSStreamView.as_view(),
+        name="tts-intro-stream",
+    ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
     path("interview/event/",InterviewIntroEventView.as_view(),name="interview-event",),

@@ -140,7 +140,6 @@ class CodingProblemTextInitView(APIView):
             )
             if isinstance(graph_state, dict):
                 intro_text = graph_state.get("tts_text") or ""
-                sentences_payload = _generate_tts_payload(intro_text, session_id)
         
         except Exception as exc:  # noqa: BLE001
             return Response(
@@ -153,7 +152,7 @@ class CodingProblemTextInitView(APIView):
 
         return Response(
             {
-                "tts_text": sentences_payload,
+                "tts_text": intro_text,
                 "session_id": session_id,
                 "stage": "intro",
             },

@@ -32,6 +32,8 @@ from .views import (
 )
 from .timer_views import LiveCodingTimerUpdateView
 
+from .deep_views import DeepAgentReportView, UserReportsPayloadView
+
 from .chap1_views import (
     CodingProblemTextInitView,
     LiveCodingPreloadView,
@@ -61,6 +63,11 @@ urlpatterns = [
         "tts/intro/",
         TTSView.as_view(),
         name="tts-intro",
+    ),
+    path(
+        "tts/intro/stream/",
+        views.TTSStreamView.as_view(),
+        name="tts-intro-stream",
     ),
     path("warmup/langgraph/", WarmupLanggraphView.as_view(), name="warmup-langgraph"),
     path("livecoding/start/", LiveCodingStartView.as_view(), name="livecoding-start"),
@@ -104,6 +111,8 @@ urlpatterns = [
     path("livecoding/final-eval/start/", views.LiveCodingFinalEvalStartView.as_view()),
     path("livecoding/final-eval/status/", views.LiveCodingFinalEvalStatusView.as_view()),
     path("livecoding/final-eval/report/", views.LiveCodingFinalEvalReportView.as_view()),
+    path("livecoding/reports/aggregate/", DeepAgentReportView.as_view(), name="livecoding-report-aggregate"),
+    path("livecoding/reports/payload/", UserReportsPayloadView.as_view(), name="livecoding-report-payload"),
     path("livecoding/reports/", views.LiveCodingReportListView.as_view(), name="livecoding-report-list"),
     path("livecoding/reports/<str:session_id>/", views.LiveCodingReportDetailView.as_view(), name="livecoding-report-detail"),
     path("livecoding/session/strategy/", views.save_strategy_answer, name="save-strategy"),

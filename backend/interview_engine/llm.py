@@ -8,7 +8,7 @@ API_KEY = os.environ.get("OPENAI_API_KEY")
 MODEL_CONFIG = {
     "default": os.getenv("LLM_MODEL_DEFAULT", "gpt-5-nano"),
     "intro": os.getenv("LLM_MODEL_INTRO", "gpt-5-nano"),
-    "classify": os.getenv("LLM_MODEL_classify", "gpt-5-nano"),
+    "classify": os.getenv("LLM_MODEL_classify", "gpt-4o-mini"),
     "hint": os.getenv("LLM_MODEL_HINT", "gpt-4o"),
     "question": os.getenv("LLM_MODEL_QUESTION", "gpt-5-nano"),
     "report": os.getenv("LLM_MODEL_REPORT", "gpt-5.1"),

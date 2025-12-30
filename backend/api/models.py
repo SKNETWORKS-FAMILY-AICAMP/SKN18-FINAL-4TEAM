@@ -120,3 +120,22 @@ class LivecodingReport(models.Model):
         managed = False
         db_table = "livecoding_reports"
         indexes = [models.Index(fields=["user", "session_id"], name="idx_lc_report_user_sess")]
+
+class UserGrowthInsight(models.Model):
+    user_id = models.CharField(max_length=64)  # unique 제거
+    version = models.IntegerField()            # user별 증가
+    window_size = models.IntegerField(default=3)
+    report_ids = models.JSONField(default=list)
+    report_content = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "user_growth_insight"
+        indexes = [
+            models.Index(fields=["user_id", "-version"]),
+            # 또는 created_at 기준
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["user_id", "version"], name="uq_user_version")
+        ]

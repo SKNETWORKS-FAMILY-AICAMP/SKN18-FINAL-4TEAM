@@ -30,3 +30,6 @@ langchain-tavily==0.2.15
 pandas==2.3.3
 scikit-learn==1.6.1
 joblib==1.5.2
+
+# deepagemts
+deepagents==0.3.1

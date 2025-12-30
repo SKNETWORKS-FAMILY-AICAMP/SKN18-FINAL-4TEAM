@@ -36,6 +36,9 @@
             <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeDropdown">
               마이페이지
             </RouterLink>
+            <RouterLink to="/studyplan" class="dropdown-link" @click="closeDropdown">
+              학습 계획
+            </RouterLink>
             <button
               type="button"
               class="dropdown-link dropdown-button"

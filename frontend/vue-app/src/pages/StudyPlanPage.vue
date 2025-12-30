@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -21,22 +21,104 @@ const calendarOptions = reactive({
     center: 'title',
     right: 'dayGridMonth'
   },
+  eventClassNames: (arg) => {
+    if (arg.event?.extendedProps?.is_completed) {
+      return [ 'is-completed' ];
+    }
+    return [ 'is-pending' ];
+  },
   events: [], // 여기에 API 데이터가 들어갑니다
   eventClick: handleEventClick,
   height: 'auto'
 });
 
+const isVideoOpen = ref(false);
+const activeVideo = ref(null);
+
+const isActiveCompleted = computed(() => {
+  return Boolean(activeVideo.value?.extendedProps?.is_completed);
+});
+
+async function toggleCompletion() {
+  if (!activeVideo.value) {
+    return;
+  }
+
+  const ok = await ensureValidSession();
+  if (!ok) {
+    alert("로그인이 필요합니다.");
+    return;
+  }
+
+  const taskId = activeVideo.value?.extendedProps?.task_id;
+  if (!taskId) {
+    alert("저장할 수 있는 작업이 없습니다.");
+    return;
+  }
+
+  const nextValue = !isActiveCompleted.value;
+
+  try {
+    const response = await axios.patch(
+      `${BACKEND_BASE}/api/tasks/complete/`,
+      {
+        task_id: taskId,
+        is_completed: nextValue
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${token.value}`
+        }
+      }
+    );
+
+    const updatedValue = response.data?.is_completed ?? nextValue;
+    if (typeof activeVideo.value.setExtendedProp === 'function') {
+      activeVideo.value.setExtendedProp('is_completed', updatedValue);
+    } else {
+      activeVideo.value.extendedProps = {
+        ...(activeVideo.value.extendedProps || {}),
+        is_completed: updatedValue
+      };
+    }
+  } catch (error) {
+    console.error(error);
+    alert("완료 상태 저장에 실패했습니다.");
+  }
+}
+
+function getYouTubeEmbedUrl(url) {
+  if (!url) return '';
+  try {
+    const parsed = new URL(url);
+    if (parsed.hostname.includes('youtu.be')) {
+      const id = parsed.pathname.replace('/', '');
+      return id ? `https://www.youtube.com/embed/${id}` : '';
+    }
+    if (parsed.hostname.includes('youtube.com')) {
+      const id = parsed.searchParams.get('v');
+      return id ? `https://www.youtube.com/embed/${id}` : '';
+    }
+  } catch (err) { /* ignore malformed urls */ }
+  return '';
+}
+
+function openVideoModal(event) {
+  activeVideo.value = event;
+  isVideoOpen.value = true;
+}
+
+function closeVideoModal() {
+  isVideoOpen.value = false;
+  activeVideo.value = null;
+}
+
 // --- 함수 구현 ---
 
 // 1. 이벤트 클릭 핸들러 (영상 링크 이동)
 function handleEventClick(info) {
-  info.jsEvent.preventDefault(); // 브라우저 기본 동작 막기
-
-  if (info.event.url) {
-    window.open(info.event.url, "_blank");
-  } else {
-    alert("이 일정에는 연결된 영상이 없습니다.");
-  }
+  info.jsEvent.preventDefault();
+  openVideoModal(info.event);
 }
 
 // 2. 계획 생성 요청 (API 호출)
@@ -94,7 +176,7 @@ async function generatePlan() {
     // 받은 데이터를 캘린더 옵션에 주입 (반응형으로 즉시 업데이트됨)
     calendarOptions.events = response.data.events;
     
-    alert("커리큘럼 생성이 완료되었습니다! 📅");
+    alert("커리큘럼 생성이 완료되었습니다!");
 
   } catch (error) {
     console.error(error);
@@ -112,8 +194,8 @@ onMounted(() => {
 <template>
   <div class="app-container">
     <header class="header">
-      <h1>🎓 AI 학습 플래너</h1>
-      <p>당신의 약점을 바탕으로 맞춤형 커리큘럼을 짜드립니다.</p>
+      <h1> AI 학습 코치</h1>
+      <p>약점 보완을 위해 AI코치가 맞춤형 커리큘럼을 짜드립니다.</p>
     </header>
 
     <div class="input-section">
@@ -126,8 +208,8 @@ onMounted(() => {
       />
       
       <select v-model="duration" class="input-select">
-        <option :value="7">7일 완성 (1주)</option>
-        <option :value="30">한달 완성 (4주)</option>
+        <option :value="7">1주 완성</option>
+        <option :value="30">4주 완성</option>
       </select>
 
       <button 
@@ -135,17 +217,54 @@ onMounted(() => {
         :disabled="loading" 
         class="btn-generate"
       >
-        {{ loading ? "Deep Agent 생각 중... 🤖" : "커리큘럼 생성하기 ✨" }}
+        {{ loading ? "Deep Agent 생각 중..." : "학습계획 생성" }}
       </button>
     </div>
 
     <div class="calendar-wrapper">
       <FullCalendar :options="calendarOptions" />
     </div>
+    <Teleport to="body">
+      <div v-if="isVideoOpen" class="video-modal" role="dialog" aria-modal="true">
+        <div class="video-backdrop"></div>
+        <div class="video-sheet">
+        <div class="video-header">
+          <div class="video-title">세부 계획</div>
+          <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
+        </div>
+        <div class="video-status">
+          <span :class="['video-badge', isActiveCompleted ? 'video-badge--done' : 'video-badge--todo']">
+            {{ isActiveCompleted ? '학습 완료' : '학습 진행 중' }}
+          </span>
+          <button type="button" class="video-toggle" @click="toggleCompletion">
+            {{ isActiveCompleted ? '완료 취소' : '완료로 표시' }}
+          </button>
+        </div>
+        <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
+        <div class="video-frame">
+            <iframe
+              v-if="getYouTubeEmbedUrl(activeVideo?.url)"
+              :src="getYouTubeEmbedUrl(activeVideo?.url)"
+              title="YouTube video"
+              frameborder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen
+            ></iframe>
+            <div v-else class="video-empty">유효한 유튜브 링크가 없습니다.</div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <style scoped>
+/* 기본 배경색 */
+:global(body) {
+  background: #f8f4eb;
+}
+
 /* 전체 레이아웃 */
 .app-container {
   max-width: 1000px;
@@ -200,11 +319,11 @@ onMounted(() => {
 }
 
 .btn-generate {
-  padding: 12px 24px;
-  background-color: #42b883; /* Vue Green Color */
+  padding: 1px 20px;
+  background-color: #1f2933; 
   color: white;
   border: none;
-  border-radius: 8px;
+  border-radius: 5px;
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
@@ -227,20 +346,150 @@ onMounted(() => {
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
+:global(.video-modal) {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 30;
+}
+
+:global(.video-backdrop) {
+  position: absolute;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.55);
+}
+
+:global(.video-sheet) {
+  position: relative;
+  width: min(720px, 92vw);
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.28);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+:global(.video-header) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+:global(.video-title) {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1f2933;
+}
+
+:global(.video-close) {
+  background: none;
+  border: none;
+  color: #6b7280;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+:global(.video-meta) {
+  color: #6b4f3f;
+  font-size: 0.95rem;
+}
+
+:global(.video-status) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+:global(.video-badge) {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 999px;
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+
+:global(.video-badge--todo) {
+  background: #fff4e5;
+  color: #9a6a35;
+}
+
+:global(.video-badge--done) {
+  background: #e7f5ff;
+  color: #2c3e50;
+}
+
+:global(.video-toggle) {
+  border: 1px solid #d2d6dc;
+  background: #fff;
+  color: #2c3e50;
+  font-weight: 600;
+  border-radius: 10px;
+  padding: 6px 12px;
+  cursor: pointer;
+}
+
+:global(.video-toggle:hover) {
+  background: #f3f4f6;
+}
+
+:global(.video-frame) {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  background: #f1f5f9;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+:global(.video-frame iframe) {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+:global(.video-empty) {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #8a6f56;
+  font-size: 0.95rem;
+}
+
 
 /* Vue Style Deep Selector (::v-deep) for Child Components */
 :deep(.fc-event) {
   cursor: pointer;
-  background-color: #e7f5ff;
   border: none;
-  border-left: 4px solid #42b883;
+  border-left: 4px solid transparent;
   padding: 4px;
-  color: #2c3e50;
-  font-weight: 500;
+  font-weight: 600;
 }
 
-:deep(.fc-event:hover) {
-  background-color: #0091ffff;
+:deep(.fc-event.is-pending) {
+  background-color: #6abaffff;
+  color: #f8fafc;
+  border-left-color: #4291b8ff;
+}
+
+:deep(.fc-event.is-pending:hover) {
+  background-color: #9bc7e6ff;
+}
+
+:deep(.fc-event.is-completed) {
+  background-color: #cad4dcff;
+  color: #2c3e50;
+  border-left-color: #4291b8ff;
+}
+
+:deep(.fc-event.is-completed:hover) {
+  background-color: #cfe9ff;
 }
 
 :deep(.fc-day-today) {

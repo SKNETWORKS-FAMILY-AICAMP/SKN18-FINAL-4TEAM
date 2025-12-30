@@ -120,7 +120,11 @@ class LatestStudyPlanView(APIView):
                     "title": task.topic,
                     "start": actual_date.strftime("%Y-%m-%d"),
                     "url": task.video_url,
-                    "extendedProps": {"day_number": task.day},
+                    "extendedProps": {
+                        "day_number": task.day,
+                        "task_id": task.id,
+                        "is_completed": task.is_completed,
+                    },
                 }
             )
 
@@ -134,5 +138,37 @@ class LatestStudyPlanView(APIView):
                 },
                 "events": events,
             },
+            status=status.HTTP_200_OK,
+        )
+
+
+class StudyTaskCompletionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def patch(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        task_id = request.data.get("task_id")
+        is_completed = request.data.get("is_completed")
+
+        if task_id is None or is_completed is None:
+            return Response({"error": "task_id와 is_completed는 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if isinstance(is_completed, str):
+            is_completed = is_completed.strip().lower() in ("true", "1", "yes", "y", "t")
+        elif not isinstance(is_completed, bool):
+            return Response({"error": "is_completed는 boolean이어야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        task = DailyTask.objects.filter(id=task_id, plan__user=user).first()
+        if not task:
+            return Response({"error": "작업을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+
+        task.is_completed = is_completed
+        task.save(update_fields=["is_completed"])
+
+        return Response(
+            {"task_id": task.id, "is_completed": task.is_completed},
             status=status.HTTP_200_OK,
         )

@@ -56,7 +56,7 @@ def _run_ruff(source_code: str, language: str) -> List[Dict[str, Any]]:
             line = line.strip()
             if not line:
                 continue
-            parts = line.split(":", 3)
+            parts = line.rsplit(":", 3)
             if len(parts) < 4:
                 continue
             _, row_str, col_str, rest = parts
@@ -68,7 +68,7 @@ def _run_ruff(source_code: str, language: str) -> List[Dict[str, Any]]:
             rest = rest.lstrip(": ").strip()
             if not rest:
                 continue
-            code_and_msg = rest.split(maxsplit=1)
+            code_and_msg = rest.rsplit(maxsplit=1)
             if not code_and_msg:
                 continue
             code = code_and_msg[0]
@@ -103,7 +103,7 @@ def _extract_rule_prefix(code: str) -> str:
 
 def _compute_quality_from_ruff(issues: List[Dict[str, Any]]) -> List[str]:
     """Ruff 진단을 기반으로 코드 품질 feedback 리스트만 생성"""
-    quality_prefixes = {"F", "E", "W", "B", "C", "S", "UP", "A", "TID", "RUF"}
+    quality_prefixes = {"F", "E", "W", "B", "C", "S", "UP", "A", "TID", "RUF", "N", "D", "Q", "I", "ERA"}
     real_issues: List[Dict[str, Any]] = []
     for issue in issues:
         code = issue.get("code")

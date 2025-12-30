@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 from datetime import datetime, timezone
-from interview_engine.llm import LLM
+from interview_engine.llm import get_llm
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from langchain_core.messages import SystemMessage, HumanMessage
 from django.core.cache import cache
@@ -45,7 +45,7 @@ def _format_qa_history(qa_history: List[Dict]) -> str:
     if not qa_history:
         return "(질문/응답 내역 없음)"
     
-    lines = []
+    lines: List[str] = []
     for i, qa in enumerate(qa_history, 1):
         q = qa.get("question", "")
         a = qa.get("answer", "")
@@ -111,7 +111,10 @@ def _generate_problem_solving_evaluation(
             HumanMessage(content=user_prompt)
         ]
         
-        response = LLM.invoke(messages)
+        print("[LLM][_generate_problem_eval_with_llm] system_prompt:", system_prompt, flush=True)
+        print("[LLM][_generate_problem_eval_with_llm] user_prompt:", user_prompt, flush=True)
+        model = get_llm("report")
+        response = model.invoke(messages)
         content = response.content
         
         # 응답 파싱
@@ -237,7 +240,10 @@ def _generate_detailed_feedback_with_llm(
             HumanMessage(content=user_prompt)
         ]
         
-        response = LLM.invoke(messages)
+        print("[LLM][_generate_detailed_feedback_with_llm] system_prompt:", system_prompt, flush=True)
+        print("[LLM][_generate_detailed_feedback_with_llm] user_prompt:", user_prompt, flush=True)
+        model = get_llm("report")
+        response = model.invoke(messages)
         content = response.content
         
         # 응답 파싱
@@ -340,9 +346,33 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         meta = state.get("meta") or {}
         session_id = _safe_str(meta.get("session_id"))
         
+        # ✅ problem_evidence가 비어있으면 직접 가져오기
+        if not code and session_id:
+            print("[DEBUG] problem_evidence에 코드 없음, 직접 Redis에서 가져옴", flush=True)
+            code_key = f"livecoding:{session_id}:code"
+            code_data = cache.get(code_key) or {}
+            latest = code_data.get("latest") or {}
+            code = _safe_str(latest.get("code") or "")
+            print(f"[DEBUG] Redis에서 가져온 코드 길이: {len(code)}", flush=True)
+        
+        if not problem_text and session_id:
+            print("[DEBUG] problem_evidence에 문제 없음, Redis problem_payload에서 가져옴", flush=True)
+            # ✅ checkpoint 대신 problem_payload 사용!
+            problem_key = f"livecoding:{session_id}:problem"
+            problem_payload = cache.get(problem_key) or {}
+            problem_text = _safe_str(problem_payload.get("problem") or "")
+            print(f"[DEBUG] Redis problem_payload에서 가져온 문제 길이: {len(problem_text)}", flush=True)
+            
+            # ✅ 그래도 없으면 checkpoint 시도
+            if not problem_text:
+                print("[DEBUG] problem_payload도 없음, checkpoint에서 시도", flush=True)
+                chap1 = load_chapter_channel_values(session_id, "chapter1")
+                problem_text = _safe_str(chap1.get("problem_data") or "")
+                print(f"[DEBUG] checkpoint에서 가져온 문제 길이: {len(problem_text)}", flush=True)
+        
         # ✅ checkpoint에서 데이터 가져오기
         initial_strategy = ""
-        qa_history = []
+        qa_history: List[Dict[str, Any]] = []
         
         if session_id:
             try:
@@ -444,12 +474,18 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         if problem_score < 0.2 and "problem_solving_risk" not in flags:
             flags.append("problem_solving_risk")
 
-        # 간단한 마크다운 (옵션)
+        code_collab_score_raw_30 = float(state.get("code_collab_score_30") or 0.0)
+        code_quality_score_raw_35 = float(state.get("code_quality_score_35") or 0.0)
+        collab_rule_20 = float(code_collab_evidence.get("collab_rule_20") or 0.0)
+        collab_llm_score_10 = float(code_collab_evidence.get("collab_llm_score_10") or 0.0)
+
         md = f"""# 코딩 테스트 결과 리포트
 
 ## 요약
 - 최종 점수: **{final_score:.2f}**
 - 최종 등급: **{final_grade}**
+- 코드 품질 원점수: **{code_quality_score_raw_35:.2f}/35**
+- 협업 능력 원점수: **{code_collab_score_raw_30:.2f}/30** (rule {collab_rule_20:.2f}/20 + LLM {collab_llm_score_10:.2f}/10)
 
 ## 강점
 {llm_feedback['strength']}
@@ -476,6 +512,12 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "prompt_score": round(code_score * 100, 0),  # 프롬프트 점수 (코드 품질 점수 사용)
             "problem_solving_score": round(problem_score * 100, 0),
             "collaboration_score": round(code_score * 100, 0),  # 협업 점수 (코드 품질에 포함)
+                        
+            "collaboration_score_raw_30": round(code_collab_score_raw_30, 2),
+            "code_quality_score_raw_35": round(code_quality_score_raw_35, 2),
+            "collaboration_rule_20": round(collab_rule_20, 2),
+            "collaboration_llm_10": round(collab_llm_score_10, 2),
+
             "final_score": round(final_score * 100, 0),
             "final_grade": final_grade,
             

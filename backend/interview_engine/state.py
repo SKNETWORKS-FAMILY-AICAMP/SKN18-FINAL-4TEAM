@@ -41,8 +41,8 @@ class CodingState(TypedDict, total=False):
     prev_code: str                  # 직전 코드 스냅샷
     snapshot_index: int             # 현재 스냅샷 인덱스
     last_snapshot_index: int        # 마지막 스냅샷 인덱스(프론트 동기화용)
-    code_quality_feedback: str      # 코드 품질 피드백 메시지
-    collaboration_feedback: str     # 협업/커뮤니케이션 관련 피드백
+    code_quality_feedback: List[str]      # 코드 품질 피드백 메시지
+    collaboration_feedback: List[str]     # 협업/커뮤니케이션 관련 피드백
     question_cnt: int               # 질문/피드백 횟수 카운트
     tts_text: str                   # TTS로 읽을 텍스트
     stt_text: str                   # STT로 받은 텍스트

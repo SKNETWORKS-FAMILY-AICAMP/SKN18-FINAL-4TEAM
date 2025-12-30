@@ -96,6 +96,7 @@
           <CodeEditor
             v-model="code"
             :mode="cmMode"
+            :read-only="sessionStage !== 'coding'"
             @editor-keydown="handleEditorKeydown"
             @editor-copy="handleCopy"
           />
@@ -106,7 +107,7 @@
               type="button"
               class="mic-button"
               @click="onAskButtonClick"
-              :disabled="isSttRunning || isTtsPlaying || isMicCooldown"
+              :disabled="isSttRunning || isTtsPlaying || isMicCooldown || isHintRecording || isHintLoading"
               :class="{ 'is-active': isRecording }"
             >
               <span class="mic-label">
@@ -116,10 +117,14 @@
             <button
               type="button"
               class="hint-button"
-              @click="requestHint"
+              @click="onHintButtonClick"
               :disabled="isSttRunning || isTtsPlaying || isHintDisabled"
             >
-              {{ isHintLoading ? "힌트 생성 중..." : "힌트 요청" }}
+              {{
+                isHintRecording
+                  ? "힌트 설명 중... 다시 눌러 전송"
+                  : (isHintLoading ? "힌트 생성 중..." : "힌트 요청")
+              }}
             </button>
             <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
           </div>
@@ -128,7 +133,7 @@
               type="button"
               class="run-button"
               @click="onSubmitClick"
-              :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording"
+              :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording || isHintRecording || isHintLoading"
             >
               {{ isSubmitting ? "제출 중..." : "제출하기" }}
             </button>
@@ -183,7 +188,7 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
-import { useRoute, useRouter, onBeforeRouteLeave } from "vue-router";
+import { useRoute, useRouter, onBeforeRouteLeave, onBeforeRouteUpdate } from "vue-router";
 import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
@@ -202,6 +207,7 @@ const {
    변수 선언
 ----------------------------- */
 const INTRO_AUDIO_KEY = (sessionId) => `jobtory_intro_audio_${sessionId}`;
+const INTRO_TEXT_KEY = (sessionId) => `jobtory_intro_text_${sessionId}`;
 let audioStream = null;
 let mediaRecorder = null;
 let audioChunks = [];
@@ -220,6 +226,7 @@ const HINT_LIMIT = 3;
 const hintCount = ref(0);
 const isHintLoading = ref(false);
 const isHintDisabled = computed(() => isHintLoading.value || hintCount.value >= HINT_LIMIT);
+const isHintRecording = ref(false);
 const ringRadius = 46;
 const ringSize = 140;
 const ringCircumference = 2 * Math.PI * ringRadius;
@@ -238,6 +245,7 @@ const introSecondChanceUsed = ref(false);
    🔥 버튼 클릭 로직
 ----------------------------- */
 const onAskButtonClick = async () => {
+  if (isHintRecording.value) return;
   if (isMicCooldown.value) return;
   if (micCooldownTimer) {
     clearTimeout(micCooldownTimer);
@@ -272,6 +280,7 @@ const onAskButtonClick = async () => {
 };
 
 const onAnswerButtonClick = async () => {
+  if (isHintRecording.value) return;
   clearAnswerCountdown();
   if (isSttRunning.value || isRecording.value) return;
    // 자동 답변 타이머로 말하기 시작할 때도 코딩 질문 타이머 정지
@@ -357,6 +366,66 @@ const onSubmitClick = async () => {
   }
 };
 
+// 힌트 버튼: 첫 클릭에서 힌트 설명을 녹음, 두 번째 클릭에서 STT + 힌트 생성
+const onHintButtonClick = async () => {
+  const token = localStorage.getItem("jobtory_access_token");
+  const sessionId = route.query.session_id;
+
+  if (hintCount.value >= HINT_LIMIT) {
+    showAntiCheat("sttError", "사용 가능한 힌트가 모두 소진되었습니다.");
+    return;
+  }
+  if (!token || !sessionId) {
+    showAntiCheat("sttError", "세션이나 로그인 정보가 없습니다.");
+    return;
+  }
+
+  // 아직 힌트를 위한 녹음을 시작하지 않은 상태 → 녹음 시작
+  if (!isHintRecording.value) {
+    if (isSttRunning.value || isTtsPlaying.value || isRecording.value) {
+      // 다른 음성 작업이 진행 중이면 무시
+      return;
+    }
+    try {
+      await startRecording();
+      isRecording.value = true;
+      isHintRecording.value = true;
+    } catch (err) {
+      console.error("힌트 녹음 시작 오류:", err);
+      showAntiCheat("micError", "마이크 접근 권한이 필요합니다.");
+    }
+    return;
+  }
+
+  // 이미 힌트 녹음 중인 상태에서 다시 클릭 → 녹음 종료 후 STT + 힌트 요청
+  try {
+    await stopRecording();
+  } catch (err) {
+    console.error("힌트 녹음 종료 오류:", err);
+  } finally {
+    isRecording.value = false;
+    isHintRecording.value = false;
+  }
+
+  if (!audioBlob.value) {
+    showAntiCheat("sttError", "녹음된 음성이 없습니다.");
+    return;
+  }
+
+  isSttRunning.value = true;
+  isHintLoading.value = true;
+  try {
+    const sttText = await transcribeHintAudio();
+    if (!sttText) {
+      return;
+    }
+    await requestHint(sttText);
+  } finally {
+    isSttRunning.value = false;
+    isHintLoading.value = false;
+  }
+};
+
 
 /* -----------------------------
   🎙️ 녹음 시작
@@ -413,6 +482,12 @@ const stopRecording = () => {
 const endSessionAndReturnToCodingTest = async (reason = "intro_flow_done_without_strategy") => {
   clearCountdown();
   try {
+    // 인트로 단계에서 전략이 아닌 답변이 반복되어 세션이 종료되는 경우,
+    // 홈 화면으로 이동하기 전에 사용자에게 한 번 안내 메시지를 보여준다.
+    if (reason === "intro_flow_done_without_strategy") {
+      window.alert("답변이 적절하지 않아 세션을 종료합니다.");
+    }
+
     const token = localStorage.getItem("jobtory_access_token");
     if (token) {
       await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
@@ -542,6 +617,8 @@ const runSttClient = async () => {
     const stageFromServer = (eventData?.stage || "").trim().toLowerCase();
     const codingIntroText = (eventData?.coding_intro_text || "").trim();
     if (stageFromServer) {
+      // 서버에서 내려준 stage를 sessionStage/currentStage 모두에 반영
+      sessionStage.value = stageFromServer;
       currentStage.value = stageFromServer;
     }
 
@@ -561,38 +638,42 @@ const runSttClient = async () => {
       userAnswerClass !== "strategy" &&
       (!introFlowDone || isFirstNonStrategy);
 
+    // intro 단계에서 첫 번째 비전략 답변(irrelevant / problem_question)에 대해
+    // 피드백 TTS를 들려준 뒤에는, 사용자가 버튼을 다시 누르지 않아도
+    // 자동으로 마이크를 열어 재답변을 받을 수 있도록 플래그를 세팅한다.
+    const shouldAutoReRecord =
+      sessionStage.value === "intro" &&
+      isFirstNonStrategy &&
+      (userAnswerClass === "irrelevant" || userAnswerClass === "problem_question");
+
+    const autoReRecordIfNeeded = async () => {
+      if (!shouldAutoReRecord) return;
+      if (isRecording.value || isSttRunning.value || isHintRecording.value) return;
+      try {
+        await startRecording();
+        isRecording.value = true;
+      } catch (err) {
+        console.error("인트로 재답변 자동 녹음 시작 실패:", err);
+        showAntiCheat(
+          "micError",
+          "마이크 자동 시작에 실패했습니다. 다시 한 번 버튼을 눌러 주세요."
+        );
+      }
+    };
+
     // 코딩 스테이지로 막 전환된 경우, 별도의 인트로 멘트를 한 번 재생
     if (stageFromServer === "coding" && codingIntroText) {
       try {
-        const ttsResp = await fetch(
-          `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
-            sessionId
-          )}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              ...(token ? { Authorization: `Bearer ${token}` } : {}),
-            },
-            body: JSON.stringify({
-              tts_text: codingIntroText,
-              max_sentences: 2,
-            }),
-          }
-        );
-        const ttsData = await ttsResp.json().catch(() => ({}));
-        if (ttsResp.ok) {
-          const chunks = Array.isArray(ttsData?.tts_text)
-            ? ttsData.tts_text
-            : [];
-          if (chunks.length) {
-            await playTtsChunks(chunks, {
-              onStart: () => {
-                isSttRunning.value = false;
-              },
-            });
-          }
-        }
+        await fetchAndPlayTts({
+          token,
+          sessionId,
+          text: codingIntroText,
+          // 코딩 단계 진입 멘트는 종종 2문장 이상이라 잘리지 않도록 넉넉히 설정
+          maxSentences: 10,
+          onStart: () => {
+            isSttRunning.value = false;
+          },
+        });
       } catch (err) {
         console.error("코딩 스테이지 인트로 TTS 요청/재생 오류:", err);
       }
@@ -610,36 +691,20 @@ const runSttClient = async () => {
               isSttRunning.value = false;
             },
           });
+          await autoReRecordIfNeeded();
         } else if (replyText) {
           // 텍스트만 온 경우에만 TTS API를 호출
-          const ttsResp = await fetch(
-            `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
-              sessionId
-            )}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-                ...(token ? { Authorization: `Bearer ${token}` } : {}),
-              },
-              // 답변/피드백은 너무 길게 읽지 않도록 최대 문장 수를 제한
-              body: JSON.stringify({ tts_text: replyText, max_sentences: 2 }),
-            }
-          );
-          const ttsData = await ttsResp.json().catch(() => ({}));
-          if (!ttsResp.ok) {
-            console.warn("응답 TTS 생성 실패", ttsResp.status, ttsData);
-            return;
-          }
-          const chunks = Array.isArray(ttsData?.tts_text)
-            ? ttsData.tts_text
-            : [];
-          if (chunks.length) {
-            await playTtsChunks(chunks, {
-              onStart: () => {
-                isSttRunning.value = false;
-              },
-            });
+          const ok = await fetchAndPlayTts({
+            token,
+            sessionId,
+            text: replyText,
+            maxSentences: 2,
+            onStart: () => {
+              isSttRunning.value = false;
+            },
+          });
+          if (ok) {
+            await autoReRecordIfNeeded();
           }
         }
       } catch (err) {
@@ -656,18 +721,99 @@ const runSttClient = async () => {
   }
 };
 
+// 힌트용 STT: 현재 녹음된 음성을 텍스트로만 변환
+const transcribeHintAudio = async () => {
+  if (!audioBlob.value) {
+    showAntiCheat("sttError", "녹음된 음성이 없습니다.");
+    return "";
+  }
+
+  const sessionId = route.query.session_id;
+  if (!sessionId) {
+    showAntiCheat("sttError", "session_id가 없습니다. 세션을 다시 시작해 주세요.");
+    return "";
+  }
+
+  try {
+    const sttResp = await fetch(
+      `${BACKEND_BASE}/api/stt/transcribe/?session_id=${encodeURIComponent(
+        sessionId
+      )}`,
+      {
+        method: "POST",
+        body: audioBlob.value,
+      }
+    );
+
+    const sttData = await sttResp.json().catch(() => ({}));
+    if (!sttResp.ok) {
+      console.warn("STT(힌트) 요청 실패", sttResp.status, sttData);
+      showAntiCheat("sttError", sttData?.error || "음성을 인식하지 못했습니다.");
+      return "";
+    }
+
+    const sttText = (sttData?.stt_text || "").trim();
+    console.log("STT(힌트) 결과:", sttData);
+
+    if (!sttText) {
+      showAntiCheat(
+        "sttError",
+        "음성에서 유효한 문장을 인식하지 못했습니다. 다시 한번 말해주세요."
+      );
+      return "";
+    }
+
+    return sttText;
+  } catch (err) {
+    console.error("STT(힌트) 요청 실패:", err);
+    showAntiCheat("sttError", "서버 통신 오류");
+    return "";
+  }
+};
+
 /* -----------------------------
   🔊 TTS
 ------------------------------ */
 // 현재 재생 중인 TTS 오디오들을 추적해서 화면을 떠날 때 모두 중단할 수 있도록 한다.
 const activeTtsAudios = new Set();
+// 진행 중인 TTS 요청(스트리밍 fetch)을 중단하기 위한 AbortController들
+const activeTtsControllers = new Set();
+// stopAllTts() 호출 이후에는 이전 TTS 작업이 더 이상 오디오를 재생하지 않도록 하는 세대 토큰
+let ttsStopGeneration = 0;
+const TTS_STREAM_ENDPOINT = `${BACKEND_BASE}/api/tts/intro/stream/`;
+const TTS_BATCH_ENDPOINT = `${BACKEND_BASE}/api/tts/intro/`;
 
 const stopAllTts = () => {
+  // 이후에 실행 중이던 TTS 작업들이 새로운 오디오를 재생하지 못하도록 한다.
+  ttsStopGeneration += 1;
+
+  // 진행 중인 스트리밍 요청이 있다면 즉시 중단한다.
+  try {
+    activeTtsControllers.forEach((controller) => {
+      try {
+        controller.abort();
+      } catch {
+        // ignore
+      }
+    });
+    activeTtsControllers.clear();
+  } catch {
+    // ignore
+  }
+
   // 브라우저 Audio 요소로 재생 중인 TTS 정지
   try {
     activeTtsAudios.forEach((audio) => {
       try {
         audio.pause();
+        // 재생 대기/진행 중인 Promise가 onended/onerror만 기다리며 남아있지 않도록 정리한다.
+        if (typeof audio.onended === "function") {
+          try {
+            audio.onended();
+          } catch {
+            // ignore
+          }
+        }
         audio.src = "";
       } catch {
         // ignore
@@ -688,9 +834,219 @@ const stopAllTts = () => {
   }
 };
 
+const playSingleTtsChunk = async (chunk) => {
+  if (!chunk?.audio) return true;
+  const myGeneration = ttsStopGeneration;
+  const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
+  try {
+    if (myGeneration !== ttsStopGeneration) return false;
+    activeTtsAudios.add(audio);
+    await audio.play();
+  } catch (err) {
+    console.error("TTS 재생 실패:", err);
+    try {
+      activeTtsAudios.delete(audio);
+    } catch {
+      // ignore
+    }
+    // 자동재생 차단(NotAllowedError)은 상위에서 기존 로직대로 처리할 수 있게 던진다.
+    if (err && err.name === "NotAllowedError") {
+      throw err;
+    }
+    return false;
+  }
+
+  return await new Promise((resolve) => {
+    const cleanup = () => {
+      audio.onended = null;
+      audio.onerror = null;
+      activeTtsAudios.delete(audio);
+    };
+    audio.onended = () => {
+      cleanup();
+      resolve(true);
+    };
+    audio.onerror = () => {
+      cleanup();
+      resolve(false);
+    };
+  });
+};
+
+const fetchTtsChunksBatch = async ({ token, sessionId, text, maxSentences }) => {
+  const ttsText = typeof text === "string" ? text.trim() : "";
+  if (!ttsText) return [];
+  const url = `${TTS_BATCH_ENDPOINT}?session_id=${encodeURIComponent(sessionId)}`;
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(
+      maxSentences ? { tts_text: ttsText, max_sentences: maxSentences } : { tts_text: ttsText }
+    ),
+  });
+  const data = await resp.json().catch(() => ({}));
+  if (!resp.ok) {
+    console.warn("TTS batch 요청 실패", resp.status, data);
+    return [];
+  }
+  return normalizeTtsChunks(data?.tts_text);
+};
+
+async function* parseNdjsonStream(stream) {
+  if (!stream) return;
+  const reader = stream.getReader();
+  const decoder = new TextDecoder("utf-8");
+  let buffer = "";
+  while (true) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      const trimmed = line.trim();
+      if (!trimmed) continue;
+      try {
+        yield JSON.parse(trimmed);
+      } catch (e) {
+        console.warn("NDJSON 파싱 실패:", e, trimmed.slice(0, 120));
+      }
+    }
+  }
+  const tail = buffer.trim();
+  if (tail) {
+    try {
+      yield JSON.parse(tail);
+    } catch (e) {
+      console.warn("NDJSON tail 파싱 실패:", e, tail.slice(0, 120));
+    }
+  }
+}
+
+const fetchAndPlayTtsStream = async ({
+  token,
+  sessionId,
+  text,
+  maxSentences,
+  onStart,
+  collectChunks,
+}) => {
+  const myGeneration = ttsStopGeneration;
+  const ttsText = typeof text === "string" ? text.trim() : "";
+  if (!ttsText) return false;
+
+  const url = `${TTS_STREAM_ENDPOINT}?session_id=${encodeURIComponent(sessionId)}`;
+  const controller = new AbortController();
+  activeTtsControllers.add(controller);
+  let resp;
+  try {
+    resp = await fetch(url, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(
+        maxSentences ? { tts_text: ttsText, max_sentences: maxSentences } : { tts_text: ttsText }
+      ),
+      signal: controller.signal,
+    });
+  } catch (err) {
+    // 화면 이탈/정지 처리로 abort 된 경우는 조용히 중단한다.
+    if (myGeneration !== ttsStopGeneration || err?.name === "AbortError") return false;
+    throw err;
+  }
+
+  if (myGeneration !== ttsStopGeneration) return false;
+
+  if (!resp.ok) {
+    const errBody = await resp.json().catch(() => ({}));
+    console.warn("TTS stream 요청 실패", resp.status, errBody);
+    try {
+      activeTtsControllers.delete(controller);
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+  if (!resp.body) {
+    // 브라우저/프록시 환경에 따라 stream body가 없을 수 있음(Safari 등)
+    try {
+      activeTtsControllers.delete(controller);
+    } catch {
+      // ignore
+    }
+    return false;
+  }
+
+  let started = false;
+  let overallOk = true;
+  let chain = Promise.resolve(true);
+  let gotAnyAudio = false;
+  let canceled = false;
+
+  try {
+    for await (const msg of parseNdjsonStream(resp.body)) {
+      if (myGeneration !== ttsStopGeneration) {
+        canceled = true;
+        break;
+      }
+      if (msg?.error) {
+        console.warn("TTS stream error chunk:", msg.error);
+        continue;
+      }
+      if (!msg?.audio) continue;
+      gotAnyAudio = true;
+      const chunk = { text: msg.text || "", audio: msg.audio };
+      if (typeof collectChunks === "function") {
+        try {
+          collectChunks(chunk);
+        } catch {
+          // ignore
+        }
+      }
+      chain = chain.then(async () => {
+        if (myGeneration !== ttsStopGeneration) {
+          canceled = true;
+          return false;
+        }
+        if (!started && typeof onStart === "function") {
+          started = true;
+          onStart();
+        }
+        const ok = await playSingleTtsChunk(chunk);
+        if (!ok) overallOk = false;
+        return ok;
+      });
+    }
+  } catch (err) {
+    if (myGeneration !== ttsStopGeneration || err?.name === "AbortError") {
+      canceled = true;
+    } else {
+      throw err;
+    }
+  } finally {
+    activeTtsControllers.delete(controller);
+  }
+
+  try {
+    const tailOk = await chain;
+    if (canceled) return false;
+    return gotAnyAudio && overallOk && tailOk;
+  } catch (err) {
+    // NotAllowedError(자동재생 차단) 등은 상위에서 처리하도록 전달
+    throw err;
+  }
+};
+
 const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart: null }) => {
+  const myGeneration = ttsStopGeneration;
   let started = false;
   for (const chunk of chunks) {
+    if (myGeneration !== ttsStopGeneration) return false;
     if (!chunk?.audio) continue;
     const audio = new Audio(`data:audio/mp3;base64,${chunk.audio}`);
     try {
@@ -702,6 +1058,14 @@ const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart:
       await audio.play();
     } catch (err) {
       console.error("TTS 재생 실패:", err);
+      try {
+        activeTtsAudios.delete(audio);
+      } catch {
+        // ignore
+      }
+      if (err && err.name === "NotAllowedError") {
+        throw err;
+      }
       if (opts?.throwOnError) throw err;
       return false;
     }
@@ -725,6 +1089,46 @@ const playTtsChunks = async (chunks = [], opts = { throwOnError: false, onStart:
     if (!finished) return false;
   }
   return true;
+};
+
+const fetchAndPlayTts = async ({
+  token,
+  sessionId,
+  text,
+  maxSentences,
+  onStart,
+  collectChunks,
+}) => {
+  const myGeneration = ttsStopGeneration;
+  try {
+    const ok = await fetchAndPlayTtsStream({
+      token,
+      sessionId,
+      text,
+      maxSentences,
+      onStart,
+      collectChunks,
+    });
+    if (myGeneration !== ttsStopGeneration) return false;
+    if (ok) return true;
+  } catch (err) {
+    if (err && err.name === "NotAllowedError") throw err;
+    console.warn("TTS stream 재생 실패, batch로 fallback:", err);
+  }
+
+  if (myGeneration !== ttsStopGeneration) return false;
+  const chunks = await fetchTtsChunksBatch({ token, sessionId, text, maxSentences });
+  if (myGeneration !== ttsStopGeneration) return false;
+  if (chunks.length && typeof collectChunks === "function") {
+    try {
+      chunks.forEach((c) => collectChunks(c));
+    } catch {
+      // ignore
+    }
+  }
+  if (!chunks.length) return false;
+  if (myGeneration !== ttsStopGeneration) return false;
+  return await playTtsChunks(chunks, { onStart });
 };
 const playWarningBeep = async (durationMs = 400, freq = 880) => {
   try {
@@ -797,22 +1201,30 @@ const normalizeTtsChunks = (payload) => {
   return [];
 };
 
-const fetchIntroTtsAudio = async () => {
+// 인트로용 고정 인사 멘트들
+const INTRO_GREETINGS = [
+  "안녕하세요 오늘 라이브 코딩 테스트를 함께 진행할 면접관입니다. 지금 화면에 보이는 문제를 천천히 살펴보시고, 곧 핵심 내용을 간단히 정리해서 안내해 드리겠습니다.",
+  "안녕하세요 저는 이번 라이브 코딩 세션을 맡은 면접관입니다. 화면의 문제를 먼저 훑어봐 주시면, 잠시 후 어떤 내용을 요구하는지 핵심만 콕 집어서 설명해 드리겠습니다.",
+  "안녕하세요 라이브 코딩 테스트를 진행할 면접관입니다. 우선 화면에 보이는 문제를 한 번 읽어보시고, 이 문제의 중요한 부분을 곧 요약해서 설명해 드리겠습니다.",
+  "안녕하세요 오늘 코딩 테스트를 도와드릴 면접관입니다. 화면의 문제를 편하게 읽어보시고 계시면, 조금 뒤에 문제의 목적과 핵심 포인트를 짧게 정리해 드리겠습니다.",
+  "안녕하세요 지금부터 라이브 코딩 테스트를 함께 할 면접관입니다. 우선 화면에 나온 문제를 눈으로 익혀 두시고, 곧 어떤 문제인지 한 번에 이해하실 수 있도록 핵심만 추려서 안내해 드리겠습니다."
+];
+
+const getRandomIntroGreeting = () => {
+  if (!INTRO_GREETINGS.length) return "";
+  const idx = Math.floor(Math.random() * INTRO_GREETINGS.length);
+  return INTRO_GREETINGS[idx] || "";
+};
+
+const fetchIntroTtsText = async () => {
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
   if (!token || !sessionId || !problemData?.value) return null;
 
-  const audioKey = INTRO_AUDIO_KEY(sessionId);
+  const textKey = INTRO_TEXT_KEY(sessionId);
 
-  const cachedAudio = sessionStorage.getItem(audioKey);
-  if (cachedAudio) {
-    try {
-      const parsed = normalizeTtsChunks(JSON.parse(cachedAudio));
-      if (parsed.length) return parsed;
-    } catch (e) {
-      console.warn("저장된 intro 오디오 파싱 실패:", e);
-    }
-  }
+  const cachedText = sessionStorage.getItem(textKey);
+  if (cachedText && cachedText.trim()) return cachedText.trim();
 
   try {
     const initResp = await fetch(`${BACKEND_BASE}/api/coding-problems/session/init/`, {
@@ -832,15 +1244,17 @@ const fetchIntroTtsAudio = async () => {
       return null;
     }
 
-    const refreshed = normalizeTtsChunks(initData.tts_text || initData.tts_audio);
-    if (refreshed.length) {
-      sessionStorage.setItem(audioKey, JSON.stringify(refreshed));
-      return refreshed;
+    const refreshedText = typeof initData.tts_text === "string" ? initData.tts_text.trim() : "";
+    if (refreshedText) {
+      sessionStorage.setItem(textKey, refreshedText);
+      // 기존 로직에서 audioKey를 쓰던 곳이 있어, text-only로 전환 시에도
+      // 이전 캐시가 남아있다면 그대로 사용 가능하도록 삭제하지는 않는다.
+      return refreshedText;
     }
 
-    console.warn("intro TTS 오디오를 다시 준비하지 못했습니다.", initData);
+    console.warn("intro TTS 텍스트를 다시 준비하지 못했습니다.", initData);
   } catch (err) {
-    console.error("intro TTS 오디오 재요청 실패:", err);
+    console.error("intro TTS 텍스트 재요청 실패:", err);
   }
   return null;
 };
@@ -896,50 +1310,101 @@ const confirmReloadIntro = async () => {
 
 const playIntroTtsFromSession = async () => {
   if (isTtsPlaying.value) {
-    isIntroPreparing.value = false;
     return;
   }
   if (sessionStage.value !== "intro") {
-    isIntroPreparing.value = false;
     return;
   }
 
+  // 인트로용 고정 인사 TTS가 준비되기 전까지 로딩 오버레이를 유지한다.
   isIntroPreparing.value = true;
 
   const sessionId = route.query.session_id;
-  // stage가 intro이면 이전 재생 여부와 관계없이 항상 재생을 시도한다.
+  const token = localStorage.getItem("jobtory_access_token");
 
-  const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
-  const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
+  // 메인 인트로 오디오를 가져오는 작업을 미리 시작해 두고,
+  // 그 사이에 고정 인사 멘트를 먼저 재생한다.
+  const loadCachedIntroChunks = () => {
+    // stage가 intro이면 이전 재생 여부와 관계없이 항상 재생을 시도한다.
+    const audioKey = sessionId ? INTRO_AUDIO_KEY(sessionId) : null;
+    const audio = audioKey ? sessionStorage.getItem(audioKey) : null;
 
-  let chunks;
-  if (audio) {
-    try {
-      chunks = JSON.parse(audio);
-    } catch (e) {
-      console.error("intro TTS audio JSON 파싱 실패:", e);
-      chunks = null;
+    let chunks;
+    if (audio) {
+      try {
+        chunks = JSON.parse(audio);
+      } catch (e) {
+        console.error("intro TTS audio JSON 파싱 실패:", e);
+        chunks = null;
+      }
     }
-  }
 
-  chunks = normalizeTtsChunks(chunks);
-  if (!chunks.length) {
-    const fetched = await fetchIntroTtsAudio();
-    if (Array.isArray(fetched) && fetched.length) {
-      chunks = fetched;
-    } else {
-      isIntroPreparing.value = false;
-      window.alert("인트로 오디오가 준비되지 않았습니다. 다시 시작해 주세요.");
-      return;
-    }
-  }
+    chunks = normalizeTtsChunks(chunks);
+    return chunks;
+  };
+
+  const cachedIntroChunks = loadCachedIntroChunks();
+  const introTextPromise = cachedIntroChunks.length ? null : fetchIntroTtsText();
 
   introPlayBlocked.value = false;
   isTtsPlaying.value = true;
-  isIntroPreparing.value = false;
-  startCountdownOnce(); // 로딩 오버레이가 사라지고 음성이 재생될 때 타이머 시작
+
   try {
-    const completed = await playTtsChunks(chunks, { throwOnError: true });
+    // 1) 짧은 인사 멘트를 먼저 TTS로 재생 (체감 레이턴시 감소)
+    const greetingText = getRandomIntroGreeting();
+    if (greetingText && token && sessionId) {
+      try {
+        const ok = await fetchAndPlayTts({
+          token,
+          sessionId,
+          text: greetingText,
+          maxSentences: 5,
+          onStart: () => {
+            
+            isIntroPreparing.value = false;
+            startCountdownOnce();
+          },
+        });
+        if (!ok) {
+          isIntroPreparing.value = false;
+        }
+      } catch (e) {
+        console.warn("intro greeting TTS 재생 실패:", e);
+        isIntroPreparing.value = false;
+      }
+    } else {
+      // 인사 멘트를 재생하지 못하는 경우에도 오버레이를 제거
+      isIntroPreparing.value = false;
+    }
+
+    // 2) 메인 인트로 오디오가 준비될 때까지 대기 후 재생
+    let completed = false;
+    if (cachedIntroChunks.length) {
+      completed = await playTtsChunks(cachedIntroChunks, { throwOnError: true });
+    } else {
+      const introText = await introTextPromise;
+      if (!introText) {
+        window.alert("인트로 오디오가 준비되지 않았습니다. 다시 시작해 주세요.");
+        return;
+      }
+      const collected = [];
+      completed = await fetchAndPlayTts({
+        token,
+        sessionId,
+        text: introText,
+        // 서버 환경변수(TTS_MAX_SENTENCES)가 너무 낮게 설정되어 있어도
+        // 메인 인트로가 잘리지 않도록 충분히 큰 값으로 명시한다.
+        maxSentences: 30,
+        collectChunks: (c) => collected.push(c),
+      });
+      if (completed && collected.length && sessionId) {
+        try {
+          sessionStorage.setItem(INTRO_AUDIO_KEY(sessionId), JSON.stringify(collected));
+        } catch (e) {
+          console.warn("intro 오디오 캐시 저장 실패:", e);
+        }
+      }
+    }
     if (completed && sessionStage.value === "intro") {
       startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
       showReloadIntroModal.value = false;
@@ -1008,25 +1473,12 @@ const requestCodingQuestion = async () => {
 
     // 텍스트만 온 경우, 인트로 TTS API를 통해 읽어준다.
     try {
-      const ttsResp = await fetch(
-        `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
-          sessionId
-        )}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ tts_text: questionText, max_sentences: 2 }),
-        }
-      );
-      const ttsData = await ttsResp.json().catch(() => ({}));
-      if (!ttsResp.ok) return;
-      const chunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
-      if (chunks.length) {
-        await playTtsChunks(chunks);
-      }
+      await fetchAndPlayTts({
+        token,
+        sessionId,
+        text: questionText,
+        maxSentences: 10,
+      });
     } catch (err) {
       console.error("coding question TTS 요청 실패:", err);
     }
@@ -1048,87 +1500,6 @@ const stopCodingQuestionTimer = () => {
   if (codingQuestionTimer) {
     clearInterval(codingQuestionTimer);
     codingQuestionTimer = null;
-  }
-};
-
-const requestAndPlayTts = async (problemPayload) => {
-  if (!problemPayload || isTtsPlaying.value) return;
-  const token = localStorage.getItem("jobtory_access_token");
-  const sessionId = route.query.session_id;
-  if (!token) {
-    console.warn("TTS 요청을 위해 로그인 토큰이 필요합니다.");
-    return;
-  }
-  if (!sessionId) {
-    console.warn("TTS 요청에 session_id가 필요합니다.");
-    return;
-  }
-  isTtsPlaying.value = true;
-  try {
-    // 1단계: 문제 + 인트로 텍스트만 LangGraph에서 받아오기
-    const initResp = await fetch(
-      `${BACKEND_BASE}/api/coding-problems/session/init/?session_id=${encodeURIComponent(
-        sessionId
-      )}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify(problemPayload),
-      }
-    );
-    const initData = await initResp.json().catch(() => ({}));
-    if (!initResp.ok) {
-      console.error("TTS 인트로 텍스트 요청 실패:", initData);
-      // TTS 재생이 실패해도 카운트다운은 진행
-      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-      return;
-    }
-
-    const introText = (initData && initData.tts_text) || "";
-    if (!introText) {
-      // 인트로 텍스트가 없어도 타이머는 시작
-      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-      return;
-    }
-
-    // 2단계: 인트로 텍스트를 TTS 전용 API에 보내어 오디오만 생성
-    const ttsResp = await fetch(
-      `${BACKEND_BASE}/api/tts/intro/?session_id=${encodeURIComponent(
-        sessionId
-      )}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        // 인트로 안내도 너무 길지 않게 2문장 정도만 읽도록 제한해
-        // 첫 오디오가 나오는 시간을 줄입니다.
-        body: JSON.stringify({ tts_text: introText, max_sentences: 2 }),
-      }
-    );
-    const ttsData = await ttsResp.json().catch(() => ({}));
-    if (!ttsResp.ok) {
-      console.error("TTS 오디오 생성 요청 실패:", ttsData);
-      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-      return;
-    }
-
-    const chunks = Array.isArray(ttsData?.tts_text) ? ttsData.tts_text : [];
-    if (chunks.length) {
-      await playTtsChunks(chunks);
-      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-    } else {
-      // 오디오 청크가 없어도 타이머는 시작
-      startAnswerCountdown(ANSWER_COUNTDOWN_SECONDS);
-    }
-  } catch (err) {
-    console.error("TTS 요청/재생 오류:", err);
-  } finally {
-    isTtsPlaying.value = false;
   }
 };
 
@@ -1253,6 +1624,12 @@ const fetchRandomProblem = async () => {
     }
 
     problemData.value = data;
+    // 서버 메타에 저장된 힌트 사용 횟수를 복원 (이어하기 시 초기화 방지)
+    if (typeof data.hint_count === "number") {
+      hintCount.value = Math.min(HINT_LIMIT, Math.max(0, data.hint_count));
+    } else {
+      hintCount.value = 0;
+    }
     introSecondChanceUsed.value = false;
     clearAnswerCountdown();
     isRecording.value = false;
@@ -1280,12 +1657,6 @@ const fetchRandomProblem = async () => {
     // 세션/언어별로 저장된 코드가 있다면 불러와서 이어서 작성할 수 있도록 합니다.
     await loadSavedCodeIfExists(sessionId, token, selectedLanguage.value);
 
-    // 새로 시작하기인 경우에만 문제 설명 인트로 TTS를 재생하고,
-    // 이어하기(resume=1)로 들어온 경우에는 이미 들었던 인트로이므로 생략합니다.
-    // stage가 intro이면 항상 인트로 음성 재생을 시도한다.
-    if (sessionStage.value === "intro") {
-      void requestAndPlayTts(problemData.value);
-    }
     // 코딩 단계 질문용 타이머 시작 (stage는 intro→coding 전환 시점에만 실제 동작)
     startCodingQuestionTimer();
   } catch (err) {
@@ -1296,8 +1667,8 @@ const fetchRandomProblem = async () => {
   }
 };
 
-// 힌트 요청: session_id, code, language, 문제 정보 함께 전달
-const requestHint = async () => {
+// 힌트 요청: session_id, code, language, 문제 정보 + 사용자의 힌트 요청 발화 함께 전달
+const requestHint = async (hintRequestText = "") => {
   const token = localStorage.getItem("jobtory_access_token");
   const sessionId = route.query.session_id;
   if (hintCount.value >= HINT_LIMIT) {
@@ -1324,6 +1695,7 @@ const requestHint = async () => {
         problem_description: problemData.value?.problem || "",
         problem_algorithm_category: problemData.value?.category || "",
         hint_count: hintCount.value,
+        hint_request_text: hintRequestText,
       }),
     });
 
@@ -1343,11 +1715,21 @@ const requestHint = async () => {
       hintCount.value = Math.min(HINT_LIMIT, hintCount.value + 1);
     }
 
-    // 힌트가 TTS 오디오로 내려오면 바로 재생
-    const ttsChunks = Array.isArray(data?.tts_audio) ? data.tts_audio : [];
-    if (ttsChunks.length) {
+    // 힌트 텍스트가 내려오면 TTS API를 통해 오디오를 생성해 재생
+    const hintText = (data && typeof data.hint_text === "string") ? data.hint_text : "";
+    if (hintText) {
       try {
-        await playTtsChunks(ttsChunks);
+        await fetchAndPlayTts({
+          token,
+          sessionId,
+          text: hintText,
+          maxSentences: 10,
+          onStart: () => {
+            // 힌트 TTS가 실제로 재생되기 시작하는 시점에
+            // STT 로딩 오버레이를 제거해 코딩 화면이 보이도록 한다.
+            isSttRunning.value = false;
+          },
+        });
       } catch (err) {
         console.error("failed to play hint TTS", err);
       }
@@ -1424,20 +1806,68 @@ const endSessionDueToTimeout = async () => {
   if (hasAutoEnded) return;
   hasAutoEnded = true;
   clearCountdown();
+  // 타임아웃 시에는 세션을 바로 종료하지 않고
+  // 현재 코드를 기준으로 자동 제출 및 리포트 생성을 시작한다.
+  stopCodingQuestionTimer();
+
+  const sessionId = route.query.session_id;
+  const token = localStorage.getItem("jobtory_access_token");
+
+  if (!sessionId || !token) {
+    // 세션이나 토큰 정보가 없으면 기존 동작대로 세션만 종료
+    try {
+      if (token) {
+        await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ reason: "timeout" }),
+        }).catch(() => {});
+      }
+    } finally {
+      localStorage.removeItem("jobtory_livecoding_session_id");
+      router.replace({ name: "home", query: { alert: "session_timeout" } });
+    }
+    return;
+  }
 
   try {
-    const token = localStorage.getItem("jobtory_access_token");
-    if (token) {
-      await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ reason: "timeout" }),
-      }).catch(() => {});
+    // 타임아웃 직전에 현재 코드를 한 번 더 저장
+    await saveCodeSnapshot(code.value);
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/final-eval/start/`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ session_id: sessionId }),
+    });
+
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      console.warn("final-eval start failed on timeout", resp.status, data);
+      window.alert(
+        data?.detail ||
+          "제한 시간이 만료되어 세션이 종료되었습니다. 리포트 생성에 실패했습니다."
+      );
+      localStorage.removeItem("jobtory_livecoding_session_id");
+      router.replace({ name: "home", query: { alert: "session_timeout" } });
+      return;
     }
-  } finally {
+
+    // 자동 제출이 시작되면 렌더링 화면으로 이동하여 리포트 생성을 기다린다.
+    router.replace({
+      name: "livecoding-rendering",
+      query: { session_id: sessionId, timeout: "1" },
+    });
+  } catch (e) {
+    console.error("failed to start final eval on timeout", e);
+    window.alert(
+      "제한 시간이 만료되어 세션이 종료되었습니다. 리포트 생성 중 오류가 발생했습니다."
+    );
     localStorage.removeItem("jobtory_livecoding_session_id");
     router.replace({ name: "home", query: { alert: "session_timeout" } });
   }
@@ -1578,8 +2008,8 @@ const forceEndSession = async (reason = "") => {
 };
 
 const handleVisibilityChange = () => {
-  if (!isAntiCheatReady.value) return;
   if (document.visibilityState === "hidden") {
+    if (!isAntiCheatReady.value) return;
     registerOffscreenInfraction("tabSwitch", "시험 화면을 벗어났습니다.");
   }
 };
@@ -1772,6 +2202,13 @@ const loadSessionFromApi = async () => {
 
     problemData.value = data;
 
+    // 서버 메타에 저장된 힌트 사용 횟수를 복원 (이어하기 시 초기화 방지)
+    if (typeof data.hint_count === "number") {
+      hintCount.value = Math.min(HINT_LIMIT, Math.max(0, data.hint_count));
+    } else {
+      hintCount.value = 0;
+    }
+
     // 서버 stage/state에 맞춰 단계 설정 (sessionStorage 단계 값은 사용하지 않음)
     const serverStage = String(data.stage || data.state || "intro").toLowerCase();
     sessionStage.value = serverStage;
@@ -1858,10 +2295,43 @@ onMounted(async () => {
   document.addEventListener("paste", pasteListener, { capture: true });
   document.addEventListener("copy", copyListener, { capture: true });
   document.addEventListener("mouseleave", handleMouseLeave);
+  // 브라우저 탭을 완전히 닫거나 새로고침할 때도
+  // 재생 중인 TTS가 남지 않도록 전역 훅을 단다.
+  window.addEventListener("beforeunload", stopAllTts);
+  // 뒤로가기/외부 이동/bfcache 진입 등 "페이지를 떠나는" 이벤트에서도 TTS를 정리한다.
+  window.addEventListener("pagehide", stopAllTts);
+  window.addEventListener("unload", stopAllTts);
 });
 
 onBeforeUnmount(() => {
+  // 코딩 세션 화면을 떠나는 모든 경우(라우트 이동, 새로고침 등)에서
+  // 현재 재생 중인 TTS를 가장 먼저 정리한다.
+  stopAllTts();
+
   void saveCodeSnapshot(code.value);
+  // 현재 남은 시간을 백엔드에 저장하여,
+  // 문제 풀이 화면을 떠났다가 이어하기로 돌아올 때
+  // 이 값부터 다시 카운트다운을 시작할 수 있도록 한다.
+  try {
+    const token = localStorage.getItem("jobtory_access_token");
+    const sessionId =
+      route.query.session_id || localStorage.getItem("jobtory_livecoding_session_id");
+    if (token && sessionId && remainingSeconds.value !== null && remainingSeconds.value !== undefined) {
+      void fetch(`${BACKEND_BASE}/api/livecoding/session/timer/`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          remaining_seconds: Number(remainingSeconds.value) || 0,
+        }),
+      }).catch(() => {});
+    }
+  } catch {
+    // 타이머 저장 실패는 치명적이지 않으므로 무시
+  }
   clearCountdown();
   clearIntroGestureHandler();
   if (micCooldownTimer) {
@@ -1878,6 +2348,9 @@ onBeforeUnmount(() => {
     mediapipeInterval = null;
   }
   window.removeEventListener("blur", handleWindowBlur);
+  window.removeEventListener("beforeunload", stopAllTts);
+  window.removeEventListener("pagehide", stopAllTts);
+  window.removeEventListener("unload", stopAllTts);
   document.removeEventListener("visibilitychange", handleVisibilityChange);
   document.removeEventListener("paste", pasteListener, { capture: true });
   document.removeEventListener("copy", copyListener, { capture: true });
@@ -1894,6 +2367,12 @@ onBeforeUnmount(() => {
 // 라우트 전환(뒤로가기 / 다른 페이지 이동) 시
 // 재생 중인 모든 TTS를 정리해 화면을 떠난 뒤에는 음성이 남지 않도록 한다.
 onBeforeRouteLeave(() => {
+  stopAllTts();
+});
+
+// 같은 컴포넌트가 유지된 채로 라우트만 바뀌는 경우에도(예: query 변경)
+// 화면을 떠나는 동작에서 TTS가 남지 않도록 정리한다.
+onBeforeRouteUpdate(() => {
   stopAllTts();
 });
 </script>

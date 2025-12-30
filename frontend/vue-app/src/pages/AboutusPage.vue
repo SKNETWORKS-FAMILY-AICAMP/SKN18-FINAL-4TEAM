@@ -78,7 +78,20 @@
             <div class="info-area">
               <h3>{{ member.name }}</h3>
               <p class="role">{{ member.role }}</p>
-              <div class="barcode"></div> </div>
+              
+              <div class="qr-section">
+                <div class="qr-divider"></div>
+                <div class="qr-wrapper">
+                  <img 
+                    :src="`https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=111827&data=${member.github}`" 
+                    alt="GitHub QR" 
+                    class="qr-code"
+                  />
+                  <span class="qr-label">GITHUB SCAN</span>
+                </div>
+              </div>
+              
+            </div>
           </article>
         </div>
       </div>
@@ -95,19 +108,19 @@ const goBack = () => {
 };
 
 const members = [
-  { name: "김규리", role: "Project Manager", img: new URL("../assets/김규리.png", import.meta.url).href },
-  { name: "김준규", role: "Assoc. PM", img: new URL("../assets/김준규.png", import.meta.url).href },
-  { name: "김민주", role: "Crew", img: new URL("../assets/김민주.png", import.meta.url).href },
-  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href },
-  { name: "정동석", role: "Crew", img: new URL("../assets/정동석.jpg", import.meta.url).href },
-  { name: "채린", role: "Crew", img: new URL("../assets/채린.png", import.meta.url).href },
+  { name: "김규리", role: "Project Manager", img: new URL("../assets/김규리.png", import.meta.url).href, github: "https://github.com/GyuriKimm" },
+  { name: "김준규", role: "Assoc. PM", img: new URL("../assets/김준규.png", import.meta.url).href, github: "https://github.com/JungyuOO" },
+  { name: "김민주", role: "Crew", img: new URL("../assets/김민주.png", import.meta.url).href, github: "https://github.com/kmjj0801" },
+  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong00" },
+  { name: "정동석", role: "Crew", img: new URL("../assets/정동석.jpg", import.meta.url).href, github: "https://github.com/dsj-1004" },
+  { name: "채린", role: "Crew", img: new URL("../assets/채린.png", import.meta.url).href, github: "https://github.com/cofls99" },
 ];
 </script>
 
 <style scoped>
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Anton&display=swap"); /* 임팩트 있는 폰트 추가 */
+@import url("https://fonts.googleapis.com/css2?family=Anton&display=swap");
 
 :root {
   --bg-color: #f3f4f6;
@@ -118,7 +131,7 @@ const members = [
 .aboutus {
   min-height: 100vh;
   background-color: var(--bg-color);
-  font-family: "Inter", sans-serif;
+  font-family: "Pretendard", sans-serif;
   color: var(--text-primary);
   overflow-x: hidden;
 }
@@ -144,7 +157,7 @@ const members = [
 .back-button:hover { background: #111827; color: #fff; }
 .back-icon { width: 24px; height: 24px; }
 
-/* --- [NEW] Hero Section Style --- */
+/* Hero Section */
 .hero {
   position: relative;
   height: 70vh;
@@ -153,20 +166,20 @@ const members = [
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* 텍스트 넘침 방지 */
+  overflow: hidden;
 }
 
-/* 1. 흐르는 텍스트 배경 (Marquee) */
+/* Marquee */
 .marquee-container {
   position: absolute;
   top: 50%;
   left: 50%;
-  transform: translate(-50%, -50%) rotate(-5deg); /* 살짝 기울여서 힙하게 */
+  transform: translate(-50%, -50%) rotate(-5deg);
   width: 120vw;
   display: flex;
   flex-direction: column;
   gap: 20px;
-  opacity: 0.08; /* 은은하게 배경으로 */
+  opacity: 0.08;
   pointer-events: none;
   z-index: 0;
 }
@@ -175,7 +188,7 @@ const members = [
   display: flex;
   white-space: nowrap;
   animation: marquee 40s linear infinite;
-  font-family: "Anton", sans-serif; /* 굵고 임팩트 있는 폰트 */
+  font-family: "Anton", sans-serif;
   font-size: 100px;
   color: #111827;
   line-height: 1;
@@ -190,7 +203,7 @@ const members = [
   100% { transform: translateX(-50%); }
 }
 
-/* 2. 글래스모피즘 패널 */
+/* Glass Panel */
 .hero-content {
   position: relative;
   z-index: 10;
@@ -230,7 +243,7 @@ const members = [
   color: #4b5563;
 }
 
-/* 스크롤 화살표 */
+/* Scroll Arrow */
 .scroll-indicator {
   position: absolute;
   bottom: 40px;
@@ -278,7 +291,7 @@ const members = [
 }
 .manifesto-text strong { color: #111827; }
 
-/* --- [NEW] Team Section (ID Card Style) --- */
+/* Team Section */
 .team {
   padding: 100px 24px 150px;
   background: #f3f4f6;
@@ -301,7 +314,7 @@ const members = [
   gap: 40px;
 }
 
-/* 사원증 카드 스타일 */
+/* ID Card Style */
 .id-card {
   background: #ffffff;
   border-radius: 16px;
@@ -319,7 +332,6 @@ const members = [
   border-color: #caa3b1;
 }
 
-/* 상단 구멍 */
 .card-hole {
   width: 60px; height: 6px;
   background: #e5e7eb;
@@ -369,22 +381,46 @@ const members = [
   letter-spacing: 0.05em;
 }
 
-/* 장식용 바코드 */
-.barcode {
-  height: 24px;
-  width: 80%;
-  margin: 0 auto;
-  background-image: linear-gradient(90deg, 
-    #000 0%, #000 4%, transparent 4%, transparent 6%, 
-    #000 6%, #000 12%, transparent 12%, transparent 14%,
-    #000 14%, #000 20%, transparent 20%, transparent 24%,
-    #000 24%, #000 30%, transparent 30%, transparent 32%,
-    #000 32%, #000 60%, transparent 60%, transparent 64%,
-    #000 64%, #000 68%, transparent 68%, transparent 72%,
-    #000 72%, #000 80%, transparent 80%, transparent 84%,
-    #000 84%, #000 100%
-  );
-  opacity: 0.2;
+/* [NEW] QR Code Styles */
+.qr-section {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.qr-divider {
+  width: 100%;
+  height: 1px;
+  background: #e5e7eb;
+  margin-bottom: 16px;
+  border-bottom: 1px dashed #d1d5db; /* 절취선 느낌 */
+}
+
+.qr-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.qr-code {
+  width: 70px;
+  height: 70px;
+  mix-blend-mode: multiply; /* 배경과 자연스럽게 섞이도록 */
+  opacity: 0.9;
+  transition: transform 0.3s;
+}
+
+.id-card:hover .qr-code {
+  transform: scale(1.1); /* 호버 시 QR 살짝 확대 */
+}
+
+.qr-label {
+  font-size: 10px;
+  font-weight: 800;
+  color: #9ca3af;
+  letter-spacing: 0.15em;
 }
 
 /* Animations */

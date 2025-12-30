@@ -197,10 +197,25 @@ def _is_starter_like(code: str, starter: str) -> bool:
     return c == s
 
 
+def _has_placeholder(code: str) -> bool:
+    if not code:
+        return True
+    if re.search(r"^\s*pass\s*$", code, flags=re.M):
+        return True
+    if re.search(r"TODO|FIXME", code, flags=re.I):
+        return True
+    if re.search(r"NotImplementedError", code):
+        return True
+    if re.search(r"^\s*\.\.\.\s*$", code, flags=re.M):
+        return True
+    return False
+
+
 def _evaluate_strategy_hybrid(
     strategy_text: str,
     code: str,
-    problem_text: str = ""
+    problem_text: str = "",
+    problem_category: str = "",
 ) -> Tuple[float, float, str]:
     """
     하이브리드 전략 평가: 룰베이스 기본 + LLM 보정
@@ -221,28 +236,87 @@ def _evaluate_strategy_hybrid(
     char_count = len(strategy_text.strip())
     
     # 길이 점수 (최대 1.5점)
-    if char_count >= 200:
+    if char_count >= 20:
         rule_strategy_score += 1.5
-    elif char_count >= 100:
+    elif char_count >= 10:
         rule_strategy_score += 1.0
-    elif char_count >= 50:
+    elif char_count >= 5:
         rule_strategy_score += 0.5
     
     # 복잡도 언급 (1.0점)
     if re.search(r"O\([NnMm\d\s\*\+log]+\)", strategy_text) or "복잡도" in strategy_text or "시간" in strategy_text:
         rule_strategy_score += 1.0
     
-    # 알고리즘 키워드 (최대 1.5점)
-    keywords = ["해시", "딕셔너리", "dict", "배열", "리스트", "DP", "dp", "그래프", "정렬", 
-                "스택", "큐", "탐색", "검색", "완전탐색", "이진탐색", "재귀", "반복"]
-    matched_keywords = sum(1 for kw in keywords if kw in strategy_text)
-    rule_strategy_score += min(matched_keywords * 0.5, 1.5)
+    # 알고리즘 키워드 (카테고리 기반, 최대 1.5점)
+    keyword_groups = {
+        "array": ["배열", "리스트", "인덱스", "순회", "정렬", "슬라이딩", "윈도우", "구간합", "prefix", "누적"],
+        "dp": ["동적계획법", "dp", "메모이제이션", "점화식", "상태", "전이"],
+        "graph": ["그래프", "bfs", "dfs", "탐색", "방문", "큐", "인접", "최단", "다익스트라", "위상"],
+        "string": ["문자열", "인덱스", "슬라이싱", "치환", "비교", "패턴", "접두", "접미", "lcs", "kmp"],
+        "hash_table": ["해시", "딕셔너리", "dict", "집합", "set", "맵", "map", "해시테이블", "hash table"],
+        "two_pointer": ["투포인터", "left", "right", "포인터", "윈도우", "슬라이딩"],
+        "stack": ["스택", "stack"],
+        "queue": ["큐", "queue", "deque"],
+        "sort": ["정렬", "sort", "sorted"],
+        "search": ["완전탐색", "이진탐색", "탐색", "검색", "재귀", "반복"],
+        "math": ["수학", "math", "정수", "소수", "mod", "모듈러", "약수", "gcd", "lcm", "조합", "순열"],
+        "tree": ["트리", "tree", "이진트리", "bst", "heap", "힙"],
+        "greedy": ["그리디", "greedy", "탐욕"],
+        "simulation": ["시뮬레이션", "simulation", "모의", "구현"],
+        "bit_manipulation": ["비트", "bit", "bitwise", "xor", "and", "or", "shift", "bit_count", "popcount"],
+        "design": ["설계", "design", "클래스", "class", "인터페이스", "interface"],
+        "heap": ["힙", "heap", "priority queue", "우선순위", "heapq", "heappush", "heappop"],
+    }
+    strategy_lower = strategy_text.lower()
+
+    category_key = ""
+    if problem_category:
+        normalized = problem_category.strip().lower()
+        normalized = re.sub(r"[^a-z0-9가-힣]+", " ", normalized).strip()
+        if normalized in keyword_groups:
+            category_key = normalized
+        else:
+            category_aliases = {
+                "array": ["array", "arrays", "배열"],
+                "string": ["string", "문자열"],
+                "graph": ["graph", "그래프"],
+                "dp": ["dp", "dynamic programming", "동적계획법"],
+                "hash_table": ["hash", "hash table", "hashtable", "해시", "해시테이블"],
+                "two_pointer": ["two pointer", "two_pointer", "투포인터"],
+                "math": ["math", "수학"],
+                "tree": ["tree", "트리"],
+                "greedy": ["greedy", "그리디"],
+                "simulation": ["simulation", "시뮬레이션"],
+                "bit_manipulation": ["bit manipulation", "bit", "비트"],
+                "design": ["design", "설계"],
+                "heap": ["heap", "priority queue", "우선순위", "힙"],
+            }
+            for key, aliases in category_aliases.items():
+                if normalized in aliases:
+                    category_key = key
+                    break
+
+    if category_key:
+        keywords_for_strategy = keyword_groups.get(category_key, [])
+        category_match = any(kw in strategy_lower for kw in keywords_for_strategy)
+        keyword_score = 1.5 if category_match else 0.0
+    else:
+        keywords_for_strategy = [kw for group in keyword_groups.values() for kw in group]
+        matched_keywords = sum(1 for kw in keywords_for_strategy if kw in strategy_lower)
+        keyword_score = min(matched_keywords * 0.5, 0.75)
+
+    rule_strategy_score += keyword_score
     
     rule_strategy_score = min(rule_strategy_score, 4.0)
     
     # 1-2. 전략-코드 일치 룰베이스 (0~4점) - AST 기반
     rule_consistency_score = 0.0
-    strategy_lower = strategy_text.lower()
+    def _mentions_any(text: str, keywords: List[str]) -> bool:
+        return any(kw in text for kw in keywords)
+
+    active_groups = set(keyword_groups.keys())
+    if category_key:
+        active_groups = {category_key}
     
     try:
         # AST 파싱으로 실제 사용 확인
@@ -264,38 +338,72 @@ def _evaluate_strategy_hybrid(
             if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
                 variable_names.add(node.id.lower())
         
-        # 딕셔너리 사용 확인
+        # 딕셔너리/집합 사용 확인
         has_dict = any(isinstance(node, ast.Dict) for node in ast.walk(tree))
+        has_set = any(isinstance(node, ast.Set) for node in ast.walk(tree))
         
         # 리스트 사용 확인
         has_list = any(isinstance(node, ast.List) for node in ast.walk(tree))
         
         # 자료구조 매칭 (각 1점)
-        if ("해시" in strategy_lower or "dict" in strategy_lower):
-            if has_dict or "dict" in function_calls or any("dict" in v for v in variable_names):
+        if "hash_table" in active_groups and _mentions_any(strategy_lower, keyword_groups["hash_table"]):
+            if has_dict or has_set or "dict" in function_calls or "set" in function_calls or any("dict" in v for v in variable_names):
                 rule_consistency_score += 1.0
                 
-        if ("배열" in strategy_lower or "리스트" in strategy_lower):
+        if "array" in active_groups and _mentions_any(strategy_lower, keyword_groups["array"]):
             if has_list or "[" in code:
                 rule_consistency_score += 1.0
         
         # 알고리즘 매칭 (각 1점)
-        if ("정렬" in strategy_lower or "sort" in strategy_lower):
+        if "sort" in active_groups and _mentions_any(strategy_lower, keyword_groups["sort"]):
             if "sort" in function_calls or "sorted" in function_calls:
                 rule_consistency_score += 1.0
         
-        if "dp" in strategy_lower:
+        if "dp" in active_groups and _mentions_any(strategy_lower, keyword_groups["dp"]):
             # dp 변수명 또는 2차원 배열 패턴
             if any("dp" in v for v in variable_names) or "[[" in code:
                 rule_consistency_score += 1.0
         
-        if ("스택" in strategy_lower or "stack" in strategy_lower):
+        if "stack" in active_groups and _mentions_any(strategy_lower, keyword_groups["stack"]):
             if "append" in function_calls and "pop" in function_calls:
                 rule_consistency_score += 1.0
         
-        if ("큐" in strategy_lower or "queue" in strategy_lower):
+        if "queue" in active_groups and _mentions_any(strategy_lower, keyword_groups["queue"]):
             if "deque" in str(tree) or "Queue" in str(tree):
                 rule_consistency_score += 1.0
+
+        if "two_pointer" in active_groups and _mentions_any(strategy_lower, keyword_groups["two_pointer"]):
+            if {"left", "right"}.issubset(variable_names) or ("left" in code and "right" in code):
+                rule_consistency_score += 1.0
+
+        if "graph" in active_groups and _mentions_any(strategy_lower, keyword_groups["graph"]):
+            if "deque" in str(tree) or "popleft" in function_calls or any(v in {"graph", "adj", "adj_list"} for v in variable_names):
+                rule_consistency_score += 1.0
+
+        if "string" in active_groups and _mentions_any(strategy_lower, keyword_groups["string"]):
+            if "'" in code or "\"" in code or "str" in function_calls:
+                rule_consistency_score += 0.5
+
+        if "bit_manipulation" in active_groups and _mentions_any(strategy_lower, keyword_groups["bit_manipulation"]):
+            if any(op in code for op in ["&", "|", "^", "<<", ">>", "~"]) or "bit_count" in code:
+                rule_consistency_score += 1.0
+
+        if "heap" in active_groups and _mentions_any(strategy_lower, keyword_groups["heap"]):
+            if "heapq" in code or "heappush" in function_calls or "heappop" in function_calls:
+                rule_consistency_score += 1.0
+
+        if "design" in active_groups and _mentions_any(strategy_lower, keyword_groups["design"]):
+            if any(isinstance(node, ast.ClassDef) for node in ast.walk(tree)):
+                rule_consistency_score += 1.0
+
+        if "math" in active_groups and _mentions_any(strategy_lower, keyword_groups["math"]):
+            if "math" in code or "gcd" in code or "lcm" in code or "%" in code:
+                rule_consistency_score += 0.5
+
+        if "simulation" in active_groups and _mentions_any(strategy_lower, keyword_groups["simulation"]):
+            has_loop = any(isinstance(node, (ast.For, ast.While)) for node in ast.walk(tree))
+            if has_loop:
+                rule_consistency_score += 0.5
         
         if ("완전탐색" in strategy_lower or "모든" in strategy_lower or "조합" in strategy_lower):
             # for 문 또는 itertools.permutations/combinations
@@ -307,11 +415,13 @@ def _evaluate_strategy_hybrid(
     except Exception:
         # AST 파싱 실패시 기존 키워드 방식으로 폴백
         code_lower = code.lower()
-        if ("해시" in strategy_lower or "dict" in strategy_lower) and ("{" in code or "dict" in code_lower):
+        if "hash_table" in active_groups and _mentions_any(strategy_lower, keyword_groups["hash_table"]) and ("{" in code or "dict" in code_lower or "set" in code_lower):
             rule_consistency_score += 0.5
-        if ("배열" in strategy_lower or "리스트" in strategy_lower) and "[" in code:
+        if "array" in active_groups and _mentions_any(strategy_lower, keyword_groups["array"]) and "[" in code:
             rule_consistency_score += 0.5
-        if ("정렬" in strategy_lower or "sort" in strategy_lower) and "sort" in code_lower:
+        if "sort" in active_groups and _mentions_any(strategy_lower, keyword_groups["sort"]) and "sort" in code_lower:
+            rule_consistency_score += 0.5
+        if "two_pointer" in active_groups and _mentions_any(strategy_lower, keyword_groups["two_pointer"]) and ("left" in code_lower and "right" in code_lower):
             rule_consistency_score += 0.5
     
     rule_consistency_score = min(rule_consistency_score, 4.0)
@@ -324,10 +434,14 @@ def _evaluate_strategy_hybrid(
     llm_consistency_score = rule_consistency_score
     llm_feedback = ""
     
-    # LLM 호출 조건: 룰베이스 점수가 애매할 때만
+    # LLM 호출 조건: 매우 좁게 제한해 일관성을 우선
     use_llm = (
-        (rule_strategy_score < 2.0 and char_count >= 80) or  # 전략이 있는데 점수가 낮음
-        (rule_consistency_score == 0 and len(code) > 100)     # 코드는 있는데 일치 0점
+        bool(problem_text and len(problem_text.strip()) >= 50)
+        and char_count >= 120
+        and len(code) >= 200
+        and not _has_placeholder(code)
+        and 1.0 <= rule_strategy_score <= 2.5
+        and rule_consistency_score <= 1.0
     )
     
     if use_llm:
@@ -413,7 +527,8 @@ def _evaluate_35_points(
     starter_code: str,
     strategy_text: str,
     test_results: Dict[str, Any],
-    problem_text: str = ""
+    problem_text: str = "",
+    problem_category: str = "",
 ) -> Tuple[float, List[str]]:
     """
     35점 만점 평가 (전략 4 + 일치 4 + 테스트 25 + 기본 2)
@@ -437,7 +552,8 @@ def _evaluate_35_points(
         strategy_score, consistency_score, hybrid_feedback = _evaluate_strategy_hybrid(
             strategy_text=strategy_text,
             code=code,
-            problem_text=problem_text
+            problem_text=problem_text,
+            problem_category=problem_category,
         )
         fb.append(f"- 전략 품질: {strategy_score:.1f}/4")
         fb.append(f"- 전략-코드 일치: {consistency_score:.1f}/4")
@@ -540,6 +656,11 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[DEBUG] chap1 keys: {list(chap1.keys()) if chap1 else 'None'}", flush=True)
     
     problem_id = cached_meta.get("problem_id")
+    problem_category = ""
+    problem_key = f"livecoding:{session_id}:problem"
+    problem_payload = cache.get(problem_key) or {}
+    if isinstance(problem_payload, dict) and problem_payload.get("category"):
+        problem_category = _safe_str(problem_payload.get("category"))
     language = _safe_str(cached_meta.get("language") or "python3")
     
     # ========== LLM 기반 테스트 평가 ==========
@@ -548,8 +669,6 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     if problem_id and code:
         try:
             # ✅ 1순위: Redis problem_payload에서 function_name 가져오기
-            problem_key = f"livecoding:{session_id}:problem"
-            problem_payload = cache.get(problem_key) or {}
             function_name = problem_payload.get("function_name")
             
             if function_name:
@@ -568,6 +687,18 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     if row and row[0]:
                         function_name = row[0]
                         print(f"[DEBUG] DB에서 function_name 가져옴: {function_name}", flush=True)
+
+            if not problem_category:
+                with connection.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT category
+                        FROM coding_problem
+                        WHERE problem_id = %s
+                        LIMIT 1
+                    """, [problem_id])
+                    row = cursor.fetchone()
+                    if row and row[0]:
+                        problem_category = _safe_str(row[0])
             
             # ✅ 3순위: 코드에서 자동 추출
             if not function_name:
@@ -609,7 +740,8 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         starter_code=starter_code,
         strategy_text=strategy_text,
         test_results=test_results,
-        problem_text=problem_text
+        problem_text=problem_text,
+        problem_category=problem_category,
     )
     
     # ========== State 업데이트 (0~1 스케일로 변환) ==========

@@ -4,13 +4,18 @@ import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
 import axios from 'axios';
+import { useRouter } from 'vue-router';
 import { useAuth } from '../hooks/useAuth';
 
 // --- 상태 관리 (State) ---
-const weakness = ref('');
 const duration = ref(7); // 기본 7일
 const loading = ref(false);
 const { token, ensureValidSession, BACKEND_BASE } = useAuth();
+const router = useRouter();
+const redirectToLogin = () => {
+  const redirect = router.currentRoute?.value?.fullPath || "/login";
+  router.push({ name: "login", query: { redirect } });
+};
 
 // FullCalendar 설정 및 데이터 관리
 const calendarOptions = reactive({
@@ -138,6 +143,8 @@ function handleEventClick(info) {
 async function loadLatestPlan() {
   const ok = await ensureValidSession();
   if (!ok) {
+    alert("로그인이 필요합니다.");
+    redirectToLogin();
     return;
   }
 
@@ -158,17 +165,13 @@ async function loadLatestPlan() {
 }
 
 async function generatePlan() {
-  if (!weakness.value) {
-    alert("약점을 입력해주세요!");
-    return;
-  }
-
   loading.value = true;
   
   try {
     const ok = await ensureValidSession();
     if (!ok) {
       alert("로그인이 필요합니다.");
+      redirectToLogin();
       return;
     }
 
@@ -176,7 +179,6 @@ async function generatePlan() {
     const response = await axios.post(
       `${BACKEND_BASE}/api/generate-plan/`,
       {
-        weakness: weakness.value,
         duration: duration.value
       },
       {
@@ -193,7 +195,21 @@ async function generatePlan() {
 
   } catch (error) {
     console.error(error);
-    alert("에러가 발생했습니다. 백엔드 서버가 켜져있는지 확인해주세요.");
+    const detail = error?.response?.data?.detail;
+    const code = error?.response?.data?.code;
+    if (code === "need_min_livecoding") {
+      alert(detail || "라이브 코딩 테스트를 최소 3회 완료해야 합니다.");
+      router.push({ name: "home" });
+      return;
+    }
+    if (error?.response?.status === 401) {
+      alert(detail || "로그인이 필요합니다.");
+      redirectToLogin();
+      return;
+    }
+
+    const fallback = detail || error?.response?.data?.error;
+    alert(fallback || "에러가 발생했습니다. 백엔드 서버가 켜져있는지 확인해주세요.");
   } finally {
     loading.value = false;
   }
@@ -212,14 +228,7 @@ onMounted(() => {
     </header>
 
     <div class="input-section">
-      <input 
-        type="text" 
-        v-model="weakness"
-        placeholder="예: Django DRF ViewSet이 너무 어려워" 
-        class="input-text"
-        @keyup.enter="generatePlan"
-      />
-      
+      <div class="input-label">라이브코딩 성장 리포트 기반 커리큘럼을 생성합니다.</div>
       <select v-model="duration" class="input-select">
         <option :value="7">1주 완성</option>
         <option :value="30">4주 완성</option>

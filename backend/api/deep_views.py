@@ -6,8 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from .authentication import JWTAuthentication
 from .models import UserGrowthInsight
 from django.db.utils import ProgrammingError
-from groth_report.graph import run_growth_report
-from groth_report.utils import append_growth_state
+from growth_report.graph import run_growth_report
+from growth_report.utils import append_growth_state
 
 
 class UserReportsPayloadView(APIView):
@@ -24,6 +24,7 @@ class UserReportsPayloadView(APIView):
         if not isinstance(user, User):
             return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
+        user_id = getattr(user, "user_id", None) or getattr(user, "id", None) or getattr(user, "email", None) or str(user)
         try:
             reports = (
                 LivecodingReport.objects.filter(user=user)
@@ -41,7 +42,7 @@ class UserReportsPayloadView(APIView):
             
         try:
             latest_growth = (
-                UserGrowthInsight.objects.filter(user_id=user)
+                UserGrowthInsight.objects.filter(user_id=user_id)
                 .order_by("-version")
                 .first()
             )
@@ -80,7 +81,7 @@ class UserReportsPayloadView(APIView):
             return Response(
             {
                 "run_mode": "initial",
-                "user_id": getattr(user, "user_id", None) or getattr(user, "id", None) or str(user),
+                "user_id": user_id,
                 "reports": payload,
                 "report_ids": report_ids,
             },
@@ -94,7 +95,7 @@ class UserReportsPayloadView(APIView):
                 run_mode = "cached"
                 return Response(
                 {
-                    "user_id": getattr(user, "user_id", None) or getattr(user, "id", None) or str(user),
+                    "user_id": user_id,
                     "report_ids":report_ids,
                     "run_mode": run_mode,
                     "prev_agent_result": prev_agent_result,
@@ -110,7 +111,7 @@ class UserReportsPayloadView(APIView):
 
                 return Response(
                     {
-                        "user_id": getattr(user, "user_id", None) or getattr(user, "id", None) or str(user),
+                        "user_id": user_id,
                         "run_mode": "incremental",
                         "report_ids":report_ids,
                         "selected_report": selected_report,
@@ -128,6 +129,7 @@ class DeepAgentReportView(APIView):
         if not isinstance(user, User):
             return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
+        user_id = getattr(user, "user_id", None) or getattr(user, "id", None) or getattr(user, "email", None) or str(user)
         # UserReportsPayloadView에서 결정한 실행 입력 사용 (없으면 서버가 재계산)
         selected_reports = request.data.get("selected_reports") or request.data.get("selected_report") or []
         report_ids = request.data.get("report_ids") or []
@@ -147,7 +149,7 @@ class DeepAgentReportView(APIView):
                 response = run_growth_report(reports)
                 result_text = response.get("final_report") if isinstance(response, dict) else str(response)
                 append_growth_state(
-                    user_id=str(user),
+                    user_id=user_id,
                     new_state={
                         "report_content": result_text,
                         "report_ids": report_ids or [r.get("session_id") for r in reports if isinstance(r, dict)],
@@ -171,7 +173,7 @@ class DeepAgentReportView(APIView):
                 response = run_growth_report(selected_reports, prev_agent_result)
                 result_text = response.get("final_report") if isinstance(response, dict) else str(response)
                 append_growth_state(
-                    user_id=str(user),
+                    user_id=user_id,
                     new_state={
                         "report_content": result_text,
                         "report_ids": report_ids,

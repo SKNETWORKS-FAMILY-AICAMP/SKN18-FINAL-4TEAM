@@ -2,8 +2,9 @@ from typing import TypedDict, List, Optional
 
 class PlanState(TypedDict):
     # [입력]
-    user_weakness: str
+    # user_weakness: str
     duration: int
+    growth_report_content: str
     
     # [작업 메모리]
     curriculum: List[dict]       # 계획 (날짜, 주제, 검색어)

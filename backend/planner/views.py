@@ -7,24 +7,45 @@ from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from .agents.graph import agent_app
 from .models import StudyPlan, DailyTask
+from api.models import UserGrowthInsight
 
 class GeneratePlanView(APIView):
     permission_classes = [IsAuthenticated]
 
     def post(self, request):
         try:
-            user_weakness = request.data.get("weakness")
-            duration = int(request.data.get("duration", 7))
-
             user = request.user
             if not user or not user.is_authenticated:
                 return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
-            if not user_weakness:
-                return Response({"error": "weakness가 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+            try:
+                duration = int(request.data.get("duration", 7))
+            except (TypeError, ValueError):
+                return Response({"error": "duration은 숫자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
-            # 1. Deep Agent 실행
-            inputs = {"user_weakness": user_weakness, "duration": duration}
+            user_id = getattr(user, "user_id", None) or getattr(user, "id", None) or str(user)
+            latest_growth = (
+                UserGrowthInsight.objects.filter(user_id=user_id)
+                .order_by("-version")
+                .first()
+            )
+            if not latest_growth:
+                return Response(
+                    {
+                        "detail": "라이브 코딩 테스트를 최소 3회 완료해야 학습 계획을 생성할 수 있습니다.",
+                        "code": "need_min_livecoding",
+                        "redirect_to": "home",
+                    },
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
+
+            growth_content = latest_growth.report_content or ""
+
+            # 1. planner langgraph 실행
+            inputs = {
+                "growth_report_content": growth_content,
+                "duration": duration,
+            }
             result = agent_app.invoke(inputs)
             
             # 최종 결과 가져오기 (비어있는 날짜는 curriculum 정보로 메꿈)
@@ -36,7 +57,8 @@ class GeneratePlanView(APIView):
             calendar_events = []
 
             with transaction.atomic():
-                plan = StudyPlan.objects.create(user=user, topic=user_weakness, duration=duration)
+                plan_topic = "라이브코딩 성장 리포트 기반 커리큘럼"
+                plan = StudyPlan.objects.create(user=user, topic=plan_topic, duration=duration)
                 
                 # tasks_to_create 리스트 삭제 (반복문 안에서 바로 저장하기 위해)
 

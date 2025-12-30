@@ -12,7 +12,7 @@ llm = ChatOpenAI(model="gpt-4o", temperature=0.7)
 # [Node 1] Planner: 기간별 맞춤 전략 수립
 def planner_node(state: PlanState):
     duration = state['duration']
-    print(f"\n🧠 [Planner] '{state['user_weakness']}' ({duration}일) 전략 수립 중...")
+    #print(f"\n🧠 [Planner] '{state['user_weakness']}' ({duration}일) 전략 수립 중...")
 
     # 기간에 따른 프롬프트 분기
     if duration == 30:
@@ -23,11 +23,13 @@ def planner_node(state: PlanState):
     prompt = ChatPromptTemplate.from_template(
         """
         당신은 IT 전문 커리큘럼 설계자입니다.
-        사용자의 약점: '{weakness}' / 기간: {duration}일
+        - 사용자의 누적 성장리포트 내용: '{growth_report_content}'
+        - 기간: {duration}일
         
         [지침] {strategy}
         
         {duration}일간의 계획을 JSON으로 작성하세요.
+        {growth_report_content} 의 내용을 바탕으로 구성하세요.
         각 항목은 "day", "topic", "search_query" 키를 가져야 합니다.
         "topic"은 간결한 주제, "search_query"는 유튜브 검색용 구체적인 키워드여야 합니다.
         "search_query"는 영어와 한글을 적절히 섞어서 검색이 잘 되도록 작성하세요.
@@ -40,14 +42,14 @@ def planner_node(state: PlanState):
     )
     
     chain = prompt | llm
-    response = chain.invoke({"weakness": state["user_weakness"], "duration": duration, "strategy": strategy})
+    response = chain.invoke({"growth_report_content": state["growth_report_content"], "duration": duration, "strategy": strategy})
     
     try:
         content = response.content.strip().replace("```json", "").replace("```", "")
         curriculum = json.loads(content)
     except:
         # 파싱 실패 시 비상용 더미 데이터
-        curriculum = [{"day": i + 1, "topic": "자율 학습", "search_query": f"{state['user_weakness']} tutorial"} for i in range(duration)]
+        curriculum = [{"day": i + 1, "topic": "자율 학습", "search_query": f"{state['growth_report_content']} tutorial"} for i in range(duration)]
 
     return {
         "curriculum": curriculum,

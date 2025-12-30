@@ -155,12 +155,16 @@ const closeDropdown = () => {
 const handleLogout = async () => {
   if (isLoggingOut.value) return;
   isLoggingOut.value = true;
-  setTimeout(async () => {
-    await logout(); // 실제 세션 종료는 약간 뒤에 수행해 전환을 부드럽게
-    isLoggingOut.value = false;
+  try {
+    await logout();
     closeDropdown();
-    void router.push({ name: "home" });
-  }, 360);
+    isMenuOpen.value = false;
+    await router.push({ name: "login" });
+  } catch (err) {
+    console.error("[logout] failed", err);
+  } finally {
+    isLoggingOut.value = false;
+  }
 };
 
 const syncProfile = () => {
@@ -264,6 +268,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   border: 1px solid #e5e7eb;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  z-index: 50;
 }
 
 .dropdown-link {

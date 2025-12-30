@@ -966,6 +966,50 @@ class LiveCodingSessionView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # 캐시에 test_cases가 비어있는 경우(예: 오래된 캐시/부분 저장/백엔드 재기동 등)
+        # DB에서 다시 불러와서 응답/캐시에 채워 넣는다.
+        test_cases = problem.get("test_cases") or []
+        if isinstance(test_cases, list) and test_cases:
+            # 과거 포맷 호환(input_data/output_data -> input/output)
+            normalized = []
+            for tc in test_cases:
+                if not isinstance(tc, dict):
+                    continue
+                if "input" in tc or "output" in tc:
+                    normalized.append(tc)
+                    continue
+                if "input_data" in tc or "output_data" in tc:
+                    normalized.append(
+                        {
+                            "id": tc.get("id"),
+                            "input": tc.get("input_data") or "",
+                            "output": tc.get("output_data") or "",
+                        }
+                    )
+            test_cases = normalized
+        else:
+            test_cases = []
+
+        if not test_cases:
+            # language와 무관하게 문제 ID 기준으로 테스트케이스를 재구성한다.
+            # (세션 meta/cache에 저장된 language 값이 DB의 language 문자열과 다르면
+            # CodingProblemLanguage 조회가 실패할 수 있어 일부 문제에서만 누락되던 이슈가 발생함)
+            try:
+                problem_id = problem.get("problem_id") or meta.get("problem_id")
+                test_cases = [
+                    {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+                    for tc in TestCase.objects.filter(problem_id=problem_id).order_by("id")
+                ]
+                # 이후 요청에서도 쓸 수 있도록 캐시에도 보강
+                try:
+                    problem["test_cases"] = test_cases
+                    cache.set(problem_key, problem)
+                except Exception:
+                    pass
+            except Exception:
+                # 캐시/DB 복구는 best-effort: 실패해도 세션 조회 자체는 진행
+                test_cases = []
+
         time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
         # 클라이언트가 remaining_seconds를 명시적으로 저장해 둔 값이 있다면
         # 그 값을 우선 사용하고, 없는 경우에만 start_at 기준으로 경과 시간을 계산한다.
@@ -1000,7 +1044,7 @@ class LiveCodingSessionView(APIView):
                 "language": problem.get("language") or meta.get("language"),
                 "function_name": problem.get("function_name"),
                 "starter_code": problem.get("starter_code"),
-                "test_cases": problem.get("test_cases") or [],
+                "test_cases": test_cases,
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": meta.get("start_at"),
                 "remaining_seconds": remaining_seconds,

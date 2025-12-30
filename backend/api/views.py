@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
+from zoneinfo import ZoneInfo
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from rest_framework import status, permissions
@@ -42,6 +43,20 @@ from .models import (
 )
 from .serializers import SignupSerializer
 from .authentication import JWTAuthentication
+
+
+def _to_kst_iso(dt):
+    if not dt:
+        return None
+    tz = ZoneInfo("Asia/Seoul")
+    try:
+        if timezone.is_naive(dt):
+            aware = dt.replace(tzinfo=tz)
+        else:
+            aware = dt.astimezone(tz)
+    except Exception:
+        return dt.isoformat()
+    return aware.isoformat()
 
 
 def health(request):
@@ -1598,8 +1613,8 @@ class LiveCodingFinalEvalReportView(APIView):
                         "code_collab_evidence": report.code_collab_evidence,
                         "error": report.error,
                         "pdf_path": report.pdf_path,
-                        "created_at": report.created_at.isoformat() if report.created_at else None,
-                        "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                        "created_at": _to_kst_iso(report.created_at),
+                        "updated_at": _to_kst_iso(report.updated_at),
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -1710,7 +1725,7 @@ class LiveCodingFinalEvalReportView(APIView):
                 values["graph_output"] = graph_output
                 print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
         try:
-            now_local = timezone.localtime()
+            now_local = timezone.localtime(timezone.now(), ZoneInfo("Asia/Seoul"))
             defaults = {
                 "user": user,
                 "report_md": report_md,
@@ -1882,8 +1897,8 @@ class LiveCodingReportListView(APIView):
                     "has_report": bool(r.report_md),
                     "has_pdf": bool(r.pdf_path),
                     "pdf_path": r.pdf_path,
-                    "created_at": r.created_at.isoformat() if r.created_at else None,
-                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                    "created_at": _to_kst_iso(r.created_at),
+                    "updated_at": _to_kst_iso(r.updated_at),
                 }
             )
 
@@ -1926,8 +1941,8 @@ class LiveCodingReportDetailView(APIView):
                 "code_collab_evidence": report.code_collab_evidence,
                 "error": report.error,
                 "pdf_path": report.pdf_path,
-                "created_at": report.created_at.isoformat() if report.created_at else None,
-                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                "created_at": _to_kst_iso(report.created_at),
+                "updated_at": _to_kst_iso(report.updated_at),
             },
             status=status.HTTP_200_OK,
         )

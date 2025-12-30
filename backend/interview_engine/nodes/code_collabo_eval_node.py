@@ -8,8 +8,9 @@ from typing import Any, Dict, List, Tuple
 import redis
 from django.core.cache import cache
 from langgraph.checkpoint.redis import RedisSaver
+from langchain_core.messages import SystemMessage, HumanMessage
 
-from interview_engine.llm import get_llm  # noqa: F401  # (필요 시 사용)
+from interview_engine.llm import get_llm  
 from interview_engine.utils.checkpoint_reader import _redis_url, load_chapter_channel_values
 
 
@@ -88,8 +89,26 @@ def _has_entrypoint_solution(code: str, function_name: str = "solution") -> bool
     return bool(re.search(pattern, code or "", flags=re.M))
 
 
-def _has_placeholder(code: str) -> bool:
+def _is_empty_literal(node: ast.AST) -> bool:
+    if isinstance(node, ast.Constant):
+        return node.value in (None, 0, 0.0, "", False)
+    if isinstance(node, (ast.List, ast.Tuple, ast.Set, ast.Dict)):
+        if isinstance(node, ast.Dict):
+            return len(node.keys) == 0
+        return len(node.elts) == 0
+    return False
+
+
+def _has_placeholder(code: str, function_name: str = "") -> bool:
     if not code:
+        return True
+    # 유효 코드(주석/공백 제외) 3줄 이하면 placeholder로 간주
+    effective_lines = [
+        ln
+        for ln in (code or "").splitlines()
+        if ln.strip() and not ln.strip().startswith("#")
+    ]
+    if len(effective_lines) <= 3:
         return True
     if re.search(r"^\s*pass\s*$", code, flags=re.M):
         return True
@@ -99,6 +118,69 @@ def _has_placeholder(code: str) -> bool:
         return True
     if re.search(r"^\s*\.\.\.\s*$", code, flags=re.M):
         return True
+    # return-only / empty literal returns (starter-like)
+    if re.search(
+        r"^\s*return\s*(None|0|0\.0|1|True|False|\"\"|''|\[\s*\]|\{\s*\}|\(\s*\))?\s*$",
+        code,
+        flags=re.M,
+    ):
+        # ensure it's basically only return/def lines
+        lines = [
+            ln
+            for ln in (code or "").splitlines()
+            if ln.strip() and not ln.strip().startswith("#")
+        ]
+        if len(lines) <= 3:
+            return True
+    # AST-based placeholder detection for python-like code
+    try:
+        tree = ast.parse(code)
+    except Exception:
+        return False
+
+    def _body_is_placeholder(body: List[ast.stmt]) -> bool:
+        if not body:
+            return True
+        if isinstance(body[0], ast.Expr) and isinstance(
+            getattr(body[0], "value", None), ast.Constant
+        ) and isinstance(body[0].value.value, str):
+            body = body[1:]
+        if not body:
+            return True
+        if len(body) == 1:
+            stmt = body[0]
+            if isinstance(stmt, ast.Pass):
+                return True
+            if isinstance(stmt, ast.Return):
+                if stmt.value is None:
+                    return True
+                return _is_empty_literal(stmt.value)
+        if len(body) == 2:
+            assign, ret = body
+            if isinstance(assign, ast.Assign) and isinstance(ret, ast.Return):
+                if len(assign.targets) == 1 and isinstance(assign.targets[0], ast.Name):
+                    if _is_empty_literal(assign.value):
+                        return isinstance(ret.value, ast.Name) and (
+                            ret.value.id == assign.targets[0].id
+                        )
+        return False
+
+    target = function_name.strip() if function_name else ""
+    has_target = False
+    if target:
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef) and node.name == target:
+                has_target = True
+                break
+        if not has_target:
+            target = ""
+
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef):
+            if target and node.name != target:
+                continue
+            if _body_is_placeholder(node.body):
+                return True
     return False
 
 
@@ -119,6 +201,133 @@ def _count_function_lengths(code: str) -> Dict[str, Any]:
     mx = max(fn_lens) if fn_lens else 0
     avg = (sum(fn_lens) / len(fn_lens)) if fn_lens else 0.0
     return {"fn_count": len(fn_lens), "max_fn_lines": mx, "avg_fn_lines": round(avg, 2)}
+
+
+def _llm_quality_score_35(code: str, problem_text: str) -> Tuple[float, str]:
+    """
+    LLM 기반 코드 품질 평가 (0~35)
+    """
+    system_prompt = (
+        "당신은 코드 품질 평가 전문가입니다. "
+        "가독성/명확성/구조화/유지보수성 관점에서 점수를 매기세요. "
+        "문제 정답 여부가 아니라 코드 품질에 집중하세요."
+    )
+    user_prompt = f"""다음 코드를 코드 품질 관점에서 평가하세요.
+문제 설명:
+{problem_text[:400] if problem_text else "(문제 정보 없음)"}
+
+코드:
+```python
+{code[:2000]}
+```
+
+JSON으로만 응답하세요:
+{{
+  "score_35": 20.5,
+  "reason": "요약 한 줄"
+}}
+"""
+    try:
+        model = get_llm("report")
+        response = model.invoke(
+            [
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=user_prompt),
+            ]
+        )
+        content = (response.content or "").strip()
+        if "```json" in content:
+            content = content.split("```json", 1)[1].split("```", 1)[0]
+        elif "```" in content:
+            content = content.split("```", 1)[1].split("```", 1)[0]
+        data = json.loads(content.strip())
+        score = float(data.get("score_35", 0.0))
+        reason = _safe_str(data.get("reason", "")).strip()
+        score = max(0.0, min(35.0, score))
+        return score, reason
+    except Exception as exc:
+        return -1.0, f"LLM 평가 실패: {exc}"
+
+
+def _extract_keywords(problem_text: str, function_name: str) -> List[str]:
+    text = _safe_str(problem_text).lower()
+    keywords: List[str] = []
+    if text:
+        keywords.extend(re.findall(r"[a-z]{3,}", text))
+        keywords.extend(re.findall(r"[가-힣]{2,}", text))
+    if function_name:
+        keywords.extend(re.findall(r"[a-z]{2,}", function_name.lower()))
+    uniq = []
+    seen = set()
+    for kw in keywords:
+        if kw in seen:
+            continue
+        seen.add(kw)
+        uniq.append(kw)
+    return uniq[:80]
+
+
+def _collab_naming_score_30(code: str, problem_text: str, function_name: str) -> Tuple[float, Dict[str, Any]]:
+    """
+    주석/변수명/함수명이 문제 정보에 맞게 작성되었는지 정량 평가 (0~30)
+    """
+    keywords = _extract_keywords(problem_text, function_name)
+    if not code or not keywords:
+        return 0.0, {
+            "keywords": keywords,
+            "fn_match": 0,
+            "var_match_ratio": 0.0,
+            "comment_match_ratio": 0.0,
+        }
+
+    fn_names: List[str] = []
+    var_names: List[str] = []
+    try:
+        tree = ast.parse(code)
+        for node in ast.walk(tree):
+            if isinstance(node, ast.FunctionDef):
+                fn_names.append(node.name.lower())
+            if isinstance(node, ast.Name) and isinstance(node.ctx, ast.Store):
+                var_names.append(node.id.lower())
+    except Exception:
+        fn_names = re.findall(r"\bdef\s+([A-Za-z_][A-Za-z0-9_]*)", code)
+        var_names = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\b", code)
+
+    comments = [
+        ln.strip("# ").lower()
+        for ln in (code or "").splitlines()
+        if ln.strip().startswith("#")
+    ]
+
+    def _matches(token: str) -> bool:
+        for kw in keywords:
+            if kw and kw in token:
+                return True
+        return False
+
+    fn_match = 1 if any(_matches(name) for name in fn_names) else 0
+    if function_name:
+        fn_match = 1 if any(name == function_name.lower() for name in fn_names) else fn_match
+
+    var_match_ratio = 0.0
+    if var_names:
+        matched = sum(1 for name in var_names if _matches(name))
+        var_match_ratio = matched / max(1, len(var_names))
+
+    comment_match_ratio = 0.0
+    if comments:
+        matched = sum(1 for c in comments if _matches(c))
+        comment_match_ratio = matched / max(1, len(comments))
+
+    score = (10.0 * fn_match) + (12.0 * var_match_ratio) + (8.0 * comment_match_ratio)
+    score = max(0.0, min(30.0, score))
+    evidence = {
+        "keywords": keywords[:20],
+        "fn_match": fn_match,
+        "var_match_ratio": round(var_match_ratio, 2),
+        "comment_match_ratio": round(comment_match_ratio, 2),
+    }
+    return score, evidence
 
 
 def _score_readability_12(prefix_cnt: Dict[str, int]) -> Dict[str, Any]:
@@ -230,7 +439,7 @@ def _score_completeness_9(
     ruf = prefix_cnt.get("RUF", 0)
 
     has_solution = _has_entrypoint_solution(code, function_name)
-    has_placeholder = _has_placeholder(code)
+    has_placeholder = _has_placeholder(code, function_name)
 
     comp_issues = (2.5 * f) + (1.3 * b) + (2.0 * s) + (1.0 * ruf)
     if not has_solution:
@@ -641,6 +850,11 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         function_name = _safe_str(problem.get("function_name") or "")
     if not function_name:
         function_name = "solution"
+    problem_text = ""
+    if isinstance(problem, dict):
+        problem_text = _safe_str(
+            problem.get("problem_text") or problem.get("content") or problem.get("question") or ""
+        )
 
     # ---- ruff issues empty + parse fail => hard fail
     if not ruff_error and not quality_fb and not collab_fb and code:
@@ -672,7 +886,7 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     q_fn_len = _count_function_lengths(code)
     q_maint = _score_maintainability_9(quality_prefix_counts, q_fn_len)
     q_comp = _score_completeness_9(quality_prefix_counts, code, function_name)
-    has_placeholder = _has_placeholder(code)
+    has_placeholder = _has_placeholder(code, function_name)
     is_starter_like = False
     try:
         starter_code = _safe_str(cache_meta.get("starter_code") or "")
@@ -699,9 +913,17 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     quality_total_35 = float(
         round(q_read["score"] + q_maint["score"] + q_comp["score"] + bonus_q, 2),
     )
+    llm_quality_score_35 = -1.0
+    llm_quality_reason = ""
     if has_placeholder or is_starter_like:
         quality_total_35 = 0.0
         bonus_q = 0.0
+        llm_quality_score_35 = 0.0
+    else:
+        llm_quality_score_35, llm_quality_reason = _llm_quality_score_35(code, problem_text)
+        if llm_quality_score_35 < 0:
+            llm_quality_score_35 = quality_total_35
+        quality_total_35 = round((0.4 * quality_total_35) + (0.6 * llm_quality_score_35), 2)
 
     # ---- 협업 스코어(30점) - collaboration prefix 전용 스코어 사용 (보너스 없음)
     c_comm = _score_collab_comm_12(collab_prefix_counts)  # 의사소통 12
@@ -728,7 +950,7 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     def _code_metrics(txt: str) -> Dict[str, float]:
         lines = (txt or "").splitlines()
         fn_stats = _count_function_lengths(txt)
-        has_ph = _has_placeholder(txt)
+        has_ph = _has_placeholder(txt, function_name)
         return {
             "line_count": len(lines),
             "max_fn_lines": fn_stats.get("max_fn_lines") or 0,
@@ -780,7 +1002,10 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     collab_rule_total_30 = float(
         round(c_comm["score"] + c_hint["score"] + c_fb["score"], 2),
     )
-    collab_total_30 = collab_rule_total_30  # 협업은 rule-based 30점만 사용
+    collab_naming_score_30, collab_naming_evidence = _collab_naming_score_30(
+        code, problem_text, function_name
+    )
+    collab_total_30 = round((0.4 * collab_rule_total_30) + (0.6 * collab_naming_score_30), 2)
     if has_placeholder or is_starter_like:
         collab_total_30 = 0.0
 
@@ -789,7 +1014,9 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     fb_lines.append("### 코드 품질 평가 (rule-based, 35점 만점)")
     if has_placeholder or is_starter_like:
         fb_lines.append("- 제출 코드가 starter_code와 동일하거나 placeholder(pass/TODO/...)가 포함되어 0점 처리")
-    fb_lines.append(f"- 총점: **{quality_total_35:.2f}/35**")
+    fb_lines.append(f"- 총점: **{quality_total_35:.2f}/35** (Ruff 40% + LLM 60%)")
+    if llm_quality_reason:
+        fb_lines.append(f"- LLM 품질 요약: {llm_quality_reason}")
     fb_lines.append(
         (
             "- 구성: "
@@ -822,7 +1049,13 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
     fb_lines.append("")
 
     fb_lines.append("### 협업 능력 평가 (rule-based 30점)")
-    fb_lines.append(f"- 총점: **{collab_total_30:.2f}/30**")
+    fb_lines.append(f"- 총점: **{collab_total_30:.2f}/30** (Ruff 40% + Naming 60%)")
+    fb_lines.append(
+        f"- 네이밍 정합성: {collab_naming_score_30:.2f}/30 "
+        f"(fn={collab_naming_evidence.get('fn_match')}, "
+        f"var={collab_naming_evidence.get('var_match_ratio')}, "
+        f"comment={collab_naming_evidence.get('comment_match_ratio')})"
+    )
     fb_lines.append(
         (
             "- 구성: "
@@ -859,9 +1092,13 @@ def code_collabo_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         "quality_maintainability": q_maint["evidence"],
         "quality_completeness": q_comp["evidence"],
         "quality_bonus": bonus_q,
+        "quality_llm_score_35": llm_quality_score_35,
+        "quality_llm_reason": llm_quality_reason,
         "collab_comm": c_comm["evidence"],
         "collab_hint": c_hint["evidence"],
         "collab_feedback": c_fb["evidence"],
+        "collab_naming_score_30": collab_naming_score_30,
+        "collab_naming_evidence": collab_naming_evidence,
         "quality_source": quality_source,
         "collaboration_source": collab_source,
         "quality_feedback_count": len(quality_fb),

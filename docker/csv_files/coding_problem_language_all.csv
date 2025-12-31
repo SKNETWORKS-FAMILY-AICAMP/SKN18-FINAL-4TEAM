@@ -1,1587 +1,684 @@
 problem_id,function_name,starter_code,language
-1,solution,"def solution(friends, gifts):
+1,solution,"def solution(n, roads):
     answer = 0
     return answer",python
-2,solution,"def solution(edges):
+2,solution,"def solution(n, roads):
     answer = []
     return answer",python
-3,solution,"def solution(dice):
+3,solution,"def solution(heights):
+    answer = 0
+    return answer",python
+4,solution,"def solution(n, queries):
     answer = []
     return answer",python
-4,solution,"def solution(coin, cards):
+5,solution,"def solution(grid, d, k):
     answer = 0
     return answer",python
-5,solution,"def solution(n, tops):
+6,solution,"def solution(targets):
     answer = 0
     return answer",python
-6,solution,"def solution(bandage, health, attacks):
+7,solution,"def solution(r1, r2):
     answer = 0
     return answer",python
-7,solution,"def solution(land):
+8,solution,"def solution(n):
     answer = 0
     return answer",python
-8,solution,"def solution(h1, m1, s1, h2, m2, s2):
+9,solution,"def solution(sequence, k):
+    answer = []
+    return answer",python
+10,solution,"def solution(plans):
+    answer = []
+    return answer",python
+11,solution,"def solution(picks, minerals):
+    answer = 0
+    return answer",python
+12,solution,"def solution(board):
+    answer = 0
+    return answer",python
+13,solution,"def solution(temperature, t1, t2, a, b, onboard):
+    answer = 0
+    return answer",python
+14,solution,"def solution(m, n, startX, startY, balls):
+    answer = []
+    return answer",python
+15,solution,"def solution(sequence):
+    answer = 0
+    return answer",python
+16,solution,"def solution(maps):
+    answer = 0
+    return answer",python
+17,solution,"def solution(book_time):
+    answer = 0
+    return answer",python
+18,solution,"def solution(maps):
+    answer = []
+    return answer",python
+19,solution,"def solution(numbers):
+    answer = []
+    return answer",python
+20,solution,"def solution(k, n, reqs):
+    answer = 0
+    return answer",python
+21,solution,"def solution(x, y, n):
+    answer = 0
+    return answer",python
+22,solution,"def solution(weights):
+    answer = 0
+    return answer",python
+23,solution,"def solution(scores):
+    answer = 0
+    return answer",python
+24,solution,"def solution(cap, n, deliveries, pickups):
     answer = -1
     return answer",python
-9,solution,"def solution(n, m, tests):
-    answer = 0
-    return answer",python
-10,solution,"def solution(n, roads):
-    answer = 0
-    return answer",python
-11,solution,"def solution(n, roads):
+25,solution,"def solution(users, emoticons):
     answer = []
     return answer",python
-12,solution,"def solution(heights):
-    answer = 0
-    return answer",python
-13,solution,"def solution(n, queries):
+26,solution,"def solution(numbers):
     answer = []
     return answer",python
-14,solution,"def solution(grid, d, k):
-    answer = 0
+27,solution,"def solution(commands):
+    answer = []
     return answer",python
-15,solution,"def solution(temperature, t1, t2, a, b, onboard):
-    answer = 0
-    return answer",python
-16,solution,"def solution(k, n, reqs):
-    answer = 0
-    return answer",python
-17,solution,"str = input()
-",python
-18,solution,"a, b = map(int, input().strip().split(' '))
-print(a + b)",python
-19,solution,"str, n = input().strip().split(' ')
-n = int(n)
-",python
-20,solution,"str = input()
-",python
-21,solution,print('hello world!'),python
-22,solution,"a, b = map(int, input().strip().split(' '))
-print(a + b)",python
-23,solution,"str1, str2 = input().strip().split(' ')
-",python
-24,solution,"str = input()
-",python
-25,solution,a = int(input()),python
-26,solution,"def solution(my_string, overwrite_string, s):
+28,solution,"def solution(n, m, x, y, r, c, k):
     answer = ''
     return answer",python
-27,solution,"def solution(str1, str2):
-    answer = ''
+29,solution,"def solution(edges, target):
+    answer = []
     return answer",python
-28,solution,"def solution(arr):
-    answer = ''
-    return answer",python
-29,solution,"def solution(my_string, k):
-    answer = ''
-    return answer",python
-30,solution,"def solution(a, b):
+30,solution,"def solution(storey):
     answer = 0
     return answer",python
-31,solution,"def solution(a, b):
+31,solution,"def solution(n, l, r):
     answer = 0
     return answer",python
-32,solution,"def solution(num, n):
+32,solution,"def solution(data, col, row_begin, row_end):
     answer = 0
     return answer",python
-33,solution,"def solution(number, n, m):
+33,solution,"def solution(n, k, enemy):
     answer = 0
     return answer",python
-34,solution,"def solution(n):
+34,solution,"def solution(k, d):
     answer = 0
     return answer",python
-35,solution,"def solution(ineq, eq, n, m):
+35,solution,"def solution(n, count):
     answer = 0
     return answer",python
-36,solution,"def solution(a, b, flag):
+36,solution,"def solution(k, tangerine):
     answer = 0
     return answer",python
-37,solution,"def solution(code):
-    answer = ''
+37,solution,"def solution(e, starts):
+    answer = []
     return answer",python
-38,solution,"def solution(a, d, included):
+38,solution,"def solution(numbers):
     answer = 0
     return answer",python
-39,solution,"def solution(a, b, c):
+39,solution,"def solution(arrayA, arrayB):
     answer = 0
     return answer",python
-40,solution,"def solution(num_list):
+40,solution,"def solution(k, ranges):
+    answer = []
+    return answer",python
+41,solution,"def solution(n, lighthouse):
     answer = 0
     return answer",python
-41,solution,"def solution(num_list):
+42,solution,"def solution(n, roads, sources, destination):
+    answer = []
+    return answer",python
+43,solution,"def solution(topping):
+    answer = -1
+    return answer",python
+44,solution,"def solution(order):
     answer = 0
     return answer",python
-42,solution,"def solution(num_list):
-    answer = []
-    return answer",python
-43,solution,"def solution(n, control):
+45,solution,"def solution(beginning, target):
     answer = 0
     return answer",python
-44,solution,"def solution(numLog):
-    answer = ''
-    return answer",python
-45,solution,"def solution(arr, queries):
-    answer = []
-    return answer",python
-46,solution,"def solution(arr, queries):
-    answer = []
-    return answer",python
-47,solution,"def solution(arr, queries):
-    answer = []
-    return answer",python
-48,solution,"def solution(l, r):
-    answer = []
-    return answer",python
-49,solution,"def solution(start_num, end_num):
-    answer = []
-    return answer",python
-50,solution,"def solution(n):
-    answer = []
-    return answer",python
-51,solution,"def solution(arr):
-    stk = []
-    return stk",python
-52,solution,"def solution(x1, x2, x3, x4):
-    answer = True
-    return answer",python
-53,solution,"def solution(a, b, c, d):
+46,solution,"def solution(clockHands):
     answer = 0
     return answer",python
-54,solution,"def solution(my_string, index_list):
-    answer = ''
-    return answer",python
-55,solution,"def solution(number):
+47,solution,"def solution(elements):
     answer = 0
     return answer",python
-56,solution,"def solution(my_string, queries):
-    answer = ''
-    return answer",python
-57,solution,"def solution(intStrs, k, s, l):
-    answer = []
-    return answer",python
-58,solution,"def solution(my_strings, parts):
-    answer = ''
-    return answer",python
-59,solution,"def solution(my_string, n):
-    answer = ''
-    return answer",python
-60,solution,"def solution(my_string):
-    answer = []
-    return answer",python
-61,solution,"def solution(my_string, is_suffix):
+48,solution,"def solution(cards):
     answer = 0
     return answer",python
-62,solution,"def solution(my_string, n):
-    answer = ''
+49,solution,"def solution(edges):
+    answer = []
     return answer",python
-63,solution,"def solution(my_string, is_prefix):
+50,solution,"def solution(target):
+    answer = []
+    return answer",python
+51,solution,"def solution(want, number, discount):
     answer = 0
     return answer",python
-64,solution,"def solution(my_string, s, e):
-    answer = ''
-    return answer",python
-65,solution,"def solution(my_string, m, c):
-    answer = ''
-    return answer",python
-66,solution,"def solution(q, r, code):
-    answer = ''
-    return answer",python
-67,solution,"def solution(my_string):
+52,solution,"def solution(dice):
     answer = []
     return answer",python
-68,solution,"def solution(n, k):
-    answer = []
-    return answer",python
-69,solution,"def solution(my_string, indices):
-    answer = ''
-    return answer",python
-70,solution,"def solution(start_num, end_num):
-    answer = []
-    return answer",python
-71,solution,"def solution(arr, idx):
-    answer = 0
-    return answer",python
-72,solution,"def solution(n, slicer, num_list):
-    answer = []
-    return answer",python
-73,solution,"def solution(num_list):
-    answer = 0
-    return answer",python
-74,solution,"def solution(arr, intervals):
-    answer = []
-    return answer",python
-75,solution,"def solution(arr):
-    answer = []
-    return answer",python
-76,solution,"def solution(arr, query):
-    answer = []
-    return answer",python
-77,solution,"def solution(num_list, n):
-    answer = []
-    return answer",python
-78,solution,"def solution(num_list, n):
-    answer = []
-    return answer",python
-79,solution,"def solution(str_list):
-    answer = []
-    return answer",python
-80,solution,"def solution(num_list, n):
-    answer = []
-    return answer",python
-81,solution,"def solution(num_list):
-    answer = 0
-    return answer",python
-82,solution,"def solution(names):
-    answer = []
-    return answer",python
-83,solution,"def solution(todo_list, finished):
-    answer = []
-    return answer",python
-84,solution,"def solution(numbers, n):
-    answer = 0
-    return answer",python
-85,solution,"def solution(arr, queries):
-    answer = []
-    return answer",python
-86,solution,"def solution(arr):
-    answer = []
-    return answer",python
-87,solution,"def solution(arr):
-    answer = 0
-    return answer",python
-88,solution,"def solution(num_list):
-    answer = 0
-    return answer",python
-89,solution,"def solution(num_list):
-    answer = 0
-    return answer",python
-90,solution,"def solution(myString, pat):
-    answer = 0
-    return answer",python
-91,solution,"def solution(myString):
-    answer = ''
-    return answer",python
-92,solution,"def solution(myString):
-    answer = ''
-    return answer",python
-93,solution,"def solution(strArr):
-    answer = []
-    return answer",python
-94,solution,"def solution(myString):
-    answer = ''
-    return answer",python
-95,solution,"def solution(my_string, alp):
-    answer = ''
-    return answer",python
-96,solution,"def solution(myString, pat):
-    answer = ''
-    return answer",python
-97,solution,"def solution(myString, pat):
-    answer = 0
-    return answer",python
-98,solution,"def solution(strArr):
-    answer = []
-    return answer",python
-99,solution,"def solution(my_string):
-    answer = []
-    return answer",python
-100,solution,"def solution(my_string):
-    answer = []
-    return answer",python
-101,solution,"def solution(myString):
-    answer = []
-    return answer",python
-102,solution,"def solution(myString):
-    answer = []
-    return answer",python
-103,solution,"def solution(binomial):
-    answer = 0
-    return answer",python
-104,solution,"def solution(myString, pat):
-    answer = 0
-    return answer",python
-105,solution,"def solution(rny_string):
-    answer = ''
-    return answer",python
-106,solution,"def solution(myStr):
-    answer = []
-    return answer",python
-107,solution,"def solution(arr):
-    answer = []
-    return answer",python
-108,solution,"def solution(arr, flag):
-    answer = []
-    return answer",python
-109,solution,"def solution(arr):
-    answer = []
-    return answer",python
-110,solution,"def solution(arr, k):
-    answer = []
-    return answer",python
-111,solution,"def solution(arr):
-    answer = []
-    return answer",python
-112,solution,"def solution(arr1, arr2):
-    answer = 0
-    return answer",python
-113,solution,"def solution(strArr):
-    answer = 0
-    return answer",python
-114,solution,"def solution(arr, n):
-    answer = []
-    return answer",python
-115,solution,"def solution(num_list):
-    answer = []
-    return answer",python
-116,solution,"def solution(num_list):
-    answer = []
-    return answer",python
-117,solution,"def solution(rank, attendance):
-    answer = 0
-    return answer",python
-118,solution,"def solution(flo):
-    answer = 0
-    return answer",python
-119,solution,"def solution(num_str):
-    answer = 0
-    return answer",python
-120,solution,"def solution(n_str):
-    answer = 0
-    return answer ",python
-121,solution,"def solution(n_str):
-    answer = ''
-    return answer",python
-122,solution,"def solution(a, b):
-    answer = ''
-    return answer",python
-123,solution,"def solution(n):
-    answer = ''
-    return answer",python
-124,solution,"def solution(arr, delete_list):
-    answer = []
-    return answer",python
-125,solution,"def solution(my_string, target):
-    answer = 0
-    return answer",python
-126,solution,"def solution(str1, str2):
-    answer = 0
-    return answer",python
-127,solution,"def solution(str_list, ex):
-    answer = ''
-    return answer",python
-128,solution,"def solution(num_list, n):
-    answer = 0
-    return answer",python
-129,solution,"def solution(a, b):
-    answer = 0
-    return answer",python
-130,solution,"def solution(date1, date2):
-    answer = 0
-    return answer",python
-131,solution,"def solution(order):
-    answer = 0
-    return answer",python
-132,solution,"def solution(picture, k):
-    answer = []
-    return answer",python
-133,solution,"def solution(arr, k):
-    answer = []
-    return answer",python
-134,solution,"def solution(myString):
-    answer = ''
-    return answer",python
-135,solution,"def solution(n):
+53,solution,"def solution(rc, operations):
     answer = [[]]
     return answer",python
-136,solution,"def solution(n):
-    answer = [[]]
-    return answer",python
-137,solution,"def solution(arr):
-    answer = 0
-    return answer",python
-138,solution,"def solution(arr):
-    answer = [[]]
-    return answer",python
-139,solution,"def solution(board, k):
-    answer = 0
-    return answer",python
-140,solution,"def solution(targets):
-    answer = 0
-    return answer",python
-141,solution,"def solution(r1, r2):
-    answer = 0
-    return answer",python
-142,solution,"def solution(n):
-    answer = 0
-    return answer",python
-143,solution,"def solution(players, callings):
+54,solution,"def solution(n, paths, gates, summits):
     answer = []
     return answer",python
-144,solution,"def solution(sequence, k):
-    answer = []
-    return answer",python
-145,solution,"def solution(name, yearning, photo):
-    answer = []
-    return answer",python
-146,solution,"def solution(plans):
-    answer = []
-    return answer",python
-147,solution,"def solution(park, routes):
-    answer = []
-    return answer",python
-148,solution,"def solution(picks, minerals):
-    answer = 0
-    return answer",python
-149,solution,"def solution(board):
-    answer = 0
-    return answer",python
-150,solution,"def solution(m, n, startX, startY, balls):
-    answer = []
-    return answer",python
-151,solution,"def solution(n, m, section):
-    answer = 0
-    return answer",python
-152,solution,"def solution(sequence):
-    answer = 0
-    return answer",python
-153,solution,"def solution(keymap, targets):
-    answer = []
-    return answer",python
-154,solution,"def solution(cards1, cards2, goal):
-    answer = ''
-    return answer",python
-155,solution,"def solution(maps):
-    answer = 0
-    return answer",python
-156,solution,"def solution(s, skip, index):
-    answer = ''
-    return answer",python
-157,solution,"def solution(book_time):
-    answer = 0
-    return answer",python
-158,solution,"def solution(maps):
-    answer = []
-    return answer",python
-159,solution,"def solution(numbers):
-    answer = []
-    return answer",python
-160,solution,"def solution(x, y, n):
-    answer = 0
-    return answer",python
-161,solution,"def solution(weights):
-    answer = 0
-    return answer",python
-162,solution,"def solution(scores):
-    answer = 0
-    return answer",python
-163,solution,"def solution(today, terms, privacies):
-    answer = []
-    return answer",python
-164,solution,"def solution(cap, n, deliveries, pickups):
-    answer = -1
-    return answer",python
-165,solution,"def solution(users, emoticons):
-    answer = []
-    return answer",python
-166,solution,"def solution(numbers):
-    answer = []
-    return answer",python
-167,solution,"def solution(commands):
-    answer = []
-    return answer",python
-168,solution,"def solution(n, m, x, y, r, c, k):
-    answer = ''
-    return answer",python
-169,solution,"def solution(edges, target):
-    answer = []
-    return answer",python
-170,solution,"def solution(storey):
-    answer = 0
-    return answer",python
-171,solution,"def solution(n, l, r):
-    answer = 0
-    return answer",python
-172,solution,"def solution(t, p):
-    answer = 0
-    return answer",python
-173,solution,"def solution(data, col, row_begin, row_end):
-    answer = 0
-    return answer",python
-174,solution,"def solution(s):
-    answer = []
-    return answer",python
-175,solution,"def solution(n, k, enemy):
-    answer = 0
-    return answer",python
-176,solution,"def solution(s):
-    answer = 0
-    return answer",python
-177,solution,"def solution(k, d):
-    answer = 0
-    return answer",python
-178,solution,"def solution(n, count):
-    answer = 0
-    return answer",python
-179,solution,"def solution(k, score):
-    answer = []
-    return answer",python
-180,solution,"def solution(k, tangerine):
-    answer = 0
-    return answer",python
-181,solution,"def solution(e, starts):
-    answer = []
-    return answer",python
-182,solution,"def solution(number, limit, power):
-    answer = 0
-    return answer",python
-183,solution,"def solution(numbers):
-    answer = 0
-    return answer",python
-184,solution,"def solution(k, m, score):
-    answer = 0
-    return answer",python
-185,solution,"def solution(arrayA, arrayB):
-    answer = 0
-    return answer",python
-186,solution,"def solution(food):
-    answer = ''
-    return answer",python
-187,solution,"def solution(k, ranges):
-    answer = []
-    return answer",python
-188,solution,"def solution(ingredient):
-    answer = 0
-    return answer",python
-189,solution,"def solution(n, lighthouse):
-    answer = 0
-    return answer",python
-190,solution,"def solution(babbling):
-    answer = 0
-    return answer",python
-191,solution,"def solution(a, b, n):
-    answer = 0
-    return answer",python
-192,solution,"def solution(n, roads, sources, destination):
-    answer = []
-    return answer",python
-193,solution,"def solution(topping):
-    answer = -1
-    return answer",python
-194,solution,"def solution(number):
-    answer = 0
-    return answer",python
-195,solution,"def solution(order):
-    answer = 0
-    return answer",python
-196,solution,"def solution(beginning, target):
-    answer = 0
-    return answer",python
-197,solution,"def solution(clockHands):
-    answer = 0
-    return answer",python
-198,solution,"def solution(elements):
-    answer = 0
-    return answer",python
-199,solution,"def solution(cards):
-    answer = 0
-    return answer",python
-200,solution,"def solution(target):
-    answer = []
-    return answer",python
-201,solution,"def solution(X, Y):
-    answer = ''
-    return answer",python
-202,solution,"def solution(want, number, discount):
-    answer = 0
-    return answer",python
-203,solution,"def solution(babbling):
-    answer = 0
-    return answer",python
-204,solution,"def solution(common):
-    answer = 0
-    return answer",python
-205,solution,"def solution(num, total):
-    answer = []
-    return answer",python
-206,solution,"def solution(M, N):
-    answer = 0
-    return answer",python
-207,solution,"def solution(A, B):
-    answer = 0
-    return answer",python
-208,solution,"def solution(my_str, n):
-    answer = []
-    return answer",python
-209,solution,"def solution(array):
-    answer = 0
-    return answer",python
-210,solution,"def solution(my_string):
-    answer = ''
-    return answer",python
-211,solution,"def solution(n, t):
-    answer = 0
-    return answer",python
-212,solution,"def solution(n):
-    answer = 0
-    return answer",python
-213,solution,"def solution(str1, str2):
-    answer = 0
-    return answer",python
-214,solution,"def solution(quiz):
-    answer = []
-    return answer",python
-215,solution,"def solution(n):
-    answer = 0
-    return answer",python
-216,solution,"def solution(n, numlist):
-    answer = []
-    return answer",python
-217,solution,"def solution(num, k):
-    answer = 0
-    return answer",python
-218,solution,"def solution(s1, s2):
-    answer = 0
-    return answer",python
-219,solution,"def solution(my_string):
-    answer = 0
-    return answer",python
-220,solution,"def solution(array):
-    answer = []
-    return answer",python
-221,solution,"def solution(message):
-    answer = 0
-    return answer",python
-222,solution,"def solution(n):
-    answer = []
-    return answer",python
-223,solution,"def solution(s):
-    answer = ''
-    return answer",python
-224,solution,"def solution(my_string, num1, num2):
-    answer = ''
-    return answer",python
-225,solution,"def solution(numbers):
-    answer = 0
-    return answer",python
-226,solution,"def solution(my_string):
-    answer = ''
-    return answer",python
-227,solution,"def solution(cipher, code):
-    answer = ''
-    return answer",python
-228,solution,"def solution(order):
-    answer = 0
-    return answer",python
-229,solution,"def solution(array, n):
-    answer = 0
-    return answer",python
-230,solution,"def solution(sides):
-    answer = 0
-    return answer",python
-231,solution,"def solution(my_string):
-    answer = ''
-    return answer",python
-232,solution,"def solution(i, j, k):
-    answer = 0
-    return answer",python
-233,solution,"def solution(before, after):
-    answer = 0
-    return answer",python
-234,solution,"def solution(bin1, bin2):
-    answer = ''
-    return answer",python
-235,solution,"def solution(chicken):
-    answer = -1
-    return answer",python
-236,solution,"def solution(id_pw, db):
-    answer = ''
-    return answer",python
-237,solution,"def solution(score):
-    answer = []
-    return answer",python
-238,solution,"def solution(numlist, n):
-    answer = []
-    return answer",python
-239,solution,"def solution(a, b):
-    answer = 0
-    return answer",python
-240,solution,"def solution(lines):
-    answer = 0
-    return answer",python
-241,solution,"def solution(dots):
-    answer = 0
-    return answer",python
-242,solution,"def solution(n):
-    answer = 0
-    return answer",python
-243,solution,"def solution(spell, dic):
-    answer = 0
-    return answer",python
-244,solution,"def solution(sides):
-    answer = 0
-    return answer",python
-245,solution,"def solution(board):
-    answer = 0
-    return answer",python
-246,solution,"def solution(my_string):
-    answer = 0
-    return answer",python
-247,solution,"def solution(polynomial):
-    answer = ''
-    return answer",python
-248,solution,"def solution(numbers):
-    answer = 0
-    return answer",python
-249,solution,"def solution(keyinput, board):
-    answer = []
-    return answer",python
-250,solution,"def solution(dots):
-    answer = 0
-    return answer",python
-251,solution,"def solution(strlist):
-    answer = []
-    return answer",python
-252,solution,"def solution(s):
-    answer = 0
-    return answer",python
-253,solution,"def solution(n):
-    answer = []
-    return answer",python
-254,solution,"def solution(my_string):
-    answer = 0
-    return answer",python
-255,solution,"def solution(my_string):
-    answer = []
-    return answer",python
-256,solution,"def solution(my_string):
-    answer = ''
-    return answer",python
-257,solution,"def solution(n):
-    answer = 0
-    return answer",python
-258,solution,"def solution(numbers):
-    answer = 0
-    return answer",python
-259,solution,"def solution(n):
-    answer = 0
-    return answer",python
-260,solution,"def solution(box, n):
-    answer = 0
-    return answer",python
-261,solution,"def solution(numbers, direction):
-    answer = []
-    return answer",python
-262,solution,"def solution(numbers, k):
-    answer = 0
-    return answer",python
-263,solution,"def solution(num_list, n):
-    answer = [[]]
-    return answer",python
-264,solution,"def solution(dot):
-    answer = 0
-    return answer",python
-265,solution,"def solution(balls, share):
-    answer = 0
-    return answer",python
-266,solution,"def solution(rsp):
-    answer = ''
-    return answer",python
-267,solution,"def solution(letter):
-    answer = ''
-    return answer",python
-268,solution,"def solution(hp):
-    answer = 0
-    return answer",python
-269,solution,"def solution(n):
-    answer = 0
-    return answer",python
-270,solution,"def solution(emergency):
-    answer = []
-    return answer",python
-271,solution,"def solution(age):
-    answer = ''
-    return answer",python
-272,solution,"def solution(numbers, num1, num2):
-    answer = []
-    return answer",python
-273,solution,"def solution(n):
-    answer = 0
-    return answer",python
-274,solution,"def solution(n, k):
-    answer = 0
-    return answer",python
-275,solution,"def solution(angle):
-    answer = 0
-    return answer",python
-276,solution,"def solution(my_string, letter):
-    answer = ''
-    return answer",python
-277,solution,"def solution(my_string, n):
-    answer = ''
-    return answer",python
-278,solution,"def solution(num_list):
-    answer = []
-    return answer",python
-279,solution,"n = int(input())
-print(n)",python
-280,solution,"def solution(my_string):
-    answer = ''
-    return answer",python
-281,solution,"def solution(num_list):
-    answer = []
-    return answer",python
-282,solution,"def solution(age):
-    answer = 0
-    return answer",python
-283,solution,"def solution(money):
-    answer = []
-    return answer",python
-284,solution,"def solution(price):
-    answer = 0
-    return answer",python
-285,solution,"def solution(numbers):
-    answer = 0
-    return answer",python
-286,solution,"def solution(slice, n):
-    answer = 0
-    return answer",python
-287,solution,"def solution(n):
-    answer = 0
-    return answer",python
-288,solution,"def solution(n):
-    answer = 0
-    return answer",python
-289,solution,"def solution(n):
-    answer = []
-    return answer",python
-290,solution,"def solution(array):
-    answer = 0
-    return answer",python
-291,solution,"def solution(array):
-    answer = 0
-    return answer",python
-292,solution,"def solution(num1, num2):
-    answer = -1
-    return answer",python
-293,solution,"def solution(numbers):
-    answer = []
-    return answer",python
-294,solution,"def solution(numer1, denom1, numer2, denom2):
-    answer = []
-    return answer",python
-295,solution,"def solution(num1, num2):
-    answer = 0
-    return answer",python
-296,solution,"def solution(num1, num2):
-    answer = 0
-    return answer",python
-297,solution,"def solution(num1, num2):
-    answer = 0
-    return answer",python
-298,solution,"def solution(num1, num2):
-    answer = 0
-    return answer",python
-299,solution,"def solution(num1, num2):
-    answer = 0
-    return answer",python
-300,solution,"def solution(num1, num2):
-    answer = -1
-    return answer",python
-301,solution,"def solution(array, height):
-    answer = 0
-    return answer",python
-302,solution,"def solution(array, n):
-    answer = 0
-    return answer",python
-303,solution,"def solution(rc, operations):
-    answer = [[]]
-    return answer",python
-304,solution,"def solution(n, paths, gates, summits):
-    answer = []
-    return answer",python
-305,solution,"def solution(alp, cop, problems):
+55,solution,"def solution(alp, cop, problems):
     answer = 0
     return answer",python
-306,solution,"def solution(queue1, queue2):
+56,solution,"def solution(queue1, queue2):
     answer = -2
     return answer",python
-307,solution,"def solution(survey, choices):
+57,solution,"def solution(board, aloc, bloc):
+    answer = -1
+    return answer",python
+58,solution,"def solution(board, skill):
+    answer = 0
+    return answer",python
+59,solution,"def solution(info, edges):
+    answer = 0
+    return answer",python
+60,solution,"def solution(n, info):
+    answer = []
+    return answer",python
+61,solution,"def solution(fees, records):
+    answer = []
+    return answer",python
+62,solution,"def solution(n, k):
+    answer = -1
+    return answer",python
+63,solution,"def solution(k, dungeons):
+    answer = -1
+    return answer",python
+64,solution,"def solution(rectangle, characterX, characterY, itemX, itemY):
+    answer = 0
+    return answer",python
+65,solution,"def solution(q, a):
+    answer = -1
+    return answer",python
+66,solution,"def solution(n, m, x, y, queries):
+    answer = -1
+    return answer",python
+67,solution,"def solution(n, left, right):
+    answer = []
+    return answer",python
+68,solution,"def solution(line):
+    answer = []
+    return answer",python
+69,solution,"def solution(n, wires):
+    answer = -1
+    return answer",python
+70,solution,"def solution(a, s):
+    answer = []
+    return answer",python
+71,solution,"def solution(a, b, g, s, w, t):
+    answer = -1
+    return answer",python
+72,solution,"def solution(grid):
+    answer = []
+    return answer",python
+73,solution,"def solution(word):
+    answer = 0
+    return answer",python
+74,solution,"def solution(k, num, links):
+    answer = 0
+    return answer",python
+75,solution,"def solution(n, start, end, roads, traps):
+    answer = 0
+    return answer",python
+76,solution,"def solution(n, k, cmd):
     answer = ''
     return answer",python
-308,solution,"def solution(board, aloc, bloc):
-    answer = -1
-    return answer",python
-309,solution,"def solution(board, skill):
-    answer = 0
-    return answer",python
-310,solution,"def solution(info, edges):
-    answer = 0
-    return answer",python
-311,solution,"def solution(n, info):
+77,solution,"def solution(places):
     answer = []
     return answer",python
-312,solution,"def solution(fees, records):
+78,solution,"def solution(values, edges, queries):
     answer = []
     return answer",python
-313,solution,"def solution(n, k):
-    answer = -1
-    return answer",python
-314,solution,"def solution(id_list, report, k):
+79,solution,"def solution(s):
     answer = []
     return answer",python
-315,solution,"def solution(k, dungeons):
-    answer = -1
-    return answer",python
-316,solution,"def solution(rectangle, characterX, characterY, itemX, itemY):
-    answer = 0
-    return answer",python
-317,solution,"def solution(q, a):
-    answer = -1
-    return answer",python
-318,solution,"def solution(n, m, x, y, queries):
-    answer = -1
-    return answer",python
-319,solution,"def solution(n, left, right):
+80,solution,"def solution(numbers):
     answer = []
     return answer",python
-320,solution,"def solution(n):
-    answer = 0
-    return answer",python
-321,solution,"def solution(line):
+81,solution,"def solution(enroll, referral, seller, amount):
     answer = []
     return answer",python
-322,solution,"def solution(n, wires):
-    answer = -1
-    return answer",python
-323,solution,"def solution(sizes):
-    answer = 0
-    return answer",python
-324,solution,"def solution(a, s):
+82,solution,"def solution(rows, columns, queries):
     answer = []
     return answer",python
-325,solution,"def solution(a, b, g, s, w, t):
-    answer = -1
-    return answer",python
-326,solution,"def solution(grid):
+83,solution,"def solution(n, z, roads, queries):
     answer = []
     return answer",python
-327,solution,"def solution(numbers):
-    answer = -1
-    return answer",python
-328,solution,"def solution(word):
-    answer = 0
-    return answer",python
-329,solution,"def solution(price, money, count):
-    answer = -1
-
-    return answer",python
-330,solution,"def solution(k, num, links):
-    answer = 0
-    return answer",python
-331,solution,"def solution(n, start, end, roads, traps):
-    answer = 0
-    return answer",python
-332,solution,"def solution(n, k, cmd):
-    answer = ''
-    return answer",python
-333,solution,"def solution(places):
-    answer = []
-    return answer",python
-334,solution,"def solution(s):
-    answer = 0
-    return answer",python
-335,solution,"def solution(values, edges, queries):
-    answer = []
-    return answer",python
-336,solution,"def solution(s):
-    answer = []
-    return answer",python
-337,solution,"def solution(numbers):
-    answer = []
-    return answer",python
-338,solution,"def solution(left, right):
-    answer = 0
-    return answer",python
-339,solution,"def solution(enroll, referral, seller, amount):
-    answer = []
-    return answer",python
-340,solution,"def solution(rows, columns, queries):
-    answer = []
-    return answer",python
-341,solution,"def solution(lottos, win_nums):
-    answer = []
-    return answer",python
-342,solution,"def solution(n, z, roads, queries):
-    answer = []
-    return answer",python
-343,solution,"def solution(a, edges):
+84,solution,"def solution(a, edges):
     answer = -2
     return answer",python
-344,solution,"def solution(s):
+85,solution,"def solution(s):
     answer = -1
     return answer",python
-345,solution,"def solution(absolutes, signs):
-    answer = 123456789
-    return answer",python
-346,solution,"def solution(sales, links):
+86,solution,"def solution(sales, links):
     answer = 0
     return answer",python
-347,solution,"def solution(board, r, c):
+87,solution,"def solution(board, r, c):
     answer = 0
     return answer",python
-348,solution,"def solution(play_time, adv_time, logs):
+88,solution,"def solution(play_time, adv_time, logs):
     answer = ''
     return answer",python
-349,solution,"def solution(n, s, a, b, fares):
+89,solution,"def solution(n, s, a, b, fares):
     answer = 0
     return answer",python
-350,solution,"def solution(info, query):
+90,solution,"def solution(info, query):
     answer = []
     return answer",python
-351,solution,"def solution(orders, course):
+91,solution,"def solution(orders, course):
     answer = []
     return answer",python
-352,solution,"def solution(new_id):
-    answer = ''
-    return answer",python
-353,solution,"def solution(t):
+92,solution,"def solution(t):
     answer = 0
     return answer",python
-354,solution,"def solution(a):
+93,solution,"def solution(a):
     answer = -1
     return answer",python
-355,solution,"def solution(s):
+94,solution,"def solution(s):
     answer = []
     return answer",python
-356,solution,"def solution(a, b):
-    answer = 1234567890
-    return answer",python
-357,solution,"def solution(s):
+95,solution,"def solution(s):
     answer = -1
     return answer",python
-358,solution,"def solution(n, edges):
+96,solution,"def solution(n, edges):
     answer = 0
     return answer",python
-359,solution,"def solution(arr):
+97,solution,"def solution(arr):
     answer = []
     return answer",python
-360,solution,"def solution(n):
-    answer = 0
-    return answer",python
-361,solution,"def solution(a):
+98,solution,"def solution(a):
     answer = -1
     return answer",python
-362,solution,"def solution(a):
+99,solution,"def solution(a):
     answer = 0
     return answer",python
-363,solution,"def solution(n):
+100,solution,"def solution(n):
     answer = []
     return answer",python
-364,solution,"def solution(numbers):
-    answer = []
-    return answer",python
-365,solution,"def solution(n, path, order):
+101,solution,"def solution(n, path, order):
     answer = True
     return answer",python
-366,solution,"def solution(board):
+102,solution,"def solution(board):
     answer = 0
     return answer",python
-367,solution,"def solution(gems):
+103,solution,"def solution(gems):
     answer = []
     return answer",python
-368,solution,"def solution(expression):
+104,solution,"def solution(expression):
     answer = 0
     return answer",python
-369,solution,"def solution(numbers, hand):
-    answer = ''
-    return answer",python
-370,solution,"def solution(s):
+105,solution,"def solution(s):
     answer = []
     return answer",python
-371,solution,"def solution(user_id, banned_id):
+106,solution,"def solution(user_id, banned_id):
     answer = 0
     return answer",python
-372,solution,"def solution(k, room_number):
+107,solution,"def solution(k, room_number):
     answer = []
     return answer",python
-373,solution,"def solution(stones, k):
+108,solution,"def solution(stones, k):
     answer = 0
     return answer",python
-374,solution,"def solution(land, height):
+109,solution,"def solution(land, height):
     answer = 0
     return answer",python
-375,solution,"def solution(w,h):
+110,solution,"def solution(w,h):
     answer = 1
     return answer",python
-376,solution,"def solution(n, weak, dist):
+111,solution,"def solution(n, weak, dist):
     answer = 0
     return answer",python
-377,solution,"def solution(n, build_frame):
+112,solution,"def solution(n, build_frame):
     answer = [[]]
     return answer",python
-378,solution,"def solution(words, queries):
+113,solution,"def solution(words, queries):
     answer = []
     return answer",python
-379,solution,"def solution(key, lock):
+114,solution,"def solution(key, lock):
     answer = True
     return answer",python
-380,solution,"def solution(p):
+115,solution,"def solution(p):
     answer = ''
     return answer",python
-381,solution,"def solution(s):
+116,solution,"def solution(s):
     answer = 0
     return answer",python
-382,solution,"def solution(cookie):
+117,solution,"def solution(cookie):
     answer = -1
     return answer",python
-383,solution,"def solution(dirs):
+118,solution,"def solution(dirs):
     answer = 0
     return answer",python
-384,solution,"def solution(skill, skill_trees):
+119,solution,"def solution(skill, skill_trees):
     answer = -1
     return answer",python
-385,solution,"def solution(n, results):
+120,solution,"def solution(n, results):
     answer = 0
     return answer",python
-386,solution,"def solution(arrows):
+121,solution,"def solution(arrows):
     answer = 0
     return answer",python
-387,solution,"def solution(n, edge):
+122,solution,"def solution(n, edge):
     answer = 0
     return answer",python
-388,solution,"def solution(n, times):
+123,solution,"def solution(n, times):
     answer = 0
     return answer",python
-389,solution,"def solution(distance, rocks, n):
+124,solution,"def solution(distance, rocks, n):
     answer = 0
     return answer",python
-390,solution,"def solution(numbers, target):
+125,solution,"def solution(numbers, target):
     answer = 0
     return answer",python
-391,solution,"def solution(tickets):
+126,solution,"def solution(tickets):
     answer = []
     return answer",python
-392,solution,"def solution(begin, target, words):
+127,solution,"def solution(begin, target, words):
     answer = 0
     return answer",python
-393,solution,"def solution(n, computers):
+128,solution,"def solution(n, computers):
     answer = 0
     return answer",python
-394,solution,"def solution(triangle):
+129,solution,"def solution(triangle):
     answer = 0
     return answer",python
-395,solution,"def solution(m, n, puddles):
+130,solution,"def solution(m, n, puddles):
     answer = 0
     return answer",python
-396,solution,"def solution(money):
+131,solution,"def solution(money):
     answer = 0
     return answer",python
-397,solution,"def solution(N, number):
+132,solution,"def solution(N, number):
     answer = 0
     return answer",python
-398,solution,"def solution(board):
+133,solution,"def solution(board):
     answer = 0
     return answer",python
-399,solution,"def solution(word, pages):
+134,solution,"def solution(word, pages):
     answer = 0
     return answer",python
-400,solution,"def solution(nodeinfo):
+135,solution,"def solution(coin, cards):
+    answer = 0
+    return answer",python
+136,solution,"def solution(nodeinfo):
     answer = [[]]
     return answer",python
-401,solution,"def solution(food_times, k):
+137,solution,"def solution(food_times, k):
     answer = 0
     return answer",python
-402,solution,"def solution(relation):
+138,solution,"def solution(relation):
     answer = 0
     return answer",python
-403,solution,"def solution(N, stages):
-    answer = []
-    return answer",python
-404,solution,"def solution(record):
+139,solution,"def solution(record):
     answer = []
     
     return answer",python
-405,solution,"def solution(people, limit):
+140,solution,"def solution(people, limit):
     answer = 0
     return answer",python
-406,solution,"def solution(routes):
+141,solution,"def solution(routes):
     answer = 0
     return answer",python
-407,solution,"def solution(number, k):
+142,solution,"def solution(number, k):
     answer = ''
     return answer",python
-408,solution,"def solution(n, lost, reserve):
+143,solution,"def solution(n, costs):
     answer = 0
     return answer",python
-409,solution,"def solution(n, costs):
+144,solution,"def solution(name):
     answer = 0
     return answer",python
-410,solution,"def solution(name):
-    answer = 0
-    return answer",python
-411,solution,"def solution(brown, yellow):
+145,solution,"def solution(brown, yellow):
     answer = []
     return answer",python
-412,solution,"def solution(answers):
-    answer = []
-    return answer",python
-413,solution,"def solution(numbers):
+146,solution,"def solution(numbers):
     answer = 0
     return answer",python
-414,solution,"def solution(array, commands):
-    answer = []
-    return answer",python
-415,solution,"def solution(citations):
+147,solution,"def solution(citations):
     answer = 0
     return answer",python
-416,solution,"def solution(numbers):
+148,solution,"def solution(numbers):
     answer = ''
     return answer",python
-417,solution,"def solution(operations):
+149,solution,"def solution(operations):
     answer = []
     return answer",python
-418,solution,"def solution(jobs):
+150,solution,"def solution(jobs):
     answer = 0
     return answer",python
-419,solution,"def solution(scoville, K):
+151,solution,"def solution(scoville, K):
     answer = 0
     return answer",python
-420,solution,"def solution(priorities, location):
+152,solution,"def solution(priorities, location):
     answer = 0
     return answer",python
-421,solution,"def solution(progresses, speeds):
+153,solution,"def solution(progresses, speeds):
     answer = []
     return answer",python
-422,solution,"def solution(prices):
+154,solution,"def solution(prices):
     answer = []
     return answer",python
-423,solution,"def solution(bridge_length, weight, truck_weights):
+155,solution,"def solution(bridge_length, weight, truck_weights):
     answer = 0
     return answer",python
-424,solution,"def solution(genres, plays):
+156,solution,"def solution(genres, plays):
     answer = []
     return answer",python
-425,solution,"def solution(clothes):
+157,solution,"def solution(clothes):
     answer = 0
     return answer",python
-426,solution,"def solution(phone_book):
+158,solution,"def solution(phone_book):
     answer = True
     return answer",python
-427,solution,"def solution(participant, completion):
+159,solution,"def solution(n, t, m, p):
     answer = ''
     return answer",python
-428,solution,"def solution(n, t, m, p):
-    answer = ''
-    return answer",python
-429,solution,"def solution(files):
+160,solution,"def solution(files):
     answer = []
     return answer",python
-430,solution,"def solution(words):
+161,solution,"def solution(words):
     answer = 0
     return answer",python
-431,solution,"def solution(msg):
+162,solution,"def solution(msg):
     answer = []
     return answer",python
-432,solution,"def solution(m, musicinfos):
+163,solution,"def solution(m, musicinfos):
     answer = ''
     return answer",python
-433,solution,"def solution(dartResult):
+164,solution,"def solution(cacheSize, cities):
     answer = 0
     return answer",python
-434,solution,"def solution(n, arr1, arr2):
-    answer = []
-    return answer",python
-435,solution,"def solution(cacheSize, cities):
+165,solution,"def solution(m, n, board):
     answer = 0
     return answer",python
-436,solution,"def solution(m, n, board):
-    answer = 0
-    return answer",python
-437,solution,"def solution(n, t, m, timetable):
+166,solution,"def solution(n, t, m, timetable):
     answer = ''
     return answer",python
-438,solution,"def solution(str1, str2):
+167,solution,"def solution(str1, str2):
     answer = 0
     return answer",python
-439,solution,"def solution(lines):
+168,solution,"def solution(lines):
     answer = 0
     return answer",python
-440,solution,"def solution(A, B):
+169,solution,"def solution(A, B):
     answer = -1
     return answer",python
-441,solution,"def solution(n,a,b):
+170,solution,"def solution(n,a,b):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-442,solution,"def solution(land, P, Q):
+171,solution,"def solution(land, P, Q):
     answer = -1
     return answer",python
-443,solution,"def solution(strs, t):
+172,solution,"def solution(strs, t):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-444,solution,"def solution(d, budget):
-    answer = 0
-    return answer",python
-445,solution,"def solution(n, words):
+173,solution,"def solution(n, words):
     answer = []
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-446,solution,"def solution(n):
+174,solution,"def solution(n):
     ans = 0
     
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return ans",python
-447,solution,"def solution(n, stations, w):
+175,solution,"def solution(n, stations, w):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-448,solution,"def solution(N, road, K):
+176,solution,"def solution(N, road, K):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-449,solution,"def solution(nums):
+177,solution,"def solution(s):
     answer = -1
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-450,solution,"def solution(s):
-    answer = -1
-
-    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
-    print('Hello Python')
-
-    return answer",python
-451,solution,"def solution(sticker):
+178,solution,"def solution(sticker):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-452,solution,"a, b = map(int, input().strip().split(' '))
-print(a + b)",python
-453,solution,"def solution(x, n):
-    answer = []
-    return answer",python
-454,solution,"def solution(arr):
+179,solution,"def solution(arr):
     answer = 0
     return answer",python
-455,solution,"def solution(n):
+180,solution,"def solution(n):
     answer = 0
     return answer",python
-456,solution,"def solution(s):
+181,solution,"def solution(s):
     answer = ''
     return answer",python
-457,solution,"def solution(arr1, arr2):
+182,solution,"def solution(arr1, arr2):
     answer = [[]]
     return answer",python
-458,solution,"def solution(arr1, arr2):
+183,solution,"def solution(n):
     answer = [[]]
     return answer",python
-459,solution,"def solution(phone_number):
-    answer = ''
-    return answer",python
-460,solution,"def solution(x):
-    answer = True
-    return answer",python
-461,solution,"def solution(n):
-    answer = [[]]
-    return answer",python
-462,solution,"def solution(n):
+184,solution,"def solution(n):
     answer = 0
     return answer",python
-463,solution,"def solution(arr):
+185,solution,"def solution(matrix_sizes):
     answer = 0
     return answer",python
-464,solution,"def solution(num):
-    answer = 0
-    return answer",python
-465,solution,"def solution(matrix_sizes):
-    answer = 0
-    return answer",python
-466,solution,"def solution(A,B):
+186,solution,"def solution(A,B):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-467,solution,"def solution(n, m):
-    answer = []
-    return answer",python
-468,solution,"def solution(s):
+187,solution,"def solution(s):
     answer = ''
     return answer",python
-469,solution,"def solution(n, s):
+188,solution,"def solution(n, s):
     answer = []
     return answer",python
-470,solution,"def solution(num):
-    answer = ''
-    return answer",python
-471,solution,"def solution(n, k):
+189,solution,"def solution(n, k):
     answer = []
     return answer",python
-472,solution,"def solution(arr):
-    answer = []
-    return answer",python
-473,solution,"def solution(n):
+190,solution,"def solution(n):
     answer = 0
     return answer",python
-474,solution,"def solution(n):
+191,solution,"def solution(n, works):
     answer = 0
     return answer",python
-475,solution,"def solution(n):
+192,solution,"def solution(n):
+    answer = 0
+    return answer",python
+193,solution,"def solution(begin, end):
     answer = []
     return answer",python
-476,solution,"def solution(n):
+194,solution,"def solution(n, cores):
+    answer = 0
+    return answer",python
+195,solution,"def solution(n):
+    answer = 0
+    return answer",python
+196,solution,"def solution(land):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-477,solution,"def solution(s):
-    answer = ''
-    return answer",python
-478,solution,"def solution(n):
+197,solution,"def solution(n):
     answer = 0
     return answer",python
-479,solution,"def solution(n):
-    answer = 0
-    return answer",python
-480,solution,"def solution(n, works):
-    answer = 0
-    return answer",python
-481,solution,"def solution(s, n):
-    answer = ''
-    return answer",python
-482,solution,"def solution(s):
-    answer = 0
-    return answer",python
-483,solution,"def solution(n):
-    answer = 0
-    return answer",python
-484,solution,"def solution(begin, end):
-    answer = []
-    return answer",python
-485,solution,"def solution(n):
-    answer = ''
-    return answer",python
-486,solution,"def solution(n):
-    answer = 0
-    return answer",python
-487,solution,"def solution(n, cores):
-    answer = 0
-    return answer",python
-488,solution,"def solution(seoul):
-    answer = ''
-    return answer",python
-489,solution,"def solution(s):
-    answer = True
-    return answer",python
-490,solution,"def solution(s):
-    answer = ''
-    return answer",python
-491,solution,"def solution(s):
+198,solution,"def solution(s):
     answer = True
     
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return True",python
-492,solution,"def solution(strings, n):
-    answer = []
-    return answer",python
-493,solution,"def solution(n):
+199,solution,"def solution(n, money):
     answer = 0
     return answer",python
-494,solution,"def solution(land):
-    answer = 0
-
-    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
-    print('Hello Python')
-
-    return answer",python
-495,solution,"def solution(a, b):
+200,solution,"def solution(n, tops):
     answer = 0
     return answer",python
-496,solution,"def solution(n):
-    answer = 0
-    return answer",python
-497,solution,"def solution(arr, divisor):
-    answer = []
-    return answer",python
-498,solution,"def solution(s):
-    answer = True
-    
-    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
-    print('Hello Python')
-
-    return True",python
-499,solution,"def solution(n, money):
-    answer = 0
-    return answer",python
-500,solution,"def solution(arr):
-    answer = []
-    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
-    print('Hello Python')
-    return answer",python
-501,solution,"def solution(board):
+201,solution,"def solution(board):
     answer = 1234
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-502,solution,"def solution(s):
+202,solution,"def solution(s):
     answer = 0
 
     # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
     print('Hello Python')
 
     return answer",python
-503,solution,"def solution(s):
+203,solution,"def solution(n):
+    answer = 0
+    return answer",python
+204,solution,"def solution(n):
+    answer = 0
+    return answer",python
+205,solution,"def solution(n):
     answer = ''
     return answer",python
-504,solution,"def solution(n):
+206,solution,"def solution(maps):
     answer = 0
     return answer",python
-505,solution,"def solution(a, b):
-    answer = ''
-    return answer",python
-506,solution,"def solution(n):
-    answer = 0
-    return answer",python
-507,solution,"def solution(n):
-    answer = ''
-    return answer",python
-508,solution,"def solution(nums):
-    answer = 0
-    return answer",python
-509,solution,"def solution(maps):
-    answer = 0
-    return answer",python
-510,solution,"def solution(arr):
+207,solution,"def solution(arr):
     answer = -1
+    return answer",python
+208,solution,"def solution(land):
+    answer = 0
+    return answer",python
+209,solution,"def solution(h1, m1, s1, h2, m2, s2):
+    answer = -1
+    return answer",python
+210,solution,"def solution(n, m, tests):
+    answer = 0
     return answer",python

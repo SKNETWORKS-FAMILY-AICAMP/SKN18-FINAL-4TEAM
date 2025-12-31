@@ -147,19 +147,24 @@ def _generate_problem_solving_evaluation(
                 return "부족"
             return t[:50]
 
+        def _first_line(text: str) -> str:
+            if not text:
+                return ""
+            return text.strip().splitlines()[0].strip()
+
         sections = content.split("###")
         for section in sections:
             section = section.strip()
             if section.upper().startswith("PROBLEM_UNDERSTANDING"):
-                text = section.replace("PROBLEM_UNDERSTANDING", "", 1).strip()
+                text = _first_line(section.replace("PROBLEM_UNDERSTANDING", "", 1))
                 result["problem_understanding"] = _extract_label(text)
             elif section.upper().startswith("UNDERSTANDING_FEEDBACK"):
                 result["understanding_feedback"] = section.replace("UNDERSTANDING_FEEDBACK", "", 1).strip()
             elif section.upper().startswith("APPROACH_VALIDITY"):
-                text = section.replace("APPROACH_VALIDITY", "", 1).strip()
+                text = _first_line(section.replace("APPROACH_VALIDITY", "", 1))
                 result["approach_validity"] = _extract_label(text)
             elif section.upper().startswith("CONSISTENCY_STATUS"):
-                text = section.replace("CONSISTENCY_STATUS", "", 1).strip()
+                text = _first_line(section.replace("CONSISTENCY_STATUS", "", 1))
                 result["consistency_status"] = text[:50]
             elif section.upper().startswith("CONSISTENCY_FEEDBACK"):
                 result["consistency_feedback"] = section.replace("CONSISTENCY_FEEDBACK", "", 1).strip()

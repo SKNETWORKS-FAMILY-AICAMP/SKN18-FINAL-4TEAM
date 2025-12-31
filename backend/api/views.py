@@ -682,11 +682,17 @@ class LiveCodingCodeSnapshotView(APIView):
         key = f"livecoding:{session_id}:code"
         data = cache.get(key) or {}
         history = data.get("history") or []
+        is_first_snapshot = len(history) == 0
         history.append(snapshot)
 
         # 메모리 보호를 위해 최대 200개까지만 유지
         if len(history) > 200:
             history = history[-200:]
+
+        # 질문 생성/진행도 비교를 위한 기준 코드(세션 시작 직후 코드)를 보관한다.
+        # starter_code 캐시가 유실된 경우에도 첫 스냅샷을 기준으로 변화율을 판단할 수 있다.
+        if is_first_snapshot and "initial_code" not in data:
+            data["initial_code"] = snapshot.get("code") or ""
 
         data["latest"] = snapshot
         data["history"] = history
@@ -1413,9 +1419,27 @@ class CodingQuestionView(APIView):
 
         # starter_code는 문제 payload에만 존재하므로, 먼저 problem에서 찾고
         # 과거 메타에 저장된 값이 있다면 보조적으로만 사용한다.
-        starter_code = (
-            (problem.get("starter_code") or "")
-        ).strip()
+        starter_code = (problem.get("starter_code") or "").strip()
+        if not starter_code:
+            starter_code = (meta.get("starter_code") or "").strip()
+        if not starter_code:
+            starter_code = (code_data.get("initial_code") or "").strip()
+        if not starter_code and history:
+            try:
+                starter_code = (history[0].get("code") or "").strip()
+            except Exception:
+                starter_code = ""
+
+        if not starter_code:
+            return Response(
+                {
+                    "skipped": True,
+                    "reason": "missing_starter_code",
+                    "question": "",
+                    "tts_audio": [],
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # 2) LangGraph(chapter2) 호출
         graph = get_cached_graph(name="chapter2")
@@ -1446,10 +1470,11 @@ class CodingQuestionView(APIView):
 
         question_text = (result.get("tts_text") or "").strip()
         if not question_text:
+            skip_reason = (result.get("question_skip_reason") or "").strip() or "empty_question"
             return Response(
                 {
                     "skipped": True,
-                    "reason": "empty_question",
+                    "reason": skip_reason,
                     "question": "",
                     "tts_audio": [],
                 },

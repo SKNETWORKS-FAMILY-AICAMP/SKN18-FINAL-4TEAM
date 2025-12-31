@@ -67,7 +67,7 @@ class LiveCodingTimerUpdateView(APIView):
         remaining_clamped = max(0, min(time_limit_seconds, remaining_val))
         meta["remaining_seconds"] = remaining_clamped
 
-        cache.set(meta_key, meta, timeout=60 * 60)
+        cache.set(meta_key, meta, timeout=None)
 
         return Response(
             {"remaining_seconds": remaining_clamped},

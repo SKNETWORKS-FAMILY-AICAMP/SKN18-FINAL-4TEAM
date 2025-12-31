@@ -600,9 +600,21 @@ class LiveCodingStartView(APIView):
 
         # 라이브 코딩 세션 관련 캐시는 TTL을 두지 않고,
         # 사용자가 명시적으로 세션을 종료/제출/새로 시작할 때 정리한다.
-        cache.set(f"livecoding:{session_id}:meta", meta)
-        cache.set(f"livecoding:{session_id}:problem", problem_payload)
-        cache.set(f"livecoding:user:{user.user_id}:current_session", session_id)
+        #
+        # 주의: Django cache 기본 timeout(기본 300초)이 적용되면
+        # "뒤로가기 → 재진입" 시점에 current_session/meta가 만료되어
+        # 이어하기가 아니라 새 세션이 생성되는 문제가 생길 수 있어 TTL을 명시한다.
+        cache.set(f"livecoding:{session_id}:meta", meta, timeout=None)
+        cache.set(
+            f"livecoding:{session_id}:problem",
+            problem_payload,
+            timeout=None,
+        )
+        cache.set(
+            f"livecoding:user:{user.user_id}:current_session",
+            session_id,
+            timeout=None,
+        )
         return Response(
             {
                 "session_id": session_id,
@@ -682,17 +694,23 @@ class LiveCodingCodeSnapshotView(APIView):
         key = f"livecoding:{session_id}:code"
         data = cache.get(key) or {}
         history = data.get("history") or []
+        is_first_snapshot = len(history) == 0
         history.append(snapshot)
 
         # 메모리 보호를 위해 최대 200개까지만 유지
         if len(history) > 200:
             history = history[-200:]
 
+        # 질문 생성/진행도 비교를 위한 기준 코드(세션 시작 직후 코드)를 보관한다.
+        # starter_code 캐시가 유실된 경우에도 첫 스냅샷을 기준으로 변화율을 판단할 수 있다.
+        if is_first_snapshot and "initial_code" not in data:
+            data["initial_code"] = snapshot.get("code") or ""
+
         data["latest"] = snapshot
         data["history"] = history
 
-        # 세션 메타 TTL(기본 1시간)과 동일하게 유지
-        cache.set(key, data, timeout=60 * 60)
+        # 세션 메타 TTL과 동일하게 유지
+        cache.set(key, data, timeout=None)
 
         return Response(
             {"saved": True, "snapshot": snapshot},
@@ -905,7 +923,7 @@ class LiveCodingHintView(APIView):
             meta["hint_count"] = int(new_hint_count)
         except Exception:
             meta["hint_count"] = new_hint_count
-        cache.set(meta_key, meta, timeout=60 * 60)
+        cache.set(meta_key, meta, timeout=None)
 
         return Response(
             {
@@ -1004,7 +1022,7 @@ class LiveCodingSessionView(APIView):
                 # 이후 요청에서도 쓸 수 있도록 캐시에도 보강
                 try:
                     problem["test_cases"] = test_cases
-                    cache.set(problem_key, problem)
+                    cache.set(problem_key, problem, timeout=None)
                 except Exception:
                     pass
             except Exception:
@@ -1085,7 +1103,12 @@ class LiveCodingActiveSessionView(APIView):
         problem_key =  f"livecoding:{session_id}:problem"
         meta = cache.get(meta_key)
         problem = cache.get(problem_key)
-        if not meta and problem:
+        if not meta or not problem:
+            # 일부 키만 만료/유실된 경우 stale mapping을 정리해 후속 동작을 안정화한다.
+            try:
+                cache.delete(mapping_key)
+            except Exception:
+                pass
             return Response(
                 {"available": False},
                 status=status.HTTP_200_OK,
@@ -1192,11 +1215,13 @@ class LiveCodingEndSessionView(APIView):
         meta_key = f"livecoding:{session_id}:meta"
         code_key = f"livecoding:{session_id}:code"
         problem_key = f"livecoding:{session_id}:problem"
+        anti_cheat_key = f"livecoding:{session_id}:anti-cheat-events"
 
         # 메타/코드/문제/매핑 제거
         cache.delete(meta_key)
         cache.delete(code_key)
         cache.delete(problem_key)
+        cache.delete(anti_cheat_key)
         cache.delete(mapping_key)
 
         # STT 버퍼 및 LangGraph 체크포인트도 함께 정리
@@ -1413,9 +1438,27 @@ class CodingQuestionView(APIView):
 
         # starter_code는 문제 payload에만 존재하므로, 먼저 problem에서 찾고
         # 과거 메타에 저장된 값이 있다면 보조적으로만 사용한다.
-        starter_code = (
-            (problem.get("starter_code") or "")
-        ).strip()
+        starter_code = (problem.get("starter_code") or "").strip()
+        if not starter_code:
+            starter_code = (meta.get("starter_code") or "").strip()
+        if not starter_code:
+            starter_code = (code_data.get("initial_code") or "").strip()
+        if not starter_code and history:
+            try:
+                starter_code = (history[0].get("code") or "").strip()
+            except Exception:
+                starter_code = ""
+
+        if not starter_code:
+            return Response(
+                {
+                    "skipped": True,
+                    "reason": "missing_starter_code",
+                    "question": "",
+                    "tts_audio": [],
+                },
+                status=status.HTTP_200_OK,
+            )
 
         # 2) LangGraph(chapter2) 호출
         graph = get_cached_graph(name="chapter2")
@@ -1446,10 +1489,11 @@ class CodingQuestionView(APIView):
 
         question_text = (result.get("tts_text") or "").strip()
         if not question_text:
+            skip_reason = (result.get("question_skip_reason") or "").strip() or "empty_question"
             return Response(
                 {
                     "skipped": True,
-                    "reason": "empty_question",
+                    "reason": skip_reason,
                     "question": "",
                     "tts_audio": [],
                 },
@@ -1459,7 +1503,7 @@ class CodingQuestionView(APIView):
         # 3) 질문 횟수/질문 기준 코드 스냅샷 메타에 반영
         code_data["question_cnt"] = question_cnt + 1
         code_data["last_question_text"] = question_text
-        cache.set(meta_key, meta, timeout=60 * 60)
+        cache.set(meta_key, meta, timeout=None)
 
         # 이번 질문 생성에 실제로 사용한 코드 스냅샷을 별도로 보관해
         # 다음 질문에서 prev_code로 사용한다.
@@ -1468,7 +1512,13 @@ class CodingQuestionView(APIView):
         if len(question_history) > 50:
             question_history = question_history[-50:]
         code_data["question_history"] = question_history
-        cache.set(code_key, code_data, timeout=60 * 60)
+        cache.set(code_key, code_data, timeout=None)
+        # 진행 중 세션 매핑도 함께 연장해 이어하기 판단이 끊기지 않도록 한다.
+        try:
+            mapping_key = f"livecoding:user:{user.user_id}:current_session"
+            cache.set(mapping_key, session_id, timeout=None)
+        except Exception:
+            pass
 
         # 4) 질문 텍스트를 TTS로 변환해 프론트로 내려줌
         try:
@@ -1828,6 +1878,7 @@ class LiveCodingFinalEvalReportView(APIView):
             meta_key = f"livecoding:{session_id}:meta"
             code_key = f"livecoding:{session_id}:code"
             problem_key = f"livecoding:{session_id}:problem"
+            anti_cheat_key = f"livecoding:{session_id}:anti-cheat-events"
 
             current_sid = cache.get(mapping_key)
             if str(current_sid) == str(session_id):
@@ -1835,6 +1886,7 @@ class LiveCodingFinalEvalReportView(APIView):
             cache.delete(meta_key)
             cache.delete(code_key)
             cache.delete(problem_key)
+            cache.delete(anti_cheat_key)
 
             # STT 버퍼 및 LangGraph 체크포인트도 함께 정리
             try:
@@ -1940,7 +1992,7 @@ class LiveCodingAntiCheatEventView(APIView):
         payload["typing"] = typing
         payload["camera"] = camera
         payload["updated_at"] = timezone.now().isoformat()
-        cache.set(key, payload, timeout=60 * 60)
+        cache.set(key, payload, timeout=None)
 
         return Response({"ok": True, "counts": payload}, status=status.HTTP_200_OK)
 
@@ -2050,7 +2102,7 @@ def save_strategy_answer(request):
         meta_key = f"livecoding:{session_id}:meta"
         meta = cache.get(meta_key) or {}
         meta["strategy_answer"] = strategy_answer
-        cache.set(meta_key, meta, 3600)
+        cache.set(meta_key, meta, timeout=None)
         
         print(f"[save_strategy] 저장 완료: {strategy_answer[:50]}...", flush=True)
         

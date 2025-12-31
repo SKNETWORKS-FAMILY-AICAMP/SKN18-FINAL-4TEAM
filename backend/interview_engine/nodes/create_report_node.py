@@ -98,17 +98,21 @@ def _generate_problem_solving_evaluation(
 
 다음 형식으로 평가해주세요:
 
+중요 규칙:
+- 각 라벨(PROBLEM_UNDERSTANDING, APPROACH_VALIDITY, CONSISTENCY_STATUS)은 반드시 한 줄만 작성합니다.
+- 라벨 줄에는 평가 단어만 작성하고, 설명/피드백/기타 문장은 절대 포함하지 마세요.
+
 ### PROBLEM_UNDERSTANDING
-(문제를 정확히 이해했는지: "우수", "양호", "부족" 중 하나만 작성)
+(문제를 정확히 이해했는지: "우수", "양호", "부족" 중 하나만 작성. 다른 단어 금지)
 
 ### UNDERSTANDING_FEEDBACK
 (문제 이해도에 대한 2-3문장 설명)
 
 ### APPROACH_VALIDITY
-(접근 방법의 적절성: "우수", "양호", "부족" 중 하나만 작성)
+(접근 방법의 적절성: "우수", "양호", "부족" 중 하나만 작성. 다른 단어 금지)
 
 ### CONSISTENCY_STATUS
-(전략과 실제 구현의 일치도: "일치", "개선하여 구현", "불일치" 중 하나만 작성)
+(전략과 실제 구현의 일치도: "일치", "개선하여 구현", "불일치" 중 하나만 작성. 다른 단어 금지)
 
 ### CONSISTENCY_FEEDBACK
 (일관성에 대한 구체적 설명 3-4문장. 초기 전략과 최종 코드를 비교하여 어떻게 구현했는지 설명)
@@ -145,7 +149,13 @@ def _generate_problem_solving_evaluation(
                 return "양호"
             if "부족" in t:
                 return "부족"
-            return t[:50]
+            if "보통" in t:
+                return "양호"
+            if "적절" in t:
+                return "양호"
+            if "부적절" in t:
+                return "부족"
+            return "평가 중"
 
         def _first_line(text: str) -> str:
             if not text:
@@ -157,12 +167,18 @@ def _generate_problem_solving_evaluation(
             section = section.strip()
             if section.upper().startswith("PROBLEM_UNDERSTANDING"):
                 text = _first_line(section.replace("PROBLEM_UNDERSTANDING", "", 1))
-                result["problem_understanding"] = _extract_label(text)
+                label = _extract_label(text)
+                if label == "평가 중":
+                    label = _extract_label(section)
+                result["problem_understanding"] = label
             elif section.upper().startswith("UNDERSTANDING_FEEDBACK"):
                 result["understanding_feedback"] = section.replace("UNDERSTANDING_FEEDBACK", "", 1).strip()
             elif section.upper().startswith("APPROACH_VALIDITY"):
                 text = _first_line(section.replace("APPROACH_VALIDITY", "", 1))
-                result["approach_validity"] = _extract_label(text)
+                label = _extract_label(text)
+                if label == "평가 중":
+                    label = _extract_label(section)
+                result["approach_validity"] = label
             elif section.upper().startswith("CONSISTENCY_STATUS"):
                 text = _first_line(section.replace("CONSISTENCY_STATUS", "", 1))
                 result["consistency_status"] = text[:50]

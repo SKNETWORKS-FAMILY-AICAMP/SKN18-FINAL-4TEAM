@@ -85,7 +85,6 @@ class FinalEvalState(TypedDict, total=False):
     code_collab_feedback: Optional[str]
     problem_eval_score: Optional[float]
     problem_eval_feedback: Optional[str]
-    final_flags: Optional[list]
     problem_evidence: Optional[Dict[str, Any]]
     code_collab_evidence: Optional[Dict[str, Any]]
     graph_output: Optional[Dict[str, Any]]

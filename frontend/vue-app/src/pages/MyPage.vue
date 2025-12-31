@@ -187,7 +187,7 @@ const formatDate = (iso) => {
 .mypage {
   min-height: 100vh;
   background: #f8f4eb;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", sans-serif;
   color: #111827;
 }
 

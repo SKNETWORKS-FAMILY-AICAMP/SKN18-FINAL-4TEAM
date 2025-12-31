@@ -282,7 +282,7 @@ class InterviewIntroEventView(APIView):
             # 1) stage 전환
             stage = "coding"
             meta["stage"] = "coding"
-            cache.set(meta_key, meta, timeout=60 * 60)
+            cache.set(meta_key, meta, timeout=None)
 
             # 2) 코딩 스테이지 인트로: chapter2 그래프 내 coding_intro 노드만 실행
             try:

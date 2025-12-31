@@ -158,12 +158,14 @@ def question_generation_agent(state: CodingState) -> CodingState:
     # (feedback, collab_lines는 code_quality_collabo_agent에서 채워진 값을 사용)
     raw_quality = state.get("code_quality_feedback") or []
     raw_collab = state.get("collaboration_feedback") or []
+    total_coquality = list(dict.fromkeys(raw_quality + raw_collab))
+    total_coquality_text = "\n".join(total_coquality)
+
 
     human_prompt = (
         f"코드 언어: {language}\n"
         f"[현재 전체 코드]\n{norm_current}\n\n"
-        f"[코드 품질 피드백]\n{raw_quality}\n\n"
-        f"[협업/스타일 피드백]\n{raw_collab}\n\n"
+        f"[코드 품질, 협업/스타일 전체 피드백]\n{total_coquality_text}\n\n"
         f"[이전 질문]\n{last_question_text}\n\n"
         "위 정보를 바탕으로, 지원자의 코드에 대해 후속 질문 1개를 생성하세요.\n"
         "- ruff 피드백에 대해선 언급하지 않고 참고만 합니다."

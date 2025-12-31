@@ -80,6 +80,8 @@ class FinalEvalState(TypedDict, total=False):
     final_score: Optional[float]
     final_grade: Optional[str]
     code_collab_score: Optional[float]
+    code_collab_score_30: Optional[float]
+    code_quality_score_35: Optional[float]
     code_collab_feedback: Optional[str]
     problem_eval_score: Optional[float]
     problem_eval_feedback: Optional[str]

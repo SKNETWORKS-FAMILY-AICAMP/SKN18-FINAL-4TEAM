@@ -1,3 +1,4 @@
+import ast
 import re
 import subprocess
 import tempfile
@@ -101,6 +102,7 @@ def _extract_rule_prefix(code: str) -> str:
     return m.group(1) if m else code
 
 
+
 def _compute_quality_from_ruff(issues: List[Dict[str, Any]]) -> List[str]:
     """Ruff 진단을 기반으로 코드 품질 feedback 리스트만 생성"""
     quality_prefixes = {"F", "E", "W", "B", "C", "S", "UP", "A", "TID", "RUF", "N", "D", "Q", "I", "ERA"}
@@ -180,7 +182,21 @@ def _ensure_ruff_issues(state: CodingState) -> List[Dict[str, Any]]:
 
     # 코드가 변경될 때마다 항상 최신 내용을 기준으로 Ruff를 다시 실행한다.
     # (Redis 체크포인터에 저장된 이전 ruff_issues는 재사용하지 않는다.)
-    issues = _run_ruff(source_code, language)
+    try:
+        issues = _run_ruff(source_code, language)
+        if not issues and language in {"python", "python3", "py"}:
+            try:
+                ast.parse(source_code)
+            except Exception as exc:
+                state["code_quality_error"] = str(exc)
+                state["collaboration_error"] = str(exc)
+                state["ruff_error"] = str(exc)
+                return [{"code": "RUFF_ERROR", "message": str(exc), "location": {}}]
+    except Exception as exc:
+        state["code_quality_error"] = str(exc)
+        state["collaboration_error"] = str(exc)
+        state["ruff_error"] = str(exc)
+        return [{"code": "RUFF_ERROR", "message": str(exc), "location": {}}]
     state["ruff_issues"] = issues
     return issues
 

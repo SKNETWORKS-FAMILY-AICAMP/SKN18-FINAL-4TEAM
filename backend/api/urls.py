@@ -29,6 +29,7 @@ from .views import (
     LiveCodingReportListView,
     LiveCodingReportDetailView,
     save_strategy_answer,
+    LiveCodingAntiCheatEventView,
 )
 from .timer_views import LiveCodingTimerUpdateView
 
@@ -113,6 +114,7 @@ urlpatterns = [
     path("livecoding/final-eval/report/", views.LiveCodingFinalEvalReportView.as_view()),
     path("livecoding/reports/aggregate/", DeepAgentReportView.as_view(), name="livecoding-report-aggregate"),
     path("livecoding/reports/payload/", UserReportsPayloadView.as_view(), name="livecoding-report-payload"),
+    path("livecoding/anti-cheat/event/", views.LiveCodingAntiCheatEventView.as_view()),
     path("livecoding/reports/", views.LiveCodingReportListView.as_view(), name="livecoding-report-list"),
     path("livecoding/reports/<str:session_id>/", views.LiveCodingReportDetailView.as_view(), name="livecoding-report-detail"),
     path("livecoding/session/strategy/", views.save_strategy_answer, name="save-strategy"),

@@ -43,12 +43,12 @@
 
             <div class="score-grid">
               <div class="score-item">
-                <div class="score-label">프로 점수</div>
-                <div class="score-value">{{ promptScoreText }}점</div>
-              </div>
-              <div class="score-item">
                 <div class="score-label">문제 해결 능력</div>
                 <div class="score-value">{{ problemSolvingScoreText }}점</div>
+              </div>
+              <div class="score-item">
+                <div class="score-label">코드 품질</div>
+                <div class="score-value">{{ codeQualityScoreText }}점</div>
               </div>
               <div class="score-item">
                 <div class="score-label">협업 능력</div>
@@ -86,6 +86,20 @@
                 <div class="feedback-text">{{ cheatingWarningText }}</div>
               </div>
             </div>
+
+            <!-- 부정행위 기록 (점수 반영 없음) -->
+            <div v-if="antiCheatSummary" class="feedback-box warning">
+              <div class="feedback-icon">📌</div>
+              <div class="feedback-content">
+                <div class="feedback-title">부정행위 기록</div>
+                <div class="feedback-text">
+                  {{ formatAntiCheatLine("캠 기반", antiCheatSummary.camera) }}
+                </div>
+                <div class="feedback-text">
+                  {{ formatAntiCheatLine("타이핑/화면 이탈", antiCheatSummary.typing) }}
+                </div>
+              </div>
+            </div>
           </div>
 
           <!-- 종합 평가 섹션 -->
@@ -99,10 +113,23 @@
 
             <div class="problem-description-box">
               <h3>📋 문제 설명</h3>
-              <div class="problem-text">
-                {{ extractProblemDescription(graphOutput.problem_text || '문제 정보를 불러오는 중입니다.') }}
+              
+              <!-- 카테고리/난이도 정보 -->
+              <div class="problem-meta">
+                <div class="meta-item">
+                  <span class="meta-label">카테고리</span>
+                  <span class="meta-value">{{ problemCategory }}</span>
+                </div>
+                <div class="meta-item">
+                  <span class="meta-label">난이도</span>
+                  <span class="meta-value" :class="difficultyClass">{{ problemDifficulty }}</span>
+                </div>
               </div>
-            </div>
+
+              <div class="problem-text">
+                  {{ extractProblemDescription(graphOutput.problem_text || '문제 정보를 불러오는 중입니다.') }}
+                </div>
+              </div>
             
             <!-- 초기 전략 답변 -->
             <div class="ps-section">
@@ -243,7 +270,7 @@ const problemText = ref("");
 const latestCode = ref("");
 
 // ✅ 세부 점수들
-const promptScore = ref(null);
+const codeQualityScore = ref(null);
 const problemSolvingScore = ref(null);
 const collaborationScore = ref(null);
 
@@ -263,6 +290,13 @@ const improvementTextHtml = computed(() => {
   const s = (improvementText.value || "").trim();
   if (!s) return "";
   return s.replace(/(^|\n)\s*-\s*/g, "$1- ").replace(/\n/g, "<br>");
+});
+
+const codeQualityScoreText = computed(() => {
+  if (codeQualityScore.value === null || codeQualityScore.value === undefined) return "-";
+  const n = Number(codeQualityScore.value);
+  if (Number.isNaN(n)) return String(codeQualityScore.value);
+  return n.toFixed(0);
 });
 
 // 만약 한 줄로 쭉 들어오고 "- ... - ..." 형태라면, 항목마다 줄바꿈
@@ -286,6 +320,7 @@ const improvementTextHtml2 = computed(() => {
 const cheatingWarningText = ref("");
 const comprehensiveEvaluationText = ref("");
 const annotatedCode = ref("");
+const antiCheatSummary = ref(null);
 
 // ✅ 문제 해결 능력 평가 관련
 const initialStrategyAnswer = ref("");
@@ -296,6 +331,17 @@ const consistencyText = ref("");
 const consistencyFeedback = ref("");
 const qaHistory = ref([]);
 
+const problemCategory = ref("");
+const problemDifficulty = ref("");
+
+const difficultyClass = computed(() => {
+  const diff = problemDifficulty.value.toLowerCase();
+  if (diff.includes("쉬움") || diff.includes("easy")) return "difficulty-easy";
+  if (diff.includes("중간") || diff.includes("medium")) return "difficulty-medium";
+  if (diff.includes("어려움") || diff.includes("hard")) return "difficulty-hard";
+  return "";
+});
+
 // ✅ LangGraph 최종 output 전체 저장
 const graphOutput = ref({});
 
@@ -305,13 +351,6 @@ const finalScoreText = computed(() => {
   if (finalScore.value === null || finalScore.value === undefined) return "-";
   const n = Number(finalScore.value);
   if (Number.isNaN(n)) return String(finalScore.value);
-  return n.toFixed(0);
-});
-
-const promptScoreText = computed(() => {
-  if (promptScore.value === null || promptScore.value === undefined) return "-";
-  const n = Number(promptScore.value);
-  if (Number.isNaN(n)) return String(promptScore.value);
   return n.toFixed(0);
 });
 
@@ -333,6 +372,13 @@ const hasCheatingWarning = computed(() => {
   return cheatingWarningText.value && cheatingWarningText.value.trim().length > 0;
 });
 
+const formatAntiCheatLine = (label, payload) => {
+  if (!payload) return `${label}: -`;
+  const count = Number(payload.count || 0);
+  const level = payload.level || "-";
+  return `${label}: ${count}회 (${level})`;
+};
+
 // 문제 이해도 클래스
 const problemUnderstandingClass = computed(() => {
   const text = problemUnderstandingText.value.toLowerCase();
@@ -353,17 +399,17 @@ const approachValidityClass = computed(() => {
 // 일관성 상태
 const consistencyClass = computed(() => {
   const text = consistencyText.value.toLowerCase();
-  if (text.includes("일치") || text.includes("동일")) return "consistency-match";
-  if (text.includes("개선") || text.includes("발전")) return "consistency-improved";
   if (text.includes("불일치") || text.includes("변경")) return "consistency-mismatch";
+  if (text.includes("개선") || text.includes("발전")) return "consistency-improved";
+  if (text.includes("일치") || text.includes("동일")) return "consistency-match";
   return "";
 });
 
 const consistencyBadge = computed(() => {
   const text = consistencyText.value.toLowerCase();
-  if (text.includes("일치") || text.includes("동일")) return "✓ 일치";
-  if (text.includes("개선") || text.includes("발전")) return "↑ 개선";
   if (text.includes("불일치") || text.includes("변경")) return "≠ 불일치";
+  if (text.includes("개선") || text.includes("발전")) return "↑ 개선";
+  if (text.includes("일치") || text.includes("동일")) return "✓ 일치";
   return "?";
 });
 
@@ -395,7 +441,7 @@ const fetchReport = async () => {
       headers: { Authorization: `Bearer ${token}` },
     });
 
-    const data = await resp.json().catch(() => ({}));
+    const data = await resp.json().catch(() => ({}));  // ✅ 여기서 선언됨!
 
     if (resp.status === 401) {
       router.replace({ name: "login" });
@@ -422,10 +468,10 @@ const fetchReport = async () => {
     // LangGraph output에서 상세 점수와 피드백 추출
     const output = data.graph_output || {};
     
-    // 점수 추출
-    promptScore.value = output.prompt_score ?? null;
-    problemSolvingScore.value = output.problem_solving_score ?? null;
-    collaborationScore.value = output.collaboration_score ?? null;
+    // ✅ 점수 추출 (수정됨)
+    codeQualityScore.value = output.code_quality_score ?? null;  // 100점 환산
+    problemSolvingScore.value = output.problem_solving_score ?? null;  // 100점 환산
+    collaborationScore.value = output.collaboration_score ?? null;  // 100점 환산
     
     // 피드백 추출
     strengthText.value = output.strength || "데이터를 불러오는 중 문제가 발생했습니다.";
@@ -433,13 +479,26 @@ const fetchReport = async () => {
     cheatingWarningText.value = output.cheating_warning || "";
     comprehensiveEvaluationText.value = output.comprehensive_evaluation || "종합 평가 데이터를 불러오는 중입니다.";
     annotatedCode.value = output.annotated_code || latestCode.value || "# 코드를 불러올 수 없습니다.";
+    antiCheatSummary.value = output.anti_cheat_summary || null;
     
+    // ✅ 카테고리/난이도 추출 (output에서!)
+    problemCategory.value = output.problem_category || "미분류";
+    problemDifficulty.value = output.problem_difficulty || "미정";
+    
+    const normalizeEvalLabel = (value) => {
+      if (!value) return "평가 중";
+      if (value.includes("우수")) return "우수";
+      if (value.includes("양호")) return "양호";
+      if (value.includes("부족")) return "부족";
+      return value;
+    };
+
     // ✅ 문제 해결 능력 평가 데이터 추출
     const psEval = output.problem_solving_evaluation || {};
     initialStrategyAnswer.value = psEval.initial_strategy || "초기 전략 답변이 기록되지 않았습니다.";
-    problemUnderstandingText.value = psEval.problem_understanding || "평가 중";
+    problemUnderstandingText.value = normalizeEvalLabel(psEval.problem_understanding);
     problemUnderstandingFeedback.value = psEval.understanding_feedback || "";
-    approachValidityText.value = psEval.approach_validity || "평가 중";
+    approachValidityText.value = normalizeEvalLabel(psEval.approach_validity);
     consistencyText.value = psEval.consistency_status || "분석 중";
     consistencyFeedback.value = psEval.consistency_feedback || "";
     qaHistory.value = psEval.qa_history || [];
@@ -1093,5 +1152,44 @@ const extractProblemDescription = (fullText) => {
 .pdf-dark .desc,
 .pdf-dark .label {
   color: rgba(230, 237, 243, 0.75) !important;
+}
+
+/* 문제 메타 정보 */
+.problem-meta {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.meta-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  backdrop-filter: blur(10px);
+}
+
+.meta-label {
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.meta-value {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.meta-value.difficulty-easy {
+  color: #4ade80;
+}
+
+.meta-value.difficulty-medium {
+  color: #fbbf24;
+}
+
+.meta-value.difficulty-hard {
+  color: #f87171;
 }
 </style>

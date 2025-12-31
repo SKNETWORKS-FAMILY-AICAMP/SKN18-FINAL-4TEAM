@@ -8,6 +8,7 @@ from django.conf import settings
 from django.core.mail import send_mail
 from django.http import JsonResponse, StreamingHttpResponse
 from django.utils import timezone
+from zoneinfo import ZoneInfo
 from django.contrib.auth.hashers import check_password, make_password
 from django.core.cache import cache
 from rest_framework import status, permissions
@@ -17,6 +18,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import IsAuthenticated
+from django.utils import timezone
 
 from .email_utils import send_verification_code, verify_code
 from .throttling import (
@@ -41,6 +43,20 @@ from .models import (
 )
 from .serializers import SignupSerializer
 from .authentication import JWTAuthentication
+
+
+def _to_kst_iso(dt):
+    if not dt:
+        return None
+    tz = ZoneInfo("Asia/Seoul")
+    try:
+        if timezone.is_naive(dt):
+            aware = dt.replace(tzinfo=tz)
+        else:
+            aware = dt.astimezone(tz)
+    except Exception:
+        return dt.isoformat()
+    return aware.isoformat()
 
 
 def health(request):
@@ -950,6 +966,50 @@ class LiveCodingSessionView(APIView):
                 status=status.HTTP_404_NOT_FOUND,
             )
 
+        # 캐시에 test_cases가 비어있는 경우(예: 오래된 캐시/부분 저장/백엔드 재기동 등)
+        # DB에서 다시 불러와서 응답/캐시에 채워 넣는다.
+        test_cases = problem.get("test_cases") or []
+        if isinstance(test_cases, list) and test_cases:
+            # 과거 포맷 호환(input_data/output_data -> input/output)
+            normalized = []
+            for tc in test_cases:
+                if not isinstance(tc, dict):
+                    continue
+                if "input" in tc or "output" in tc:
+                    normalized.append(tc)
+                    continue
+                if "input_data" in tc or "output_data" in tc:
+                    normalized.append(
+                        {
+                            "id": tc.get("id"),
+                            "input": tc.get("input_data") or "",
+                            "output": tc.get("output_data") or "",
+                        }
+                    )
+            test_cases = normalized
+        else:
+            test_cases = []
+
+        if not test_cases:
+            # language와 무관하게 문제 ID 기준으로 테스트케이스를 재구성한다.
+            # (세션 meta/cache에 저장된 language 값이 DB의 language 문자열과 다르면
+            # CodingProblemLanguage 조회가 실패할 수 있어 일부 문제에서만 누락되던 이슈가 발생함)
+            try:
+                problem_id = problem.get("problem_id") or meta.get("problem_id")
+                test_cases = [
+                    {"id": tc.id, "input": tc.input_data, "output": tc.output_data}
+                    for tc in TestCase.objects.filter(problem_id=problem_id).order_by("id")
+                ]
+                # 이후 요청에서도 쓸 수 있도록 캐시에도 보강
+                try:
+                    problem["test_cases"] = test_cases
+                    cache.set(problem_key, problem)
+                except Exception:
+                    pass
+            except Exception:
+                # 캐시/DB 복구는 best-effort: 실패해도 세션 조회 자체는 진행
+                test_cases = []
+
         time_limit_seconds = int(meta.get("time_limit_seconds") or 40 * 60)
         # 클라이언트가 remaining_seconds를 명시적으로 저장해 둔 값이 있다면
         # 그 값을 우선 사용하고, 없는 경우에만 start_at 기준으로 경과 시간을 계산한다.
@@ -984,7 +1044,7 @@ class LiveCodingSessionView(APIView):
                 "language": problem.get("language") or meta.get("language"),
                 "function_name": problem.get("function_name"),
                 "starter_code": problem.get("starter_code"),
-                "test_cases": problem.get("test_cases") or [],
+                "test_cases": test_cases,
                 "time_limit_seconds": time_limit_seconds,
                 "start_at": meta.get("start_at"),
                 "remaining_seconds": remaining_seconds,
@@ -1577,6 +1637,31 @@ class LiveCodingFinalEvalReportView(APIView):
         meta_key = f"livecoding:{session_id}:meta"
         meta = cache.get(meta_key)
         if not meta:
+            # 캐시가 정리된 경우 DB에 저장된 리포트로 fallback
+            report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
+            if report:
+                return Response(
+                    {
+                        "status": report.status or "done",
+                        "step": report.step or "saved",
+                        "final_report_markdown": report.report_md or "",
+                        "final_score": report.final_score,
+                        "final_grade": report.final_grade,
+                        "final_flags": report.final_flags or [],
+                        "graph_output": report.graph_output or {},
+                        "problem_eval_score": report.problem_eval_score,
+                        "problem_eval_feedback": report.problem_eval_feedback,
+                        "code_collab_score": report.code_collab_score,
+                        "code_collab_feedback": report.code_collab_feedback,
+                        "problem_evidence": report.problem_evidence,
+                        "code_collab_evidence": report.code_collab_evidence,
+                        "error": report.error,
+                        "pdf_path": report.pdf_path,
+                        "created_at": _to_kst_iso(report.created_at),
+                        "updated_at": _to_kst_iso(report.updated_at),
+                    },
+                    status=status.HTTP_200_OK,
+                )
             return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
         if str(meta.get("user_id")) != str(user.user_id):
             return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
@@ -1655,6 +1740,23 @@ class LiveCodingFinalEvalReportView(APIView):
                             or code_data.get("problem")
                         )
 
+                # 4) DB에서 problem_id로 조회
+                if not problem_text:
+                    try:
+                        problem_id = None
+                        if isinstance(meta, dict):
+                            problem_id = meta.get("problem_id")
+                        if not problem_id:
+                            cached_meta = cache.get(meta_key) or {}
+                            if isinstance(cached_meta, dict):
+                                problem_id = cached_meta.get("problem_id")
+                        if problem_id:
+                            problem_row = CodingProblem.objects.filter(problem_id=problem_id).first()
+                            if problem_row:
+                                problem_text = problem_row.problem
+                    except Exception as e:
+                        print(f"[✗ 리포트 API] DB problem 조회 실패: {e}", flush=True)
+
                 if problem_text:
                     graph_output["problem_text"] = problem_text
                     values["graph_output"] = graph_output  # ✅ 중요: values에 다시 박아줘야 return에서도 유지됨
@@ -1667,8 +1769,7 @@ class LiveCodingFinalEvalReportView(APIView):
                 values["graph_output"] = graph_output
                 print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
         try:
-            from api.models import LivecodingReport  # 지연 import로 순환참조 회피
-
+            now_local = timezone.localtime(timezone.now(), ZoneInfo("Asia/Seoul"))
             defaults = {
                 "user": user,
                 "report_md": report_md,
@@ -1685,11 +1786,15 @@ class LiveCodingFinalEvalReportView(APIView):
                 "step": values.get("step"),
                 "status": values.get("status"),
                 "error": values.get("error"),
+                "updated_at": now_local,
             }
-            LivecodingReport.objects.update_or_create(
+            report_obj, created = LivecodingReport.objects.update_or_create(
                 session_id=session_id,
                 defaults=defaults,
             )
+            if created and not report_obj.created_at:
+                report_obj.created_at = now_local
+                report_obj.save(update_fields=["created_at"])
         except Exception as e:
             # 저장 실패는 조회 응답을 막지 않음
             print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
@@ -1748,6 +1853,64 @@ class LiveCodingFinalEvalReportView(APIView):
         )
 
 
+class LiveCodingAntiCheatEventView(APIView):
+    """
+    프론트엔드에서 감지한 부정행위 이벤트 카운트 기록
+    - POST /api/livecoding/anti-cheat/event/
+      body: {"session_id": "...", "event_type": "..."}
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        data = request.data or {}
+        session_id = data.get("session_id")
+        event_type = (data.get("event_type") or "").strip()
+        if not session_id or not event_type:
+            return Response({"detail": "session_id와 event_type이 필요합니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        # 세션 소유권 검증
+        meta_key = f"livecoding:{session_id}:meta"
+        meta = cache.get(meta_key)
+        if not meta:
+            return Response({"detail": "해당 세션 정보를 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
+        if str(meta.get("user_id")) != str(user.user_id):
+            return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
+
+        allowed = {
+            "typing_paste",
+            "typing_copy",
+            "typing_offscreen",
+            "camera_blocked",
+            "camera_mediapipe",
+        }
+        if event_type not in allowed:
+            return Response({"detail": "지원하지 않는 event_type입니다."}, status=status.HTTP_400_BAD_REQUEST)
+
+        key = f"livecoding:{session_id}:anti-cheat-events"
+        payload = cache.get(key) or {}
+        typing = payload.get("typing") or {}
+        camera = payload.get("camera") or {}
+
+        if event_type.startswith("typing_"):
+            label = event_type.replace("typing_", "", 1)
+            typing[label] = int(typing.get(label, 0)) + 1
+        else:
+            label = event_type.replace("camera_", "", 1)
+            camera[label] = int(camera.get(label, 0)) + 1
+
+        payload["typing"] = typing
+        payload["camera"] = camera
+        payload["updated_at"] = timezone.now().isoformat()
+        cache.set(key, payload, timeout=60 * 60)
+
+        return Response({"ok": True, "counts": payload}, status=status.HTTP_200_OK)
+
 
 class LiveCodingReportListView(APIView):
     """
@@ -1778,8 +1941,8 @@ class LiveCodingReportListView(APIView):
                     "has_report": bool(r.report_md),
                     "has_pdf": bool(r.pdf_path),
                     "pdf_path": r.pdf_path,
-                    "created_at": r.created_at.isoformat() if r.created_at else None,
-                    "updated_at": r.updated_at.isoformat() if r.updated_at else None,
+                    "created_at": _to_kst_iso(r.created_at),
+                    "updated_at": _to_kst_iso(r.updated_at),
                 }
             )
 
@@ -1822,8 +1985,8 @@ class LiveCodingReportDetailView(APIView):
                 "code_collab_evidence": report.code_collab_evidence,
                 "error": report.error,
                 "pdf_path": report.pdf_path,
-                "created_at": report.created_at.isoformat() if report.created_at else None,
-                "updated_at": report.updated_at.isoformat() if report.updated_at else None,
+                "created_at": _to_kst_iso(report.created_at),
+                "updated_at": _to_kst_iso(report.updated_at),
             },
             status=status.HTTP_200_OK,
         )
@@ -1851,6 +2014,33 @@ def save_strategy_answer(request):
         
         print(f"[save_strategy] 저장 완료: {strategy_answer[:50]}...", flush=True)
         
+        # ✅ checkpoint에도 저장 (추가)
+        try:
+            from langgraph.checkpoint.postgres import PostgresSaver
+            from interview_engine.graph import get_checkpointer
+            
+            checkpointer = get_checkpointer()
+            
+            # 현재 checkpoint 가져오기
+            config = {"configurable": {"thread_id": session_id}}
+            checkpoint = checkpointer.get(config)
+            
+            if checkpoint:
+                # chapter1 채널에 저장
+                channel_values = checkpoint.get("channel_values") or {}
+                chapter1 = channel_values.get("chapter1") or {}
+                chapter1["user_strategy_answer"] = strategy_answer
+                channel_values["chapter1"] = chapter1
+                
+                # checkpoint 업데이트
+                checkpoint["channel_values"] = channel_values
+                checkpointer.put(config, checkpoint)
+                
+                print(f"[save_strategy] checkpoint 저장 완료", flush=True)
+        except Exception as e:
+            # checkpoint 저장 실패해도 Redis는 성공했으므로 계속 진행
+            print(f"[save_strategy] checkpoint 저장 실패 (무시): {e}", flush=True)
+
         return Response({
             "success": True,
             "message": "Strategy answer saved",

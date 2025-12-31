@@ -12,6 +12,7 @@ MODEL_CONFIG = {
     "hint": os.getenv("LLM_MODEL_HINT", "gpt-4o"),
     "question": os.getenv("LLM_MODEL_QUESTION", "gpt-5-nano"),
     "report": os.getenv("LLM_MODEL_REPORT", "gpt-5.1"),
+    "solve": os.getenv("LLM_MODEL_SOLVING", "gpt-5-nano"),
 }
 
 _llm_cache = {}

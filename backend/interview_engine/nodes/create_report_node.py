@@ -2,15 +2,10 @@
 from __future__ import annotations
 
 from typing import Any, Dict, List
-from datetime import datetime, timezone
 from interview_engine.llm import get_llm
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from langchain_core.messages import SystemMessage, HumanMessage
 from django.core.cache import cache
-
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
 
 
 def _clamp01(x: float) -> float:
@@ -152,19 +147,24 @@ def _generate_problem_solving_evaluation(
                 return "부족"
             return t[:50]
 
+        def _first_line(text: str) -> str:
+            if not text:
+                return ""
+            return text.strip().splitlines()[0].strip()
+
         sections = content.split("###")
         for section in sections:
             section = section.strip()
             if section.upper().startswith("PROBLEM_UNDERSTANDING"):
-                text = section.replace("PROBLEM_UNDERSTANDING", "", 1).strip()
+                text = _first_line(section.replace("PROBLEM_UNDERSTANDING", "", 1))
                 result["problem_understanding"] = _extract_label(text)
             elif section.upper().startswith("UNDERSTANDING_FEEDBACK"):
                 result["understanding_feedback"] = section.replace("UNDERSTANDING_FEEDBACK", "", 1).strip()
             elif section.upper().startswith("APPROACH_VALIDITY"):
-                text = section.replace("APPROACH_VALIDITY", "", 1).strip()
+                text = _first_line(section.replace("APPROACH_VALIDITY", "", 1))
                 result["approach_validity"] = _extract_label(text)
             elif section.upper().startswith("CONSISTENCY_STATUS"):
-                text = section.replace("CONSISTENCY_STATUS", "", 1).strip()
+                text = _first_line(section.replace("CONSISTENCY_STATUS", "", 1))
                 result["consistency_status"] = text[:50]
             elif section.upper().startswith("CONSISTENCY_FEEDBACK"):
                 result["consistency_feedback"] = section.replace("CONSISTENCY_FEEDBACK", "", 1).strip()
@@ -565,15 +565,6 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         )
         print("[create_report_node] 문제 해결 능력 평가 완료", flush=True)
 
-        # flags
-        flags: List[str] = list(state.get("final_flags") or [])
-        if final_score01 < 0.3 and "low_score" not in flags:
-            flags.append("low_score")
-        if code_quality_percent < 20.0 and "code_quality_risk" not in flags:
-            flags.append("code_quality_risk")
-        if problem_score_percent < 20.0 and "problem_solving_risk" not in flags:
-            flags.append("problem_solving_risk")
-
         collab_rule_20 = float(code_collab_evidence.get("collab_rule_20") or 0.0)
         collab_llm_score_10 = float(code_collab_evidence.get("collab_llm_score_10") or 0.0)
 
@@ -624,8 +615,6 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         state["final_score"] = round(final_score_raw_100, 0)
         state["final_grade"] = final_grade
         state["final_report_markdown"] = md
-        state["final_flags"] = flags
-
         state["problem_eval_score"] = round(problem_score, 4)
         state["problem_eval_feedback"] = problem_feedback
 
@@ -673,7 +662,6 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "submitted_code": code,
             
             # 추가 정보
-            "flags": flags,
             "code_feedback": code_feedback,
             "problem_feedback": problem_feedback,
         }

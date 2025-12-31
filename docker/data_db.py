@@ -1,5 +1,10 @@
 import csv
+from pathlib import Path
 import psycopg2
+from psycopg2 import sql
+
+# CSV 경로는 실행 위치가 아니라 "이 파일 위치" 기준으로 잡기
+CSV_DIR = Path(__file__).resolve().parent / "csv_files"
 
 # Docker Compose 기준 연결 정보
 conn = psycopg2.connect(
@@ -14,9 +19,7 @@ cur = conn.cursor()
 # 기존 데이터 삭제 (테이블이 있을 경우만)
 print("기존 데이터 삭제 중...")
 try:
-    cur.execute("TRUNCATE TABLE coding_problem_language CASCADE;")
-    cur.execute("TRUNCATE TABLE test_case CASCADE;")
-    cur.execute("TRUNCATE TABLE coding_problem CASCADE;")
+    cur.execute("TRUNCATE TABLE coding_problem_language, test_case, coding_problem RESTART IDENTITY CASCADE;")
     conn.commit()
     print("기존 데이터 삭제 완료\n")
 except psycopg2.errors.UndefinedTable:
@@ -25,13 +28,13 @@ except psycopg2.errors.UndefinedTable:
 
 # 1. coding_problem
 print("coding_problem 처리 시작...")
-with open('docker/csv_files/coding_problem_merged.csv', 'r', encoding='utf-8') as f:
+with open(CSV_DIR / "coding_problems.csv", "r", encoding="utf-8-sig", newline="") as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:
         cur.execute(
             "INSERT INTO coding_problem (problem_id, problem, difficulty, category) VALUES (%s, %s, %s, %s)",
-            (row['id'], row['problem'], row['difficulty'], row['category'])
+            (row['problem_id'], row['problem'], row['difficulty'], row['category'])
         )
         count += 1
         if count % 100 == 0:
@@ -41,13 +44,13 @@ with open('docker/csv_files/coding_problem_merged.csv', 'r', encoding='utf-8') a
 
 # 2. test_case
 print("test_case 처리 시작...")
-with open('docker/csv_files/coding_problems_testcases_merged.csv', 'r', encoding='utf-8') as f:
+with open(CSV_DIR / "coding_problems_testcases.csv", "r", encoding="utf-8-sig", newline="") as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:
         cur.execute(
-            "INSERT INTO test_case (id, problem_id, input, output) VALUES (%s, %s, %s, %s)",
-            (row['id'], row['problem_id'], row['input'], row['output'])
+            "INSERT INTO test_case (problem_id, input, output) VALUES (%s, %s, %s)",
+            (row['problem_id'], row['input'], row['output'])
         )
         count += 1
         if count % 100 == 0:
@@ -57,19 +60,32 @@ with open('docker/csv_files/coding_problems_testcases_merged.csv', 'r', encoding
 
 # 3. coding_problem_language
 print("coding_problem_language 처리 시작...")
-with open('docker/csv_files/coding_problem_language_all_merged.csv', 'r', encoding='utf-8') as f:
+with open(CSV_DIR / "coding_problem_language_all.csv", "r", encoding="utf-8-sig", newline="") as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:
         cur.execute(
-            "INSERT INTO coding_problem_language (id, problem_id, function_name, starter_code, language) VALUES (%s, %s, %s, %s, %s)",
-            (row['id'], row['problem_id'], row['function_name'], row['starter_code'], row['language'])
+            "INSERT INTO coding_problem_language (problem_id, function_name, starter_code, language) VALUES (%s, %s, %s, %s)",
+            (row['problem_id'], row['function_name'], row['starter_code'], row['language'])
         )
         count += 1
         if count % 100 == 0:
             print(f"  {count}개 처리 중...")
     conn.commit()
     print(f"coding_problem_language: 총 {count}개 완료\n")
+
+# coding_problem은 SERIAL 컬럼(problem_id)에 직접 값을 넣었으므로 시퀀스 보정 필요
+cur.execute(
+    sql.SQL(
+        "SELECT setval("
+        "pg_get_serial_sequence(%s, %s), "
+        "COALESCE((SELECT MAX({col}) FROM {tbl}), 0) + 1, "
+        "false"
+        ");"
+    ).format(tbl=sql.Identifier("coding_problem"), col=sql.Identifier("problem_id")),
+    ("coding_problem", "problem_id"),
+)
+conn.commit()
 
 cur.close()
 conn.close()

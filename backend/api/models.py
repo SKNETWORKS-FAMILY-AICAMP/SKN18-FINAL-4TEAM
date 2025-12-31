@@ -56,6 +56,7 @@ class CodingProblem(models.Model):
   problem = models.TextField()
   difficulty = models.CharField(max_length=50)
   category = models.CharField(max_length=100)
+  algorithm = models.JSONField(null=True, blank=True)
 
   class Meta:
     managed = False

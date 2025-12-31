@@ -448,7 +448,7 @@ const handleSubmit = async () => {
 .login-page {
   min-height: 100vh;
   background: linear-gradient(135deg, #e2f0da, #f8f4eb);
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", sans-serif;
   color: #111827;
   display: flex;
   flex-direction: column;

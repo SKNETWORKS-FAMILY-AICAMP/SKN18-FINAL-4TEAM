@@ -164,7 +164,7 @@ const handleSubmit = () => {
 .signup-page {
   min-height: 100vh;
   background: #f6f5ef;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-family: "Inter", sans-serif;
   color: #111827;
   display: flex;
   flex-direction: column;

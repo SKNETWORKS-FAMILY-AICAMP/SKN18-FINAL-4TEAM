@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS coding_problem (
     problem_id   SERIAL PRIMARY KEY,
     problem      TEXT         NOT NULL,
     difficulty   VARCHAR(50)  NOT NULL,
-    category     VARCHAR(500) NOT NULL
+    category     VARCHAR(500) NOT NULL,
+    algorithm    JSONB
 );
 
 CREATE TABLE IF NOT EXISTS coding_problem_language (

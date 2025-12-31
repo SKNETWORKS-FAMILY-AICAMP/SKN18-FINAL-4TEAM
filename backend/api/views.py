@@ -51,9 +51,10 @@ def _to_kst_iso(dt):
     tz = ZoneInfo("Asia/Seoul")
     try:
         if timezone.is_naive(dt):
-            aware = dt.replace(tzinfo=tz)
+            aware = timezone.make_aware(dt, timezone=ZoneInfo("UTC"))
         else:
-            aware = dt.astimezone(tz)
+            aware = dt
+        aware = aware.astimezone(tz)
     except Exception:
         return dt.isoformat()
     return aware.isoformat()
@@ -1642,12 +1643,24 @@ class LiveCodingFinalEvalReportView(APIView):
             if report:
                 return Response(
                     {
-                        "status": report.status or "done",
-                        "step": report.step or "saved",
+                        "status": "done",
+                        "step": "saved",
                         "final_report_markdown": report.report_md or "",
                         "final_score": report.final_score,
                         "final_grade": report.final_grade,
-                        "final_flags": report.final_flags or [],
+                        "problem_text": report.problem_text,
+                        "code_feedback": report.code_feedback,
+                        "problem_solving_evaluation": report.problem_solving_evaluation,
+                        "initial_strategy": report.initial_strategy,
+                        "approach_validity": report.approach_validity,
+                        "consistency_status": report.consistency_status,
+                        "consistency_feedback": report.consistency_feedback,
+                        "submitted_code": report.submitted_code,
+                        "annotated_code": report.annotated_code,
+                        "strength": report.strength,
+                        "improvement": report.improvement,
+                        "comprehensive_evaluation": report.comprehensive_evaluation,
+                        "anti_cheat_summary": report.anti_cheat_summary,
                         "graph_output": report.graph_output or {},
                         "problem_eval_score": report.problem_eval_score,
                         "problem_eval_feedback": report.problem_eval_feedback,
@@ -1655,8 +1668,6 @@ class LiveCodingFinalEvalReportView(APIView):
                         "code_collab_feedback": report.code_collab_feedback,
                         "problem_evidence": report.problem_evidence,
                         "code_collab_evidence": report.code_collab_evidence,
-                        "error": report.error,
-                        "pdf_path": report.pdf_path,
                         "created_at": _to_kst_iso(report.created_at),
                         "updated_at": _to_kst_iso(report.updated_at),
                     },
@@ -1690,6 +1701,7 @@ class LiveCodingFinalEvalReportView(APIView):
         report_md = values.get("final_report_markdown") or ""
         
         graph_output = values.get("graph_output") or {}
+        problem_solving_evaluation = graph_output.get("problem_solving_evaluation") or {}
 
         # graph_output에 problem_text가 없으면 여러 소스에서 최대한 찾아 채움
         if not graph_output.get("problem_text"):
@@ -1775,7 +1787,19 @@ class LiveCodingFinalEvalReportView(APIView):
                 "report_md": report_md,
                 "final_score": values.get("final_score"),
                 "final_grade": values.get("final_grade"),
-                "final_flags": values.get("final_flags") or [],
+                "problem_text": graph_output.get("problem_text"),
+                "code_feedback": graph_output.get("code_feedback"),
+                "problem_solving_evaluation": problem_solving_evaluation,
+                "initial_strategy": problem_solving_evaluation.get("initial_strategy"),
+                "approach_validity": problem_solving_evaluation.get("approach_validity"),
+                "consistency_status": problem_solving_evaluation.get("consistency_status"),
+                "consistency_feedback": problem_solving_evaluation.get("consistency_feedback"),
+                "submitted_code": graph_output.get("submitted_code"),
+                "annotated_code": graph_output.get("annotated_code"),
+                "strength": graph_output.get("strength"),
+                "improvement": graph_output.get("improvement"),
+                "comprehensive_evaluation": graph_output.get("comprehensive_evaluation"),
+                "anti_cheat_summary": graph_output.get("anti_cheat_summary"),
                 "graph_output": values.get("graph_output") or {},
                 "problem_eval_score": values.get("problem_eval_score"),
                 "problem_eval_feedback": values.get("problem_eval_feedback"),
@@ -1783,16 +1807,13 @@ class LiveCodingFinalEvalReportView(APIView):
                 "code_collab_feedback": values.get("code_collab_feedback"),
                 "problem_evidence": values.get("problem_evidence"),
                 "code_collab_evidence": values.get("code_collab_evidence"),
-                "step": values.get("step"),
-                "status": values.get("status"),
-                "error": values.get("error"),
                 "updated_at": now_local,
             }
             report_obj, created = LivecodingReport.objects.update_or_create(
                 session_id=session_id,
                 defaults=defaults,
             )
-            if created and not report_obj.created_at:
+            if created:
                 report_obj.created_at = now_local
                 report_obj.save(update_fields=["created_at"])
         except Exception as e:
@@ -1846,7 +1867,19 @@ class LiveCodingFinalEvalReportView(APIView):
                 "final_report_markdown": report_md,
                 "final_score": values.get("final_score"),
                 "final_grade": values.get("final_grade"),
-                "final_flags": values.get("final_flags", []),
+                "problem_text": graph_output.get("problem_text"),
+                "code_feedback": graph_output.get("code_feedback"),
+                "problem_solving_evaluation": problem_solving_evaluation,
+                "initial_strategy": problem_solving_evaluation.get("initial_strategy"),
+                "approach_validity": problem_solving_evaluation.get("approach_validity"),
+                "consistency_status": problem_solving_evaluation.get("consistency_status"),
+                "consistency_feedback": problem_solving_evaluation.get("consistency_feedback"),
+                "submitted_code": graph_output.get("submitted_code"),
+                "annotated_code": graph_output.get("annotated_code"),
+                "strength": graph_output.get("strength"),
+                "improvement": graph_output.get("improvement"),
+                "comprehensive_evaluation": graph_output.get("comprehensive_evaluation"),
+                "anti_cheat_summary": graph_output.get("anti_cheat_summary"),
                 "graph_output": values.get("graph_output"),  # 위에서 values에 다시 저장했기 때문에 안전
             },
             status=status.HTTP_200_OK,
@@ -1937,12 +1970,9 @@ class LiveCodingReportListView(APIView):
                     "session_id": r.session_id,
                     "final_score": r.final_score,
                     "final_grade": r.final_grade,
-                    "final_flags": r.final_flags or [],
                     "has_report": bool(r.report_md),
-                    "has_pdf": bool(r.pdf_path),
-                    "pdf_path": r.pdf_path,
-                    "created_at": _to_kst_iso(r.created_at),
-                    "updated_at": _to_kst_iso(r.updated_at),
+                "created_at": _to_kst_iso(r.created_at),
+                "updated_at": _to_kst_iso(r.updated_at),
                 }
             )
 
@@ -1969,13 +1999,25 @@ class LiveCodingReportDetailView(APIView):
 
         return Response(
             {
-                "status": report.status or "done",
-                "step": report.step or "saved",
+                "status": "done",
+                "step": "saved",
                 "session_id": report.session_id,
                 "final_report_markdown": report.report_md or "",
                 "final_score": report.final_score,
                 "final_grade": report.final_grade,
-                "final_flags": report.final_flags or [],
+                "problem_text": report.problem_text,
+                "code_feedback": report.code_feedback,
+                "problem_solving_evaluation": report.problem_solving_evaluation,
+                "initial_strategy": report.initial_strategy,
+                "approach_validity": report.approach_validity,
+                "consistency_status": report.consistency_status,
+                "consistency_feedback": report.consistency_feedback,
+                "submitted_code": report.submitted_code,
+                "annotated_code": report.annotated_code,
+                "strength": report.strength,
+                "improvement": report.improvement,
+                "comprehensive_evaluation": report.comprehensive_evaluation,
+                "anti_cheat_summary": report.anti_cheat_summary,
                 "graph_output": report.graph_output or {},
                 "problem_eval_score": report.problem_eval_score,
                 "problem_eval_feedback": report.problem_eval_feedback,
@@ -1983,8 +2025,6 @@ class LiveCodingReportDetailView(APIView):
                 "code_collab_feedback": report.code_collab_feedback,
                 "problem_evidence": report.problem_evidence,
                 "code_collab_evidence": report.code_collab_evidence,
-                "error": report.error,
-                "pdf_path": report.pdf_path,
                 "created_at": _to_kst_iso(report.created_at),
                 "updated_at": _to_kst_iso(report.updated_at),
             },

@@ -212,11 +212,112 @@ def _has_placeholder(code: str) -> bool:
     return False
 
 
+def _normalize_algo_tag(tag: str) -> str:
+    t = (tag or "").strip().lower()
+    t = re.sub(r"[^a-z0-9가-힣]+", " ", t).strip()
+    return t
+
+
+def _algo_tags_to_groups(problem_algorithms: List[str]) -> set:
+    algo_group_map = {
+        "dp": "dp",
+        "dynamic programming": "dp",
+        "lis": "dp",
+        "greedy": "greedy",
+        "sorting": "sort",
+        "ranking": "sort",
+        "hashing": "hash_table",
+        "hashmap": "hash_table",
+        "hashset": "hash_table",
+        "set": "hash_table",
+        "join": "hash_table",
+        "two pointers": "two_pointer",
+        "two pointer": "two_pointer",
+        "sliding window": "two_pointer",
+        "intervals": "two_pointer",
+        "prefix sum": "array",
+        "array": "array",
+        "preprocessing": "array",
+        "bfs": "graph",
+        "dfs": "graph",
+        "graph": "graph",
+        "shortest path": "graph",
+        "dijkstra": "graph",
+        "topological sort": "graph",
+        "tree": "tree",
+        "stack": "stack",
+        "queue": "queue",
+        "streaming": "queue",
+        "binary search": "search",
+        "divide and conquer": "search",
+        "backtracking": "search",
+        "math": "math",
+        "vector": "math",
+        "matrix": "math",
+        "sparse": "math",
+        "simulation": "simulation",
+        "heap": "heap",
+        "top k": "heap",
+        "bitmask": "bit_manipulation",
+        "string": "string",
+        "parsing": "string",
+        "regex": "string",
+        "kmp": "string",
+        "edit distance": "string",
+        "statistics": "statistics",
+        "metrics": "statistics",
+        "aggregation": "statistics",
+        "counting": "statistics",
+        "quantile": "statistics",
+        "numerical stability": "statistics",
+        "sampling": "statistics",
+        "frequency": "statistics",
+        "thresholding": "statistics",
+        "normalization": "statistics",
+        "z score": "statistics",
+        "minmax scaling": "statistics",
+        "mean": "statistics",
+        "variance": "statistics",
+        "covariance": "statistics",
+        "entropy": "statistics",
+        "kl divergence": "statistics",
+        "confusion matrix": "statistics",
+        "auc": "statistics",
+        "log loss": "statistics",
+        "iqr": "statistics",
+        "confidence interval": "statistics",
+        "histogram": "statistics",
+        "winsorization": "statistics",
+        "mae": "statistics",
+        "nlp": "nlp",
+        "transformer": "nlp",
+        "attention": "nlp",
+        "softmax": "nlp",
+        "padding": "nlp",
+        "masking": "nlp",
+        "positional encoding": "nlp",
+        "cosine similarity": "nlp",
+        "tf idf": "nlp",
+        "beam search": "nlp",
+        "clustering": "ml",
+        "nearest centroid": "ml",
+    }
+    groups = set()
+    for tag in problem_algorithms:
+        normalized = _normalize_algo_tag(tag)
+        if not normalized:
+            continue
+        mapped = algo_group_map.get(normalized)
+        if mapped:
+            groups.add(mapped)
+    return groups
+
+
 def _evaluate_strategy_hybrid(
     strategy_text: str,
     code: str,
     problem_text: str = "",
-    problem_category: str = "",
+    problem_algorithms: List[str] | str = "",
 ) -> Tuple[float, float, str]:
     """
     하이브리드 전략 평가: 룰베이스 기본 + LLM 보정
@@ -250,55 +351,297 @@ def _evaluate_strategy_hybrid(
     
     # 알고리즘 키워드 (카테고리 기반, 최대 1.5점)
     keyword_groups = {
-        "array": ["배열", "리스트", "인덱스", "순회", "정렬", "슬라이딩", "윈도우", "구간합", "prefix", "누적"],
-        "dp": ["동적계획법", "dp", "메모이제이션", "점화식", "상태", "전이"],
-        "graph": ["그래프", "bfs", "dfs", "탐색", "방문", "큐", "인접", "최단", "다익스트라", "위상"],
-        "string": ["문자열", "인덱스", "슬라이싱", "치환", "비교", "패턴", "접두", "접미", "lcs", "kmp"],
-        "hash_table": ["해시", "딕셔너리", "dict", "집합", "set", "맵", "map", "해시테이블", "hash table"],
-        "two_pointer": ["투포인터", "left", "right", "포인터", "윈도우", "슬라이딩"],
+        "array": [
+            "배열",
+            "배열형",
+            "리스트",
+            "리스트형",
+            "어레이",
+            "어레",
+            "어레이리스트",
+            "배열리스트",
+            "array",
+            "arrays",
+            "list",
+            "lists",
+            "인덱스",
+            "순회",
+            "반복",
+            "구간합",
+            "구간 합",
+            "누적합",
+            "누적 합",
+            "prefix",
+            "prefix sum",
+            "누적",
+            "슬라이딩",
+            "슬라이딩윈도우",
+            "슬라이딩 윈도우",
+            "윈도우",
+            "윈도우 기법",
+        ],
+        "dp": [
+            "동적계획법",
+            "다이나믹 프로그래밍",
+            "다이나믹",
+            "다이내믹 프로그래밍",
+            "다이내믹",
+            "동적 계획법",
+            "dp",
+            "dynamic programming",
+            "메모이제이션",
+            "메모이제이션",
+            "메모",
+            "점화식",
+            "상태",
+            "전이",
+            "상태 전이",
+        ],
+        "graph": [
+            "그래프",
+            "그래프탐색",
+            "그래프 탐색",
+            "graph",
+            "graphs",
+            "bfs",
+            "dfs",
+            "탐색",
+            "순회",
+            "방문",
+            "인접",
+            "인접리스트",
+            "인접 리스트",
+            "인접행렬",
+            "인접 행렬",
+            "최단",
+            "최단거리",
+            "최단 거리",
+            "다익스트라",
+            "다이크스트라",
+            "다익스트라 알고리즘",
+            "위상",
+            "위상정렬",
+            "위상 정렬",
+        ],
+        "string": [
+            "문자열",
+            "스트링",
+            "string",
+            "strings",
+            "인덱스",
+            "슬라이싱",
+            "치환",
+            "비교",
+            "패턴",
+            "패턴매칭",
+            "패턴 매칭",
+            "접두",
+            "접미",
+            "접두사",
+            "접미사",
+            "lcs",
+            "kmp",
+            "regex",
+            "정규식",
+        ],
+        "hash_table": [
+            "해시",
+            "해시테이블",
+            "딕셔너리",
+            "집합",
+            "맵",
+            "hash",
+            "hash table",
+            "hashmap",
+            "hashset",
+            "dict",
+            "set",
+            "map",
+            "맵핑",
+            "매핑",
+        ],
+        "two_pointer": [
+            "투포인터",
+            "투 포인터",
+            "투포인타",
+            "two pointer",
+            "two pointers",
+            "two-pointer",
+            "two-pointer technique",
+            "left",
+            "right",
+            "포인터",
+            "윈도우",
+            "슬라이딩",
+        ],
         "stack": ["스택", "stack"],
         "queue": ["큐", "queue", "deque"],
-        "sort": ["정렬", "sort", "sorted"],
-        "search": ["완전탐색", "이진탐색", "탐색", "검색", "재귀", "반복"],
-        "math": ["수학", "math", "정수", "소수", "mod", "모듈러", "약수", "gcd", "lcm", "조합", "순열"],
-        "tree": ["트리", "tree", "이진트리", "bst", "heap", "힙"],
+        "sort": ["정렬", "sort", "sorted", "sorting", "order", "ordering"],
+        "search": [
+            "완전탐색",
+            "이진탐색",
+            "binary search",
+            "탐색",
+            "검색",
+            "재귀",
+            "반복",
+            "backtracking",
+            "divide and conquer",
+            "분할정복",
+            "분할 정복",
+        ],
+        "math": [
+            "수학",
+            "math",
+            "mathematics",
+            "정수",
+            "소수",
+            "mod",
+            "모듈러",
+            "약수",
+            "gcd",
+            "lcm",
+            "조합",
+            "순열",
+            "경우의수",
+            "경우의 수",
+        ],
+        "tree": [
+            "트리",
+            "tree",
+            "이진트리",
+            "이진 트리",
+            "bst",
+            "힙트리",
+            "힙 트리",
+        ],
         "greedy": ["그리디", "greedy", "탐욕"],
         "simulation": ["시뮬레이션", "simulation", "모의", "구현"],
-        "bit_manipulation": ["비트", "bit", "bitwise", "xor", "and", "or", "shift", "bit_count", "popcount"],
+        "bit_manipulation": [
+            "비트",
+            "bit",
+            "bitwise",
+            "xor",
+            "and",
+            "or",
+            "shift",
+            "bit_count",
+            "popcount",
+            "비트연산",
+            "비트 연산",
+            "시프트",
+        ],
         "design": ["설계", "design", "클래스", "class", "인터페이스", "interface"],
-        "heap": ["힙", "heap", "priority queue", "우선순위", "heapq", "heappush", "heappop"],
+        "heap": [
+            "힙",
+            "heap",
+            "priority queue",
+            "우선순위",
+            "우선순위큐",
+            "우선순위 큐",
+            "heapq",
+            "heappush",
+            "heappop",
+        ],
+        "statistics": [
+            "통계",
+            "statistics",
+            "metric",
+            "metrics",
+            "평균",
+            "mean",
+            "분산",
+            "variance",
+            "표준편차",
+            "std",
+            "stddev",
+            "분위수",
+            "quantile",
+            "사분위",
+            "iqr",
+            "히스토그램",
+            "histogram",
+            "신뢰구간",
+            "confidence interval",
+            "정규화",
+            "normalization",
+            "z-score",
+            "z score",
+            "minmax",
+            "min-max",
+            "스케일링",
+            "scaling",
+            "엔트로피",
+            "entropy",
+            "kl",
+            "kl divergence",
+            "auc",
+            "log loss",
+            "로그손실",
+            "mae",
+            "혼동행렬",
+            "confusion matrix",
+            "지표",
+            "메트릭",
+            "정확도",
+            "정밀도",
+            "재현율",
+            "f1",
+            "f1-score",
+        ],
+        "nlp": [
+            "nlp",
+            "자연어",
+            "토큰",
+            "token",
+            "tokens",
+            "임베딩",
+            "embedding",
+            "transformer",
+            "attention",
+            "softmax",
+            "cosine",
+            "tf-idf",
+            "tfidf",
+            "beam",
+            "beam search",
+            "positional",
+            "masking",
+            "padding",
+            "토크나이즈",
+            "토큰화",
+            "토큰화",
+        ],
+        "ml": [
+            "클러스터링",
+            "군집",
+            "clustering",
+            "cluster",
+            "centroid",
+            "nearest centroid",
+            "거리",
+            "유사도",
+            "similarity",
+            "분류",
+            "classification",
+            "회귀",
+            "regression",
+        ],
     }
     strategy_lower = strategy_text.lower()
 
-    category_key = ""
-    if problem_category:
-        normalized = problem_category.strip().lower()
-        normalized = re.sub(r"[^a-z0-9가-힣]+", " ", normalized).strip()
-        if normalized in keyword_groups:
-            category_key = normalized
-        else:
-            category_aliases = {
-                "array": ["array", "arrays", "배열"],
-                "string": ["string", "문자열"],
-                "graph": ["graph", "그래프"],
-                "dp": ["dp", "dynamic programming", "동적계획법"],
-                "hash_table": ["hash", "hash table", "hashtable", "해시", "해시테이블"],
-                "two_pointer": ["two pointer", "two_pointer", "투포인터"],
-                "math": ["math", "수학"],
-                "tree": ["tree", "트리"],
-                "greedy": ["greedy", "그리디"],
-                "simulation": ["simulation", "시뮬레이션"],
-                "bit_manipulation": ["bit manipulation", "bit", "비트"],
-                "design": ["design", "설계"],
-                "heap": ["heap", "priority queue", "우선순위", "힙"],
-            }
-            for key, aliases in category_aliases.items():
-                if normalized in aliases:
-                    category_key = key
-                    break
+    algo_list = []
+    if isinstance(problem_algorithms, list):
+        algo_list = [str(x) for x in problem_algorithms if x]
+    elif problem_algorithms:
+        algo_list = [str(problem_algorithms)]
 
-    if category_key:
-        keywords_for_strategy = keyword_groups.get(category_key, [])
+    active_groups = _algo_tags_to_groups(algo_list)
+
+    if active_groups:
+        keywords_for_strategy = [
+            kw for g in active_groups for kw in keyword_groups.get(g, [])
+        ]
         category_match = any(kw in strategy_lower for kw in keywords_for_strategy)
         keyword_score = 1.5 if category_match else 0.0
     else:
@@ -315,9 +658,8 @@ def _evaluate_strategy_hybrid(
     def _mentions_any(text: str, keywords: List[str]) -> bool:
         return any(kw in text for kw in keywords)
 
-    active_groups = set(keyword_groups.keys())
-    if category_key:
-        active_groups = {category_key}
+    if not active_groups:
+        active_groups = set(keyword_groups.keys())
     
     try:
         # AST 파싱으로 실제 사용 확인
@@ -530,7 +872,7 @@ def _evaluate_35_points(
     strategy_text: str,
     test_results: Dict[str, Any],
     problem_text: str = "",
-    problem_category: str = "",
+    problem_algorithms: List[str] | str = "",
 ) -> Tuple[float, List[str]]:
     """
     35점 만점 평가 (전략 4 + 일치 4 + 테스트 25 + 기본 2)
@@ -555,7 +897,7 @@ def _evaluate_35_points(
             strategy_text=strategy_text,
             code=code,
             problem_text=problem_text,
-            problem_category=problem_category,
+            problem_algorithms=problem_algorithms,
         )
         fb.append(f"- 전략 품질: {strategy_score:.1f}/4")
         fb.append(f"- 전략-코드 일치: {consistency_score:.1f}/4")
@@ -658,11 +1000,20 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         print(f"[DEBUG] chap1 keys: {list(chap1.keys()) if chap1 else 'None'}", flush=True)
     
     problem_id = cached_meta.get("problem_id")
-    problem_category = ""
+    problem_algorithms: List[str] = []
     problem_key = f"livecoding:{session_id}:problem"
     problem_payload = cache.get(problem_key) or {}
-    if isinstance(problem_payload, dict) and problem_payload.get("category"):
-        problem_category = _safe_str(problem_payload.get("category"))
+    if isinstance(problem_payload, dict) and problem_payload.get("algorithm"):
+        raw_algos = problem_payload.get("algorithm")
+        if isinstance(raw_algos, list):
+            problem_algorithms = [str(a) for a in raw_algos if a]
+        elif isinstance(raw_algos, str):
+            try:
+                parsed = json.loads(raw_algos)
+                if isinstance(parsed, list):
+                    problem_algorithms = [str(a) for a in parsed if a]
+            except Exception:
+                problem_algorithms = []
     language = _safe_str(cached_meta.get("language") or "python3")
     
     # ========== LLM 기반 테스트 평가 ==========
@@ -690,17 +1041,25 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
                         function_name = row[0]
                         print(f"[DEBUG] DB에서 function_name 가져옴: {function_name}", flush=True)
 
-            if not problem_category:
+            if not problem_algorithms:
                 with connection.cursor() as cursor:
                     cursor.execute("""
-                        SELECT category
+                        SELECT algorithm
                         FROM coding_problem
                         WHERE problem_id = %s
                         LIMIT 1
                     """, [problem_id])
                     row = cursor.fetchone()
                     if row and row[0]:
-                        problem_category = _safe_str(row[0])
+                        if isinstance(row[0], list):
+                            problem_algorithms = [str(a) for a in row[0] if a]
+                        else:
+                            try:
+                                parsed = json.loads(row[0])
+                                if isinstance(parsed, list):
+                                    problem_algorithms = [str(a) for a in parsed if a]
+                            except Exception:
+                                problem_algorithms = []
             
             # ✅ 3순위: 코드에서 자동 추출
             if not function_name:
@@ -743,7 +1102,7 @@ def problem_solving_eval_node(state: Dict[str, Any]) -> Dict[str, Any]:
         strategy_text=strategy_text,
         test_results=test_results,
         problem_text=problem_text,
-        problem_category=problem_category,
+        problem_algorithms=problem_algorithms,
     )
     
     # ========== State 업데이트 (0~1 스케일로 변환) ==========

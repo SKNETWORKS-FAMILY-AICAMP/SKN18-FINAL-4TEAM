@@ -21,11 +21,54 @@ RETURN p.problem_id AS problem_id,
 ORDER BY score DESC
 LIMIT $limit;
 
+// Sample: evidence-aware recommendations (uses Evidence if present)
+// Params: {"user_id":"...", "limit":10, "allowed_difficulties":["normal","hard"]}
+MATCH (u:User {user_id:$user_id})-[:TOOK]->(i:Interview)
+WITH i ORDER BY i.created_at DESC LIMIT 1
+OPTIONAL MATCH (i)-[:HAS_EVIDENCE]->(e:Evidence)-[sup:SUPPORTS]->(s:AlgoSkill)
+WITH i, collect({skill: s, weight: coalesce(sup.weight, e.weight, 1.0)}) AS ev
+CALL {
+  WITH i, ev
+  WITH i, ev
+  WHERE size(ev) > 0
+  UNWIND ev AS item
+  RETURN item.skill AS skill, item.weight AS weight
+  UNION
+  WITH i, ev
+  WHERE size(ev) = 0
+  MATCH (i)-[g:SHOWED_GAP]->(s2:AlgoSkill)
+  RETURN s2 AS skill, coalesce(g.weight, 1.0) AS weight
+}
+MATCH (skill)<-[:USES_ALGO]-(p:Problem)
+OPTIONAL MATCH (p)-[:HAS_DIFFICULTY]->(d:Difficulty)
+WITH p, d, sum(weight) AS score
+WHERE d.level IN $allowed_difficulties
+RETURN p.problem_id AS problem_id,
+       p.problem AS problem,
+       score AS score
+ORDER BY score DESC
+LIMIT $limit;
+
 // Sample: pull candidate problem_ids for ES rerank
 // Params: {"user_id":"...", "limit":200}
 MATCH (u:User {user_id:$user_id})-[:TOOK]->(i:Interview)
 WITH i ORDER BY i.created_at DESC LIMIT 1
-MATCH (i)-[:SHOWED_GAP]->(s:AlgoSkill)
-MATCH (s)<-[:USES_ALGO]-(p:Problem)
-RETURN DISTINCT p.problem_id AS problem_id
+OPTIONAL MATCH (i)-[:HAS_EVIDENCE]->(e:Evidence)-[sup:SUPPORTS]->(s:AlgoSkill)
+WITH i, collect({skill: s, weight: coalesce(sup.weight, e.weight, 1.0)}) AS ev
+CALL {
+  WITH i, ev
+  WITH i, ev
+  WHERE size(ev) > 0
+  UNWIND ev AS item
+  RETURN item.skill AS skill, item.weight AS weight
+  UNION
+  WITH i, ev
+  WHERE size(ev) = 0
+  MATCH (i)-[g:SHOWED_GAP]->(s2:AlgoSkill)
+  RETURN s2 AS skill, coalesce(g.weight, 1.0) AS weight
+}
+MATCH (skill)<-[:USES_ALGO]-(p:Problem)
+WITH p, sum(weight) AS score
+RETURN p.problem_id AS problem_id
+ORDER BY score DESC
 LIMIT $limit;

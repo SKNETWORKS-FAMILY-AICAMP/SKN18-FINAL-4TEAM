@@ -401,6 +401,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # ✅ 카테고리/난이도/알고리즘 초기화
         problem_category = "미분류"
         problem_difficulty = "미정"
+        problem_id = None
         problem_algorithms: List[str] = []
         
         # ✅ problem_evidence가 비어있으면 직접 가져오기
@@ -691,6 +692,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "problem_category": problem_category,
             "problem_difficulty": problem_difficulty,
             "problem_algorithms": problem_algorithms,
+            "problem_id": problem_id,
 
             # 문제 해결 능력 평가 추가
             "problem_solving_evaluation": {

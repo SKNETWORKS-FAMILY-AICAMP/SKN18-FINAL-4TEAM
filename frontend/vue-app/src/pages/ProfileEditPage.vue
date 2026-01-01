@@ -95,8 +95,7 @@
             <div class="field-line">
               <select v-model="profileForm.major" class="field-input">
                 <option value="">선택</option>
-                <option value="전공">전공</option>
-                <option value="비전공">비전공</option>
+                <option v-for="opt in majorOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </div>
           </div>
@@ -238,10 +237,12 @@
 import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
+import { useProfileOptions } from "../hooks/useProfileOptions";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const router = useRouter();
 const auth = useAuth();
+const { options: optionData, loading: optionsLoading, error: optionsError, fetchProfileOptions } = useProfileOptions();
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 70 }, (_, i) => currentYear - i);
@@ -282,78 +283,15 @@ const profileForm = reactive({
   region_single: "",
 });
 
-const graduatedOptions = ["고졸", "전문대졸(2,3년제)", "대졸(4년제 이상)", "석사 이상", "박사 이상"];
-const academicOptions = ["재학", "휴학", "졸업", "중퇴"];
-const careerOptions = ["junior (0~3년차)", "mid (4~7년차)", "senior (8~10년차)", "lead (10년차~)"];
-const statusOptions = ["재직중", "이직", "구직중", "프리랜서", "기타"];
-const techStackOptions = [
-  "Python",
-  "NumPy",
-  "Pandas",
-  "SciPy",
-  "Scikit-learn",
-  "XGBoost",
-  "LightGBM",
-  "CatBoost",
-  "TensorFlow",
-  "Keras",
-  "PyTorch",
-  "Transformers",
-  "LangChain",
-  "LangGraph",
-  "OpenAI API",
-  "HuggingFace Hub",
-  "SentenceTransformers",
-  "spaCy",
-  "NLTK",
-  "MLflow",
-  "Airflow",
-  "DVC",
-  "Optuna",
-  "Jupyter Notebook",
-  "JupyterLab",
-];
-const desiredRoleOptions = [
-  "AI/ML 엔지니어",
-  "데이터사이언티스트",
-  "LLM 엔지니어",
-  "컴퓨터비전엔지니어",
-  "연구원/리서처",
-  "음성인식 엔지니어",
-  "MLOps 엔지니어",
-  "데이터엔지니어",
-  "AI 서비스/제품기획",
-];
-const detailedRoleOptions = [
-  "제너럴리스트",
-  "지능비서개발",
-  "강화학습",
-  "추천 시스템",
-  "설계/최적화",
-  "연구/실험관리",
-  "테크스카우팅/분석",
-  "테크스펙/품질/계약",
-  "트레이닝 엔지니어링",
-  "LLM 파인튜닝/서빙",
-  "컴퓨터비전",
-  "지리정보 분석/지도화",
-  "OCR/문서 인식",
-  "음성 인식/TTS",
-  "MLOps/데이터인프라",
-  "모델 서빙/배포",
-  "데이터 엔지니어링",
-  "AI 보안/안전",
-];
-const regionOptions = [
-  "서울",
-  "인천",
-  "부산",
-  "대구",
-  "대전",
-  "광주",
-  "울산",
-  "세종"
-];
+const graduatedOptions = computed(() => optionData.value?.graduated_school || []);
+const majorOptions = computed(() => optionData.value?.major || []);
+const academicOptions = computed(() => optionData.value?.academic_status || []);
+const careerOptions = computed(() => optionData.value?.career_level || []);
+const statusOptions = computed(() => optionData.value?.current_status || []);
+const techStackOptions = computed(() => optionData.value?.tech_stack || []);
+const desiredRoleOptions = computed(() => optionData.value?.desired_role || []);
+const detailedRoleOptions = computed(() => optionData.value?.detailed_role || []);
+const regionOptions = computed(() => optionData.value?.region || []);
 
 const showPasswordMatch = computed(
   () => !!newPassword.value && !!newPasswordConfirm.value && newPassword.value === newPasswordConfirm.value
@@ -603,6 +541,7 @@ const handleSubmit = async () => {
 };
 
 onMounted(() => {
+  void fetchProfileOptions().catch(() => {});
   loadProfile();
 });
 </script>

@@ -221,8 +221,7 @@
               <span>전공 여부</span>
               <select v-model="profileForm.major">
                 <option value="">선택</option>
-                <option value="전공">전공</option>
-                <option value="비전공">비전공</option>
+                <option v-for="opt in majorOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
             </label>
             <label class="modal-field">
@@ -353,12 +352,14 @@ import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 import ForcedExitAlert from "../components/ForcedExitAlert.vue";
+import { useProfileOptions } from "../hooks/useProfileOptions";
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 const route = useRoute();
 const router = useRouter();
 const { isAuthenticated, user, fetchProfile, logout, token } = useAuth();
+const { options: optionData, loading: optionsLoading, error: optionsError, fetchProfileOptions } = useProfileOptions();
 const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false);
 const isLoggingOut = ref(false);
@@ -381,69 +382,15 @@ const profileForm = reactive({
   region_single: ""
 });
 
-const graduatedOptions = ["고졸", "전문대졸(2,3년제)", "대졸(4년제 이상)", "석사 이상", "박사 이상"];
-const academicOptions = ["재학", "휴학", "졸업", "중퇴"];
-const careerOptions = ["junior (0~3년차)", "mid (4~7년차)", "senior (8~10년차)", "lead (10년차~)"];
-const statusOptions = ["재직중", "퇴사", "구직중", "프리랜서", "기타"];
-const techStackOptions = [
-  "Python",
-  "NumPy",
-  "Pandas",
-  "SciPy",
-  "Scikit-learn",
-  "XGBoost",
-  "LightGBM",
-  "CatBoost",
-  "TensorFlow",
-  "Keras",
-  "PyTorch",
-  "Transformers",
-  "LangChain",
-  "LangGraph",
-  "OpenAI API",
-  "HuggingFace Hub",
-  "SentenceTransformers",
-  "spaCy",
-  "NLTK",
-  "MLflow",
-  "Airflow",
-  "DVC",
-  "Optuna",
-  "Jupyter Notebook",
-  "JupyterLab"
-];
-const desiredRoleOptions = [
-  "AI/ML 엔지니어",
-  "데이터 사이언티스트",
-  "LLM 엔지니어",
-  "컴퓨터비전 엔지니어",
-  "자연어처리 엔지니어",
-  "음성인식 엔지니어",
-  "MLOps 엔지니어",
-  "데이터 엔지니어",
-  "AI 서비스 개발자"
-];
-const detailedRoleOptions = [
-  "딥러닝 모델링",
-  "지도/비지도 학습",
-  "강화학습",
-  "추천 시스템",
-  "시계열 예측",
-  "자연어 처리",
-  "텍스트 분류/분석",
-  "텍스트 생성/요약",
-  "프롬프트 엔지니어링",
-  "LLM 파인튜닝/서빙",
-  "컴퓨터 비전",
-  "이미지 분류/탐지",
-  "OCR/문서 인식",
-  "음성 인식/TTS",
-  "MLOps/파이프라인",
-  "모델 서빙/배포",
-  "데이터 파이프라인",
-  "AI 보안/안전"
-];
-const regionOptions = ["서울", "인천", "부산", "대구", "대전", "세종", "울산", "광주"];
+const graduatedOptions = computed(() => optionData.value?.graduated_school || []);
+const majorOptions = computed(() => optionData.value?.major || []);
+const academicOptions = computed(() => optionData.value?.academic_status || []);
+const careerOptions = computed(() => optionData.value?.career_level || []);
+const statusOptions = computed(() => optionData.value?.current_status || []);
+const techStackOptions = computed(() => optionData.value?.tech_stack || []);
+const desiredRoleOptions = computed(() => optionData.value?.desired_role || []);
+const detailedRoleOptions = computed(() => optionData.value?.detailed_role || []);
+const regionOptions = computed(() => optionData.value?.region || []);
 
 const toggleMultiSelect = (field, value) => {
   const current = Array.isArray(profileForm[field]) ? profileForm[field] : [];
@@ -570,6 +517,7 @@ const checkForcedAlert = () => {
 onMounted(() => {
   window.addEventListener("storage", syncProfile);
   syncProfile();
+  void fetchProfileOptions().catch(() => {});
   void loadProfile();
   checkForcedAlert();
 });

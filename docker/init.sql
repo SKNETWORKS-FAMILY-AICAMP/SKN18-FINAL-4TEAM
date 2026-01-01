@@ -4,7 +4,8 @@ CREATE TABLE IF NOT EXISTS coding_problem (
     problem_id   SERIAL PRIMARY KEY,
     problem      TEXT         NOT NULL,
     difficulty   VARCHAR(50)  NOT NULL,
-    category     VARCHAR(500) NOT NULL
+    category     VARCHAR(500) NOT NULL,
+    algorithm    JSONB
 );
 
 CREATE TABLE IF NOT EXISTS coding_problem_language (
@@ -94,18 +95,26 @@ CREATE TABLE IF NOT EXISTS livecoding_reports (
     report_md         TEXT NOT NULL,
     final_score       NUMERIC(6,2),
     final_grade       VARCHAR(8),
-    final_flags       JSONB        DEFAULT '[]'::jsonb,
     graph_output      JSONB        DEFAULT '{}'::jsonb,
+    problem_text            TEXT,
+    code_feedback           TEXT,
+    problem_solving_evaluation JSONB,
+    initial_strategy        TEXT,
+    approach_validity       TEXT,
+    consistency_status      TEXT,
+    consistency_feedback    TEXT,
+    submitted_code          TEXT,
+    annotated_code          TEXT,
+    strength                TEXT,
+    improvement             TEXT,
+    comprehensive_evaluation TEXT,
+    anti_cheat_summary      JSONB,
     problem_eval_score NUMERIC(6,4),
     problem_eval_feedback TEXT,
     code_collab_score NUMERIC(6,4),
     code_collab_feedback TEXT,
     problem_evidence  JSONB,
     code_collab_evidence JSONB,
-    step              VARCHAR(20),
-    status            VARCHAR(20),
-    error             TEXT,
-    pdf_path          TEXT,
     created_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at        TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

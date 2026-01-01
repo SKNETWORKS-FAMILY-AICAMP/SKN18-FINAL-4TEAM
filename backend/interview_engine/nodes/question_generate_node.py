@@ -119,6 +119,12 @@ def question_generation_agent(state: CodingState) -> CodingState:
     norm_prev = _normalize_code_for_compare(prev_code)
     norm_starter = _normalize_code_for_compare(starter_code)
 
+    # 비교 기준(스타터/이전 질문 코드)이 없으면 변화율을 판단할 수 없으므로 질문 생성 스킵
+    # (예: Redis 캐시가 일부 유실되어 starter_code가 비어있는 경우)
+    if not norm_prev and not norm_starter:
+        state["tts_text"] = ""
+        return state
+
     # 1) 아직 starter code에서 크게 벗어나지 않았다면(거의 손대지 않은 상태) 질문 스킵
     is_starter_only = norm_starter == norm_current
 

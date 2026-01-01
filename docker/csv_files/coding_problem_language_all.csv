@@ -1,0 +1,684 @@
+problem_id,function_name,starter_code,language
+1,solution,"def solution(n, roads):
+    answer = 0
+    return answer",python
+2,solution,"def solution(n, roads):
+    answer = []
+    return answer",python
+3,solution,"def solution(heights):
+    answer = 0
+    return answer",python
+4,solution,"def solution(n, queries):
+    answer = []
+    return answer",python
+5,solution,"def solution(grid, d, k):
+    answer = 0
+    return answer",python
+6,solution,"def solution(targets):
+    answer = 0
+    return answer",python
+7,solution,"def solution(r1, r2):
+    answer = 0
+    return answer",python
+8,solution,"def solution(n):
+    answer = 0
+    return answer",python
+9,solution,"def solution(sequence, k):
+    answer = []
+    return answer",python
+10,solution,"def solution(plans):
+    answer = []
+    return answer",python
+11,solution,"def solution(picks, minerals):
+    answer = 0
+    return answer",python
+12,solution,"def solution(board):
+    answer = 0
+    return answer",python
+13,solution,"def solution(temperature, t1, t2, a, b, onboard):
+    answer = 0
+    return answer",python
+14,solution,"def solution(m, n, startX, startY, balls):
+    answer = []
+    return answer",python
+15,solution,"def solution(sequence):
+    answer = 0
+    return answer",python
+16,solution,"def solution(maps):
+    answer = 0
+    return answer",python
+17,solution,"def solution(book_time):
+    answer = 0
+    return answer",python
+18,solution,"def solution(maps):
+    answer = []
+    return answer",python
+19,solution,"def solution(numbers):
+    answer = []
+    return answer",python
+20,solution,"def solution(k, n, reqs):
+    answer = 0
+    return answer",python
+21,solution,"def solution(x, y, n):
+    answer = 0
+    return answer",python
+22,solution,"def solution(weights):
+    answer = 0
+    return answer",python
+23,solution,"def solution(scores):
+    answer = 0
+    return answer",python
+24,solution,"def solution(cap, n, deliveries, pickups):
+    answer = -1
+    return answer",python
+25,solution,"def solution(users, emoticons):
+    answer = []
+    return answer",python
+26,solution,"def solution(numbers):
+    answer = []
+    return answer",python
+27,solution,"def solution(commands):
+    answer = []
+    return answer",python
+28,solution,"def solution(n, m, x, y, r, c, k):
+    answer = ''
+    return answer",python
+29,solution,"def solution(edges, target):
+    answer = []
+    return answer",python
+30,solution,"def solution(storey):
+    answer = 0
+    return answer",python
+31,solution,"def solution(n, l, r):
+    answer = 0
+    return answer",python
+32,solution,"def solution(data, col, row_begin, row_end):
+    answer = 0
+    return answer",python
+33,solution,"def solution(n, k, enemy):
+    answer = 0
+    return answer",python
+34,solution,"def solution(k, d):
+    answer = 0
+    return answer",python
+35,solution,"def solution(n, count):
+    answer = 0
+    return answer",python
+36,solution,"def solution(k, tangerine):
+    answer = 0
+    return answer",python
+37,solution,"def solution(e, starts):
+    answer = []
+    return answer",python
+38,solution,"def solution(numbers):
+    answer = 0
+    return answer",python
+39,solution,"def solution(arrayA, arrayB):
+    answer = 0
+    return answer",python
+40,solution,"def solution(k, ranges):
+    answer = []
+    return answer",python
+41,solution,"def solution(n, lighthouse):
+    answer = 0
+    return answer",python
+42,solution,"def solution(n, roads, sources, destination):
+    answer = []
+    return answer",python
+43,solution,"def solution(topping):
+    answer = -1
+    return answer",python
+44,solution,"def solution(order):
+    answer = 0
+    return answer",python
+45,solution,"def solution(beginning, target):
+    answer = 0
+    return answer",python
+46,solution,"def solution(clockHands):
+    answer = 0
+    return answer",python
+47,solution,"def solution(elements):
+    answer = 0
+    return answer",python
+48,solution,"def solution(cards):
+    answer = 0
+    return answer",python
+49,solution,"def solution(edges):
+    answer = []
+    return answer",python
+50,solution,"def solution(target):
+    answer = []
+    return answer",python
+51,solution,"def solution(want, number, discount):
+    answer = 0
+    return answer",python
+52,solution,"def solution(dice):
+    answer = []
+    return answer",python
+53,solution,"def solution(rc, operations):
+    answer = [[]]
+    return answer",python
+54,solution,"def solution(n, paths, gates, summits):
+    answer = []
+    return answer",python
+55,solution,"def solution(alp, cop, problems):
+    answer = 0
+    return answer",python
+56,solution,"def solution(queue1, queue2):
+    answer = -2
+    return answer",python
+57,solution,"def solution(board, aloc, bloc):
+    answer = -1
+    return answer",python
+58,solution,"def solution(board, skill):
+    answer = 0
+    return answer",python
+59,solution,"def solution(info, edges):
+    answer = 0
+    return answer",python
+60,solution,"def solution(n, info):
+    answer = []
+    return answer",python
+61,solution,"def solution(fees, records):
+    answer = []
+    return answer",python
+62,solution,"def solution(n, k):
+    answer = -1
+    return answer",python
+63,solution,"def solution(k, dungeons):
+    answer = -1
+    return answer",python
+64,solution,"def solution(rectangle, characterX, characterY, itemX, itemY):
+    answer = 0
+    return answer",python
+65,solution,"def solution(q, a):
+    answer = -1
+    return answer",python
+66,solution,"def solution(n, m, x, y, queries):
+    answer = -1
+    return answer",python
+67,solution,"def solution(n, left, right):
+    answer = []
+    return answer",python
+68,solution,"def solution(line):
+    answer = []
+    return answer",python
+69,solution,"def solution(n, wires):
+    answer = -1
+    return answer",python
+70,solution,"def solution(a, s):
+    answer = []
+    return answer",python
+71,solution,"def solution(a, b, g, s, w, t):
+    answer = -1
+    return answer",python
+72,solution,"def solution(grid):
+    answer = []
+    return answer",python
+73,solution,"def solution(word):
+    answer = 0
+    return answer",python
+74,solution,"def solution(k, num, links):
+    answer = 0
+    return answer",python
+75,solution,"def solution(n, start, end, roads, traps):
+    answer = 0
+    return answer",python
+76,solution,"def solution(n, k, cmd):
+    answer = ''
+    return answer",python
+77,solution,"def solution(places):
+    answer = []
+    return answer",python
+78,solution,"def solution(values, edges, queries):
+    answer = []
+    return answer",python
+79,solution,"def solution(s):
+    answer = []
+    return answer",python
+80,solution,"def solution(numbers):
+    answer = []
+    return answer",python
+81,solution,"def solution(enroll, referral, seller, amount):
+    answer = []
+    return answer",python
+82,solution,"def solution(rows, columns, queries):
+    answer = []
+    return answer",python
+83,solution,"def solution(n, z, roads, queries):
+    answer = []
+    return answer",python
+84,solution,"def solution(a, edges):
+    answer = -2
+    return answer",python
+85,solution,"def solution(s):
+    answer = -1
+    return answer",python
+86,solution,"def solution(sales, links):
+    answer = 0
+    return answer",python
+87,solution,"def solution(board, r, c):
+    answer = 0
+    return answer",python
+88,solution,"def solution(play_time, adv_time, logs):
+    answer = ''
+    return answer",python
+89,solution,"def solution(n, s, a, b, fares):
+    answer = 0
+    return answer",python
+90,solution,"def solution(info, query):
+    answer = []
+    return answer",python
+91,solution,"def solution(orders, course):
+    answer = []
+    return answer",python
+92,solution,"def solution(t):
+    answer = 0
+    return answer",python
+93,solution,"def solution(a):
+    answer = -1
+    return answer",python
+94,solution,"def solution(s):
+    answer = []
+    return answer",python
+95,solution,"def solution(s):
+    answer = -1
+    return answer",python
+96,solution,"def solution(n, edges):
+    answer = 0
+    return answer",python
+97,solution,"def solution(arr):
+    answer = []
+    return answer",python
+98,solution,"def solution(a):
+    answer = -1
+    return answer",python
+99,solution,"def solution(a):
+    answer = 0
+    return answer",python
+100,solution,"def solution(n):
+    answer = []
+    return answer",python
+101,solution,"def solution(n, path, order):
+    answer = True
+    return answer",python
+102,solution,"def solution(board):
+    answer = 0
+    return answer",python
+103,solution,"def solution(gems):
+    answer = []
+    return answer",python
+104,solution,"def solution(expression):
+    answer = 0
+    return answer",python
+105,solution,"def solution(s):
+    answer = []
+    return answer",python
+106,solution,"def solution(user_id, banned_id):
+    answer = 0
+    return answer",python
+107,solution,"def solution(k, room_number):
+    answer = []
+    return answer",python
+108,solution,"def solution(stones, k):
+    answer = 0
+    return answer",python
+109,solution,"def solution(land, height):
+    answer = 0
+    return answer",python
+110,solution,"def solution(w,h):
+    answer = 1
+    return answer",python
+111,solution,"def solution(n, weak, dist):
+    answer = 0
+    return answer",python
+112,solution,"def solution(n, build_frame):
+    answer = [[]]
+    return answer",python
+113,solution,"def solution(words, queries):
+    answer = []
+    return answer",python
+114,solution,"def solution(key, lock):
+    answer = True
+    return answer",python
+115,solution,"def solution(p):
+    answer = ''
+    return answer",python
+116,solution,"def solution(s):
+    answer = 0
+    return answer",python
+117,solution,"def solution(cookie):
+    answer = -1
+    return answer",python
+118,solution,"def solution(dirs):
+    answer = 0
+    return answer",python
+119,solution,"def solution(skill, skill_trees):
+    answer = -1
+    return answer",python
+120,solution,"def solution(n, results):
+    answer = 0
+    return answer",python
+121,solution,"def solution(arrows):
+    answer = 0
+    return answer",python
+122,solution,"def solution(n, edge):
+    answer = 0
+    return answer",python
+123,solution,"def solution(n, times):
+    answer = 0
+    return answer",python
+124,solution,"def solution(distance, rocks, n):
+    answer = 0
+    return answer",python
+125,solution,"def solution(numbers, target):
+    answer = 0
+    return answer",python
+126,solution,"def solution(tickets):
+    answer = []
+    return answer",python
+127,solution,"def solution(begin, target, words):
+    answer = 0
+    return answer",python
+128,solution,"def solution(n, computers):
+    answer = 0
+    return answer",python
+129,solution,"def solution(triangle):
+    answer = 0
+    return answer",python
+130,solution,"def solution(m, n, puddles):
+    answer = 0
+    return answer",python
+131,solution,"def solution(money):
+    answer = 0
+    return answer",python
+132,solution,"def solution(N, number):
+    answer = 0
+    return answer",python
+133,solution,"def solution(board):
+    answer = 0
+    return answer",python
+134,solution,"def solution(word, pages):
+    answer = 0
+    return answer",python
+135,solution,"def solution(coin, cards):
+    answer = 0
+    return answer",python
+136,solution,"def solution(nodeinfo):
+    answer = [[]]
+    return answer",python
+137,solution,"def solution(food_times, k):
+    answer = 0
+    return answer",python
+138,solution,"def solution(relation):
+    answer = 0
+    return answer",python
+139,solution,"def solution(record):
+    answer = []
+    
+    return answer",python
+140,solution,"def solution(people, limit):
+    answer = 0
+    return answer",python
+141,solution,"def solution(routes):
+    answer = 0
+    return answer",python
+142,solution,"def solution(number, k):
+    answer = ''
+    return answer",python
+143,solution,"def solution(n, costs):
+    answer = 0
+    return answer",python
+144,solution,"def solution(name):
+    answer = 0
+    return answer",python
+145,solution,"def solution(brown, yellow):
+    answer = []
+    return answer",python
+146,solution,"def solution(numbers):
+    answer = 0
+    return answer",python
+147,solution,"def solution(citations):
+    answer = 0
+    return answer",python
+148,solution,"def solution(numbers):
+    answer = ''
+    return answer",python
+149,solution,"def solution(operations):
+    answer = []
+    return answer",python
+150,solution,"def solution(jobs):
+    answer = 0
+    return answer",python
+151,solution,"def solution(scoville, K):
+    answer = 0
+    return answer",python
+152,solution,"def solution(priorities, location):
+    answer = 0
+    return answer",python
+153,solution,"def solution(progresses, speeds):
+    answer = []
+    return answer",python
+154,solution,"def solution(prices):
+    answer = []
+    return answer",python
+155,solution,"def solution(bridge_length, weight, truck_weights):
+    answer = 0
+    return answer",python
+156,solution,"def solution(genres, plays):
+    answer = []
+    return answer",python
+157,solution,"def solution(clothes):
+    answer = 0
+    return answer",python
+158,solution,"def solution(phone_book):
+    answer = True
+    return answer",python
+159,solution,"def solution(n, t, m, p):
+    answer = ''
+    return answer",python
+160,solution,"def solution(files):
+    answer = []
+    return answer",python
+161,solution,"def solution(words):
+    answer = 0
+    return answer",python
+162,solution,"def solution(msg):
+    answer = []
+    return answer",python
+163,solution,"def solution(m, musicinfos):
+    answer = ''
+    return answer",python
+164,solution,"def solution(cacheSize, cities):
+    answer = 0
+    return answer",python
+165,solution,"def solution(m, n, board):
+    answer = 0
+    return answer",python
+166,solution,"def solution(n, t, m, timetable):
+    answer = ''
+    return answer",python
+167,solution,"def solution(str1, str2):
+    answer = 0
+    return answer",python
+168,solution,"def solution(lines):
+    answer = 0
+    return answer",python
+169,solution,"def solution(A, B):
+    answer = -1
+    return answer",python
+170,solution,"def solution(n,a,b):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+171,solution,"def solution(land, P, Q):
+    answer = -1
+    return answer",python
+172,solution,"def solution(strs, t):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+173,solution,"def solution(n, words):
+    answer = []
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+174,solution,"def solution(n):
+    ans = 0
+    
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return ans",python
+175,solution,"def solution(n, stations, w):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+176,solution,"def solution(N, road, K):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+177,solution,"def solution(s):
+    answer = -1
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+178,solution,"def solution(sticker):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+179,solution,"def solution(arr):
+    answer = 0
+    return answer",python
+180,solution,"def solution(n):
+    answer = 0
+    return answer",python
+181,solution,"def solution(s):
+    answer = ''
+    return answer",python
+182,solution,"def solution(arr1, arr2):
+    answer = [[]]
+    return answer",python
+183,solution,"def solution(n):
+    answer = [[]]
+    return answer",python
+184,solution,"def solution(n):
+    answer = 0
+    return answer",python
+185,solution,"def solution(matrix_sizes):
+    answer = 0
+    return answer",python
+186,solution,"def solution(A,B):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+187,solution,"def solution(s):
+    answer = ''
+    return answer",python
+188,solution,"def solution(n, s):
+    answer = []
+    return answer",python
+189,solution,"def solution(n, k):
+    answer = []
+    return answer",python
+190,solution,"def solution(n):
+    answer = 0
+    return answer",python
+191,solution,"def solution(n, works):
+    answer = 0
+    return answer",python
+192,solution,"def solution(n):
+    answer = 0
+    return answer",python
+193,solution,"def solution(begin, end):
+    answer = []
+    return answer",python
+194,solution,"def solution(n, cores):
+    answer = 0
+    return answer",python
+195,solution,"def solution(n):
+    answer = 0
+    return answer",python
+196,solution,"def solution(land):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+197,solution,"def solution(n):
+    answer = 0
+    return answer",python
+198,solution,"def solution(s):
+    answer = True
+    
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return True",python
+199,solution,"def solution(n, money):
+    answer = 0
+    return answer",python
+200,solution,"def solution(n, tops):
+    answer = 0
+    return answer",python
+201,solution,"def solution(board):
+    answer = 1234
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+202,solution,"def solution(s):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer",python
+203,solution,"def solution(n):
+    answer = 0
+    return answer",python
+204,solution,"def solution(n):
+    answer = 0
+    return answer",python
+205,solution,"def solution(n):
+    answer = ''
+    return answer",python
+206,solution,"def solution(maps):
+    answer = 0
+    return answer",python
+207,solution,"def solution(arr):
+    answer = -1
+    return answer",python
+208,solution,"def solution(land):
+    answer = 0
+    return answer",python
+209,solution,"def solution(h1, m1, s1, h2, m2, s2):
+    answer = -1
+    return answer",python
+210,solution,"def solution(n, m, tests):
+    answer = 0
+    return answer",python

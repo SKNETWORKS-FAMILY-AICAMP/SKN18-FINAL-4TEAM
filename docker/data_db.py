@@ -33,8 +33,15 @@ with open(CSV_DIR / "coding_problems.csv", "r", encoding="utf-8-sig", newline=""
     count = 0
     for row in reader:
         cur.execute(
-            "INSERT INTO coding_problem (problem_id, problem, difficulty, category) VALUES (%s, %s, %s, %s)",
-            (row['problem_id'], row['problem'], row['difficulty'], row['category'])
+            "INSERT INTO coding_problem (problem_id, problem, difficulty, category, algorithm) "
+            "VALUES (%s, %s, %s, %s, %s)",
+            (
+                row["problem_id"],
+                row["problem"],
+                row["difficulty"],
+                row["category"],
+                row.get("algorithm"),
+            )
         )
         count += 1
         if count % 100 == 0:

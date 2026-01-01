@@ -40,6 +40,7 @@ from .models import (
     TestCase,
     User,
     LivecodingReport,
+    UserProfile,
 )
 from .serializers import SignupSerializer
 from .authentication import JWTAuthentication
@@ -1321,6 +1322,90 @@ class ProfileView(APIView):
             },
             status=status.HTTP_200_OK,
         )
+
+
+class UserProfileDetailView(APIView):
+    """
+    user_profile 테이블을 조회/업데이트하는 뷰.
+    GET  /api/user/profile/detail/   -> 프로필 조회(없으면 빈 값 생성 후 반환)
+    PATCH/POST                       -> 프로필 생성 또는 수정
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def _serialize(self, profile):
+        return {
+            "user_id": profile.user.user_id,
+            "graduated_school": profile.graduated_school,
+            "university": profile.university,
+            "major": profile.major,
+            "academic_status": profile.academic_status,
+            "graduation_year": profile.graduation_year,
+            "career_level": profile.career_level,
+            "current_status": profile.current_status,
+            "tech_stack": profile.tech_stack or [],
+            "desired_role": profile.desired_role or [],
+            "detailed_role": profile.detailed_role or [],
+            "region": profile.region or [],
+            "created_at": profile.created_at,
+            "updated_at": profile.updated_at,
+        }
+
+    def get(self, request):
+        user = request.user
+        profile, created = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={"created_at": timezone.now(), "updated_at": timezone.now()},
+        )
+        return Response(self._serialize(profile), status=status.HTTP_200_OK)
+
+    def post(self, request):
+        return self.patch(request)
+
+    def patch(self, request):
+        user = request.user
+        payload = request.data or {}
+        profile, _ = UserProfile.objects.get_or_create(
+            user=user,
+            defaults={"created_at": timezone.now()},
+        )
+
+        # 업데이트 가능한 필드들
+        fields = [
+            "graduated_school",
+            "university",
+            "major",
+            "academic_status",
+            "graduation_year",
+            "career_level",
+            "current_status",
+            "tech_stack",
+            "desired_role",
+            "detailed_role",
+            "region",
+        ]
+        for f in fields:
+            if f not in payload:
+                continue
+            val = payload.get(f)
+            # 빈 문자열을 None/[]로 치환
+            if val == "":
+                val = None
+            # 졸업 연도는 정수 변환 (실패 시 None)
+            if f == "graduation_year" and val is not None:
+                try:
+                    val = int(val)
+                except Exception:
+                    val = None
+            # 배열 필드는 None/""이면 빈 리스트로
+            if f in ("tech_stack", "desired_role", "detailed_role", "region"):
+                if val is None or val == "":
+                    val = []
+            setattr(profile, f, val)
+        profile.updated_at = timezone.now()
+        profile.save(update_fields=fields + ["updated_at"])
+        return Response(self._serialize(profile), status=status.HTTP_200_OK)
 
 # backend/api/views.py
 

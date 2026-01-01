@@ -1,14 +1,16 @@
 <template>
   <div class="session-page">
-    <AntiCheatAlert
-      :visible="antiCheatAlert.visible"
-      :state="antiCheatAlert.state"
-      :title="antiCheatAlert.title"
-      :description="antiCheatAlert.description"
-      :level="antiCheatAlert.level"
-      :timestamp="antiCheatAlert.timestamp"
-      @dismiss="resetAntiCheatState"
-    />
+    <div class="anticheat-wrapper">
+      <AntiCheatAlert
+        :visible="antiCheatAlert.visible"
+        :state="antiCheatAlert.state"
+        :title="antiCheatAlert.title"
+        :description="antiCheatAlert.description"
+        :level="antiCheatAlert.level"
+        :timestamp="antiCheatAlert.timestamp"
+        @dismiss="resetAntiCheatState"
+      />
+    </div> 
     <header class="session-header">
       <div class="session-title-block">
         <h1>JobTory Live Coding</h1>
@@ -2568,12 +2570,25 @@ onBeforeRouteUpdate(() => {
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 
 .session-page {
-  min-height: 100vh;
+  height: 100vh; 
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   background: #111827;
   color: #e5e7eb;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  position: relative;
+}
+
+.anticheat-wrapper {
+  position: fixed;
+  top: 20px; 
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 2000; 
+  pointer-events: auto;
 }
 
 .session-header {
@@ -2629,19 +2644,32 @@ onBeforeRouteUpdate(() => {
   gap: 1px;
   background: #030712;
   position: relative;
+  height: 100%;       /* 부모(session-page)의 남은 높이를 꽉 채움 */
+  overflow: hidden;
 }
 
 .left-column {
   display: flex;
   flex-direction: column;
+  height: 100%;     
+  overflow: hidden;   
 }
 
-.camera-pane,
-.problem-pane,
+.problem-pane {
+  display: flex;
+  flex-direction: column;
+  background: #020617;
+  flex: 1;              /* 남은 공간 모두 차지 */
+  min-height: 0;        /* flex 자식의 내부 스크롤을 위해 필수 */
+  overflow: hidden;     /* 넘치는 내용은 body에서 스크롤 처리 */
+}
+
 .editor-pane {
   display: flex;
   flex-direction: column;
   background: #020617;
+  height: 100%;         /* 에디터도 높이 꽉 채움 */
+  overflow: hidden;
 }
 
 .pane-header {
@@ -2660,7 +2688,9 @@ onBeforeRouteUpdate(() => {
 
 .problem-body {
   padding: 16px 20px 20px;
-  overflow-y: auto;
+  overflow-y: auto; 
+  flex: 1;    
+  min-height: 0;      
 }
 
 .retry-button {
@@ -2844,6 +2874,7 @@ onBeforeRouteUpdate(() => {
   flex: 1;
   padding: 12px 16px 0;
   background: #020617;
+  min-height: 0;
 }
 
 .editor-footer {

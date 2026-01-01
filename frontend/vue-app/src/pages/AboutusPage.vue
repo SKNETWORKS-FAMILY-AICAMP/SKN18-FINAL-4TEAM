@@ -1,12 +1,7 @@
 <template>
   <div class="aboutus">
     <nav class="nav-header">
-      <button type="button" class="back-button" @click="goBack" aria-label="뒤로 가기">
-        <svg class="back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-      </button>
+      <a data-v-7f42e975="" href="/" class="brand">JOBTORY</a>
     </nav>
 
     <header class="hero">
@@ -111,7 +106,7 @@ const members = [
   { name: "김규리", role: "Project Manager", img: new URL("../assets/김규리.png", import.meta.url).href, github: "https://github.com/GyuriKimm" },
   { name: "김준규", role: "Assoc. PM", img: new URL("../assets/김준규.png", import.meta.url).href, github: "https://github.com/JungyuOO" },
   { name: "김민주", role: "Crew", img: new URL("../assets/김민주.png", import.meta.url).href, github: "https://github.com/kmjj0801" },
-  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong00" },
+  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong-00" },
   { name: "정동석", role: "Crew", img: new URL("../assets/정동석.jpg", import.meta.url).href, github: "https://github.com/dsj-1004" },
   { name: "채린", role: "Crew", img: new URL("../assets/채린.png", import.meta.url).href, github: "https://github.com/cofls99" },
 ];

@@ -370,6 +370,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         # evidence
         problem_evidence = dict(state.get("problem_evidence") or {})
         code_collab_evidence = dict(state.get("code_collab_evidence") or {})
+        strategy_algorithms = problem_evidence.get("strategy_algorithms") or []
 
         # 35/30/35 기준 원점수 합산으로 최종 점수 계산
         code_quality_score_raw_35 = float(state.get("code_quality_score_35") or 0.0)
@@ -693,6 +694,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "problem_difficulty": problem_difficulty,
             "problem_algorithms": problem_algorithms,
             "problem_id": problem_id,
+            "strategy_algorithms": strategy_algorithms,
 
             # 문제 해결 능력 평가 추가
             "problem_solving_evaluation": {

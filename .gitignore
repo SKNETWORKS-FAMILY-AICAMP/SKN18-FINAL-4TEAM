@@ -20,4 +20,4 @@ docker/database/elasticsearch/
 docker/postgres-data/
 docker/redis-data/
 docker/elasticsearch-data/
-docker/database/neo4j/import/
+docker/database/neo4j/import/*.csv

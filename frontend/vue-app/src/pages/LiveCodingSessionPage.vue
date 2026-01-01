@@ -111,34 +111,32 @@
           />
         </div>
         <footer class="editor-footer">
-          <div class="footer-left">
+          <div class="footer-group">
             <button
               type="button"
-              class="hint-button"
+              class="footer-btn hint-btn"
               @click="onHintButtonClick"
               :disabled="isSttRunning || isTtsPlaying || isHintDisabled"
             >
-              {{
-                isHintRecording
-                  ? "힌트 설명 중... 다시 눌러 전송"
-                  : (isHintLoading ? "힌트 생성 중..." : "힌트 요청")
-              }}
+              {{ isHintRecording ? "설명 종료 (전송)" : (isHintLoading ? "생성 중..." : "AI 힌트 요청") }}
             </button>
-            <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
+            <span class="hint-count">남은 힌트: {{ HINT_LIMIT - hintCount }}</span>
           </div>
-          <div class="footer-right">
+          
+          <div class="footer-group">
             <button
               type="button"
-              class="run-button"
+              class="footer-btn submit-btn"
               @click="onSubmitClick"
               :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording || isHintRecording || isHintLoading"
             >
-              {{ isSubmitting ? "제출 중..." : "제출하기" }}
+              {{ isSubmitting ? "제출 중..." : "코드 제출" }}
             </button>
           </div>
         </footer>
       </section>
     </main>
+
 
     <!-- 자동 녹음(전략 답변 등) 중: 중앙 제출 버튼 -->
     <div v-if="showAutoRecordingSubmitOverlay" class="recording-submit-overlay">
@@ -2710,10 +2708,16 @@ onBeforeRouteUpdate(() => {
 }
 
 .editor-pane {
+  display: flex; flex-direction: column;
+}
+
+/* 공통 패널 스타일 (Glassmorphism) */
+.pane {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
   display: flex;
   flex-direction: column;
-  background: #020617;
-  height: 100%;         /* 에디터도 높이 꽉 채움 */
   overflow: hidden;
 }
 
@@ -2732,10 +2736,8 @@ onBeforeRouteUpdate(() => {
 }
 
 .problem-body {
-  padding: 16px 20px 20px;
-  overflow-y: auto; 
-  flex: 1;    
-  min-height: 0;      
+  padding: 20px;
+  overflow-y: auto;
 }
 
 .retry-button {
@@ -2777,8 +2779,6 @@ onBeforeRouteUpdate(() => {
 }
 
 .camera-body {
-  padding: 12px;
-  background: #000;
   display: flex; justify-content: center;
 }
 
@@ -2786,7 +2786,7 @@ onBeforeRouteUpdate(() => {
   position: relative;
   width: 100%;
   aspect-ratio: 16/9;
-  border-radius: 8px;
+  border-radius: 5px;
   overflow: hidden;
   border: 1px solid #334155;
 }
@@ -2814,22 +2814,9 @@ onBeforeRouteUpdate(() => {
   background: radial-gradient(circle at 0 0, #020617, #020617 40%, #020617);
 }
 
-.camera-placeholder video {
-  width: 260px;
-  aspect-ratio: 16 / 9;
-  border-radius: 14px;
-  object-fit: cover;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.7);
-}
 
-.camera-placeholder .camera-message {
-  font-size: 5px;
-  color: #e5e7eb;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 4px 5px;
-  border-radius: 999px;
-  margin-top: 6px;
-}
+
+
 
 .problem-title {
   margin: 0 0 12px;
@@ -2932,19 +2919,25 @@ onBeforeRouteUpdate(() => {
 }
 
 .editor-body {
-  flex: 1;
-  padding: 12px 16px 0;
-  background: #020617;
-  min-height: 0;
+  flex: 1; min-height: 0; position: relative;
+  background: #1e1e1e; /* Editor bg */
 }
 
+
 .editor-footer {
-  padding: 8px 18px 12px;
-  border-top: 1px solid #1f2937;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  height: 60px;
+  background: #1e1e1e;
+  border-top: 1px solid #333;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+}
+
+.footer-group { display: flex; align-items: center; gap: 16px; }
+
+.footer-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 6px; border: none;
+  font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;
 }
 
 .footer-left,
@@ -2954,8 +2947,21 @@ onBeforeRouteUpdate(() => {
   gap: 12px;
 }
 
+.hint-btn {
+  background: rgba(255,255,255,0.1); color: #e2e8f0;
+}
+.hint-btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+
+.hint-count { font-size: 12px; color: #64748b; }
+
+.submit-btn {
+  background: #2563eb; color: #fff;
+}
+.submit-btn:hover:not(:disabled) { background: #1d4ed8; transform: translateY(-1px); }
+.submit-btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+
+
 .mic-button,
-.hint-button,
 .run-button {
   padding: 6px 14px;
   border-radius: 999px;
@@ -2967,14 +2973,12 @@ onBeforeRouteUpdate(() => {
   cursor: pointer;
 }
 
-.mic-button:disabled,
-.hint-button:disabled {
+.mic-button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
 
-.mic-button:hover:not(:disabled),
-.hint-button:hover:not(:disabled) {
+.mic-button:hover:not(:disabled){
   background: #1fb154;
   transform: translateY(-1px);
 }
@@ -2982,11 +2986,6 @@ onBeforeRouteUpdate(() => {
 .mic-button.is-active {
   background: linear-gradient(135deg, #16a34a, #22c55e);
   color: #0b1a13;
-}
-
-.hint-counter {
-  font-size: 12px;
-  color: #9ca3af;
 }
 
 .mic-label {

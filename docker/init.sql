@@ -64,16 +64,6 @@ CREATE TABLE user_profile(
 );
 
 
-CREATE TABLE company(
-  id             BIGSERIAL PRIMARY KEY,
-  company_code   VARCHAR(50) UNIQUE,         -- 비즈니스용 식별자(선택)
-  name           VARCHAR(200) NOT NULL,      -- 회사명
-  industry       VARCHAR(100),               -- 사업 분야
-  size_band      VARCHAR(50),                -- 회사 규모
-  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
 CREATE TABLE auth_identities (
   id SERIAL PRIMARY KEY,
   user_id VARCHAR(50) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,

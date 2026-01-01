@@ -84,6 +84,14 @@
           </p>
           <div class="hero-actions">
             <RouterLink to="/coding-test" class="secondary hover-scale">라이브 코딩 테스트 보기</RouterLink>
+            <button
+              v-if="isAuthenticated"
+              type="button"
+              class="primary hover-scale"
+              @click="openProfileModal"
+            >
+              프로필 입력/수정
+            </button>
           </div>
         </div>
 
@@ -188,22 +196,261 @@
       :visible="showForcedExit"
       @close="showForcedExit = false"
     />
+
+    <!-- 프로필 입력 모달 -->
+    <div v-if="showProfileModal" class="modal-overlay" @click.self="closeProfileModal">
+      <div class="modal-card profile-card">
+        <div class="modal-header">
+          <h3>프로필 입력</h3>
+          <button type="button" class="modal-close" @click="closeProfileModal">✕</button>
+        </div>
+        <div class="modal-body profile-body">
+          <template v-if="currentProfileStep === 1">
+            <label class="modal-field">
+              <span>최종 학력 *</span>
+              <select v-model="profileForm.graduated_school">
+                <option value="">선택</option>
+                <option v-for="opt in graduatedOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>학교명</span>
+              <input v-model="profileForm.university" type="text" placeholder="학교명" />
+            </label>
+            <label class="modal-field">
+              <span>전공 여부</span>
+              <select v-model="profileForm.major">
+                <option value="">선택</option>
+                <option value="전공">전공</option>
+                <option value="비전공">비전공</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>재학 상태</span>
+              <select v-model="profileForm.academic_status">
+                <option value="">선택</option>
+                <option v-for="opt in academicOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>졸업(예정) 연도</span>
+              <input v-model="profileForm.graduation_year" type="number" min="1900" max="2100" />
+            </label>
+          </template>
+
+          <template v-else>
+            <label class="modal-field">
+              <span>경력 레벨 *</span>
+              <select v-model="profileForm.career_level">
+                <option value="">선택</option>
+                <option v-for="opt in careerOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>현재 상태</span>
+              <select v-model="profileForm.current_status">
+                <option value="">선택</option>
+                <option v-for="opt in statusOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>기술 스택</span>
+              <div class="checkbox-group">
+                <label
+                  v-for="opt in techStackOptions"
+                  :key="opt"
+                  class="checkbox-item"
+                >
+                <input
+                  type="checkbox"
+                  :value="opt"
+                  v-model="profileForm.tech_stack"
+                />
+                <span>{{ opt }}</span>
+              </label>
+            </div>
+          </label>
+
+            <label class="modal-field">
+              <span>희망 직무</span>
+              <div class="checkbox-group">
+                <label
+                  v-for="opt in desiredRoleOptions"
+                  :key="opt"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="opt"
+                    v-model="profileForm.desired_role"
+                  />
+                  <span>{{ opt }}</span>
+                </label>
+              </div>
+            </label>
+
+            <label class="modal-field">
+              <span>세부 희망 직무</span>
+              <div class="checkbox-group">
+                <label
+                  v-for="opt in detailedRoleOptions"
+                  :key="opt"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="opt"
+                    v-model="profileForm.detailed_role"
+                  />
+                  <span>{{ opt }}</span>
+                </label>
+              </div>
+            </label>
+
+            <label class="modal-field">
+              <span>희망 근무지</span>
+              <select v-model="profileForm.region">
+                <option value="">선택</option>
+                <option v-for="opt in regionOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <div class="modal-steps">
+            <span :class="{ active: currentProfileStep === 1 }">1</span>
+            <span :class="{ active: currentProfileStep === 2 }">2</span>
+          </div>
+          <div class="modal-actions">
+            <button v-if="currentProfileStep === 2" type="button" class="pill-button ghost" @click="currentProfileStep = 1">
+              이전
+            </button>
+            <button
+              v-if="currentProfileStep === 1"
+              type="button"
+              class="pill-button"
+              @click="currentProfileStep = 2"
+            >
+              다음
+            </button>
+            <button
+              v-else
+              class="pill-button"
+              :disabled="savingProfile"
+              @click="saveProfile"
+            >
+              {{ savingProfile ? "저장 중..." : "저장" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 import ForcedExitAlert from "../components/ForcedExitAlert.vue";
 
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+
 const route = useRoute();
 const router = useRouter();
-const { isAuthenticated, user, fetchProfile, logout } = useAuth();
+const { isAuthenticated, user, fetchProfile, logout, token } = useAuth();
 const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false);
 const isLoggingOut = ref(false);
 const showForcedExit = ref(false);
+const showProfileModal = ref(false);
+const currentProfileStep = ref(1);
+const savingProfile = ref(false);
+const profileForm = reactive({
+  graduated_school: "",
+  university: "",
+  major: "",
+  academic_status: "",
+  graduation_year: "",
+  career_level: "",
+  current_status: "",
+  tech_stack: [],
+  desired_role: [],
+  detailed_role: [],
+  region: [],
+  region_single: ""
+});
+
+const graduatedOptions = ["고졸", "전문대졸(2,3년제)", "대졸(4년제 이상)", "석사 이상", "박사 이상"];
+const academicOptions = ["재학", "휴학", "졸업", "중퇴"];
+const careerOptions = ["junior (0~3년차)", "mid (4~7년차)", "senior (8~10년차)", "lead (10년차~)"];
+const statusOptions = ["재직중", "퇴사", "구직중", "프리랜서", "기타"];
+const techStackOptions = [
+  "Python",
+  "NumPy",
+  "Pandas",
+  "SciPy",
+  "Scikit-learn",
+  "XGBoost",
+  "LightGBM",
+  "CatBoost",
+  "TensorFlow",
+  "Keras",
+  "PyTorch",
+  "Transformers",
+  "LangChain",
+  "LangGraph",
+  "OpenAI API",
+  "HuggingFace Hub",
+  "SentenceTransformers",
+  "spaCy",
+  "NLTK",
+  "MLflow",
+  "Airflow",
+  "DVC",
+  "Optuna",
+  "Jupyter Notebook",
+  "JupyterLab"
+];
+const desiredRoleOptions = [
+  "AI/ML 엔지니어",
+  "데이터 사이언티스트",
+  "LLM 엔지니어",
+  "컴퓨터비전 엔지니어",
+  "자연어처리 엔지니어",
+  "음성인식 엔지니어",
+  "MLOps 엔지니어",
+  "데이터 엔지니어",
+  "AI 서비스 개발자"
+];
+const detailedRoleOptions = [
+  "딥러닝 모델링",
+  "지도/비지도 학습",
+  "강화학습",
+  "추천 시스템",
+  "시계열 예측",
+  "자연어 처리",
+  "텍스트 분류/분석",
+  "텍스트 생성/요약",
+  "프롬프트 엔지니어링",
+  "LLM 파인튜닝/서빙",
+  "컴퓨터 비전",
+  "이미지 분류/탐지",
+  "OCR/문서 인식",
+  "음성 인식/TTS",
+  "MLOps/파이프라인",
+  "모델 서빙/배포",
+  "데이터 파이프라인",
+  "AI 보안/안전"
+];
+const regionOptions = ["서울", "인천", "부산", "대구", "대전", "세종", "울산", "광주"];
+
+const toggleMultiSelect = (field, value) => {
+  const current = Array.isArray(profileForm[field]) ? profileForm[field] : [];
+  profileForm[field] = current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value];
+};
 
 const userName = computed(() => user.value?.name || "회원");
 
@@ -238,6 +485,79 @@ const syncProfile = () => {
   }
 };
 
+const needProfileModal = (profile) => {
+  // 간단한 기준: 학력/경력 레벨이 비어 있으면 추가 입력 안내
+  return !profile?.graduated_school || !profile?.career_level;
+};
+
+const loadProfile = async () => {
+  if (!isAuthenticated.value) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/user/profile/detail/`, {
+      headers: token.value ? { Authorization: `Bearer ${token.value}` } : {},
+    });
+    if (!res.ok) throw new Error("프로필 조회 실패");
+    const data = await res.json();
+    Object.assign(profileForm, {
+      graduated_school: data.graduated_school || "",
+      university: data.university || "",
+      major: data.major || "",
+      academic_status: data.academic_status || "",
+      graduation_year: data.graduation_year || "",
+      career_level: data.career_level || "",
+      current_status: data.current_status || "",
+      tech_stack: data.tech_stack || [],
+      desired_role: data.desired_role || [],
+      detailed_role: data.detailed_role || [],
+      region: data.region || [],
+      region_single: (data.region && data.region[0]) || ""
+    });
+    if (needProfileModal(data)) {
+      showProfileModal.value = true;
+    }
+  } catch (err) {
+    // 조회 실패 시 새 입력을 안내
+    showProfileModal.value = true;
+  }
+};
+
+const saveProfile = async () => {
+  savingProfile.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/user/profile/detail/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token.value ? { Authorization: `Bearer ${token.value}` } : {}),
+      },
+      body: JSON.stringify({
+        ...profileForm,
+        region: profileForm.region_single ? [profileForm.region_single] : []
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const detail = data?.detail || "프로필 저장에 실패했습니다.";
+      throw new Error(detail);
+    }
+    showProfileModal.value = false;
+  } catch (err) {
+    window.alert(err.message || "프로필 저장 중 오류가 발생했습니다.");
+  } finally {
+    savingProfile.value = false;
+  }
+};
+
+const openProfileModal = () => {
+  showProfileModal.value = true;
+  currentProfileStep.value = 1;
+};
+
+const closeProfileModal = () => {
+  showProfileModal.value = false;
+  currentProfileStep.value = 1;
+};
+
 const checkForcedAlert = () => {
   if (route.query.alert === "anti-cheat") {
     showForcedExit.value = true;
@@ -250,6 +570,7 @@ const checkForcedAlert = () => {
 onMounted(() => {
   window.addEventListener("storage", syncProfile);
   syncProfile();
+  void loadProfile();
   checkForcedAlert();
 });
 
@@ -466,6 +787,21 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   background: #f9fafb;
   color: #111827;
   transition: all 0.3s ease;
+}
+.primary {
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  background: #111827;
+  color: #f9fafb;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 .hover-scale:hover {
   transform: scale(1.05);
@@ -692,6 +1028,138 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   color: #ffffff;
   border-color: #ffffff;
   background: #111827;
+}
+
+/* Profile modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card.profile-card {
+  width: min(900px, 92vw);
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.modal-body.profile-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 16px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.modal-field input,
+.modal-field select {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.modal-field select[multiple] {
+  min-height: 120px;
+}
+.modal-field select[multiple] {
+  width: 100%;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+.modal-steps {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.modal-steps span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b7280;
+}
+.modal-steps span.active {
+  background: #111827;
+  color: #f9fafb;
+  border-color: #111827;
+}
+.pill-button.ghost {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+}
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.tag-option {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.tag-option.active {
+  background: #111827;
+  color: #f9fafb;
+  border-color: #111827;
+}
+.tag-option:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
 }
 
 /* Mobile Styles */

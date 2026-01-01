@@ -41,6 +41,7 @@ from .models import (
     User,
     LivecodingReport,
     UserProfile,
+    ProfileOption,
 )
 from .serializers import SignupSerializer
 from .authentication import JWTAuthentication
@@ -1432,6 +1433,43 @@ class UserProfileDetailView(APIView):
         profile.updated_at = timezone.now()
         profile.save(update_fields=fields + ["updated_at"])
         return Response(self._serialize(profile), status=status.HTTP_200_OK)
+
+
+class UserProfileOptionsView(APIView):
+    """
+    프로필 입력에 사용되는 선택지 목록을 제공하는 뷰.
+    GET /api/user/profile/options/ -> 체크 제약과 동일한 리스트 반환
+    """
+
+    permission_classes = [AllowAny]
+
+    def get(self, request):
+        rows = (
+            ProfileOption.objects.all()
+            .values_list("category", "value")
+            .order_by("category", "display_order", "id")
+        )
+
+        grouped = {}
+        for cat, val in rows:
+            grouped.setdefault(cat, []).append(val)
+
+        # 보강: 필수 카테고리가 누락되었을 경우 빈 배열이라도 리턴
+        categories = [
+            "graduated_school",
+            "major",
+            "academic_status",
+            "career_level",
+            "current_status",
+            "tech_stack",
+            "desired_role",
+            "detailed_role",
+            "region",
+        ]
+        for c in categories:
+            grouped.setdefault(c, [])
+
+        return Response(grouped, status=status.HTTP_200_OK)
 
 # backend/api/views.py
 

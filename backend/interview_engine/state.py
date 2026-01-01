@@ -51,7 +51,7 @@ class CodingState(TypedDict, total=False):
     # 1. 핵심 컨텍스트 (Redis Shared Data)
     current_user_code: str          # 현재 에디터 코드
     problem_description: str        # 문제 지문
-    real_algorithm_category: str    # 실제 문제 알고리즘 (예: DP)
+    real_algorithm_category: str    # 실제 문제 알고리즘 태그(복수 가능, 예: DP)
 
     # 2. 힌트 에이전트 상태 관리 필드
     hint_trigger: str               # "manual" (버튼)

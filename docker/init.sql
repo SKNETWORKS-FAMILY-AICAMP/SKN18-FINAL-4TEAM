@@ -30,6 +30,7 @@ CREATE TABLE IF NOT EXISTS test_case (
         ON DELETE CASCADE
 );
 
+
 CREATE TABLE users (
   user_id       VARCHAR(50) PRIMARY KEY,
   email         VARCHAR(255) NOT NULL UNIQUE,
@@ -39,6 +40,37 @@ CREATE TABLE users (
   birthdate     DATE,
   created_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at    TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+--CHECK 제약조건 걸어놓은 컬럼들은 프론트에서 선택하게끔(드롭다운)으로 구현해야 할 듯
+CREATE TABLE user_profile(
+  user_id         VARCHAR(50) PRIMARY KEY REFERENCES users(user_id) ON DELETE CASCADE,
+  --최종 학력
+  graduated_school VARCHAR(100) CHECK (graduated_school IN ('고졸','전문대졸(2,3년제)','대졸(4년제 이상)','석사 이상','박사 이상')),
+  university      VARCHAR(200),     -- 학교명 공공데이터베이스 활용 가능, 프론트에서 학교명 검색해서 선택하게끔
+  major           VARCHAR(20) CHECK (major IN ('전공','비전공')),
+  academic_status VARCHAR(20) CHECK (academic_status IN ('재학','휴학','졸업','중퇴')),
+  graduation_year INT,              -- 졸업(예정) 연도
+  career_level    VARCHAR(50) CHECK(career_level IN ('junior (0~3년차)', 'mid (4~7년차)', 'senior (8~10년차)', 'lead (10년차~)')),  -- 경력 사항
+  current_status  VARCHAR(50) CHECK (current_status IN ('재직중','퇴사','구직중','프리랜서','기타')),
+  tech_stack      TEXT[] CHECK (tech_stack IS NULL OR tech_stack <@ ARRAY['Python','NumPy','Pandas','SciPy','Scikit-learn','XGBoost','LightGBM','CatBoost','TensorFlow','Keras','PyTorch','Transformers','LangChain','LangGraph','OpenAI API','HuggingFace Hub','SentenceTransformers','spaCy','NLTK','MLflow','Airflow','DVC','Optuna','Jupyter Notebook','JupyterLab']::text[]),
+  desired_role    TEXT[] CHECK (desired_role IS NULL OR desired_role <@ ARRAY['AI/ML 엔지니어','데이터 사이언티스트','LLM 엔지니어','컴퓨터비전 엔지니어','자연어처리 엔지니어','음성인식 엔지니어','MLOps 엔지니어','데이터 엔지니어','AI 서비스 개발자']::text[]), -- 희망 직무 (상위)
+  detailed_role   TEXT[] CHECK (detailed_role IS NULL OR detailed_role <@ ARRAY['딥러닝 모델링','지도/비지도 학습','강화학습','추천 시스템','시계열 예측','자연어 처리', '텍스트 분류/분석', '텍스트 생성/요약', '프롬프트 엔지니어링', 'LLM 파인튜닝/서빙', '컴퓨터 비전', '이미지 분류/탐지', 'OCR/문서 인식', '음성 인식/TTS', 'MLOps/파이프라인', '모델 서빙/배포', '데이터 파이프라인', 'AI 보안/안전']::text[]), -- 세부 희망 직무
+  region          TEXT[] CHECK(region IS NULL OR region <@ ARRAY['서울', '인천', '부산', '대구', '대전', '세종', '울산', '광주']),     -- 희망 근무지
+  created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+
+CREATE TABLE company(
+  id             BIGSERIAL PRIMARY KEY,
+  company_code   VARCHAR(50) UNIQUE,         -- 비즈니스용 식별자(선택)
+  name           VARCHAR(200) NOT NULL,      -- 회사명
+  industry       VARCHAR(100),               -- 사업 분야
+  size_band      VARCHAR(50),                -- 회사 규모
+  created_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at     TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE auth_identities (

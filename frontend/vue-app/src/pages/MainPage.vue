@@ -1183,4 +1183,142 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   }
   .marquee-content span { font-size: 48px; }
 }
+
+/* ===== Profile Modal polish ===== */
+.modal-card.profile-card {
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.modal-header {
+  background: rgba(248, 244, 235, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+.modal-close:hover {
+  background: rgba(17, 24, 39, 0.08);
+}
+
+/* form grid inside modal */
+.modal-body.profile-body {
+  background: #ffffff;
+}
+
+/* field label */
+.modal-field > span {
+  font-weight: 800;
+  color: #111827;
+}
+
+/* inputs */
+.modal-field input,
+.modal-field select {
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.modal-field input:focus,
+.modal-field select:focus {
+  outline: none;
+  border-color: #111827;
+  box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.12);
+}
+
+/* checkbox group -> chip style */
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.checkbox-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* hide native checkbox */
+.checkbox-item input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* chip */
+.checkbox-item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkbox-item:hover span {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10);
+}
+
+/* checked style */
+.checkbox-item input[type="checkbox"]:checked + span {
+  background: #111827;
+  color: #f9fafb;
+  border-color: #111827;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+}
+
+/* footer polish */
+.modal-footer {
+  background: rgba(248, 244, 235, 0.65);
+  backdrop-filter: blur(8px);
+}
+
+.pill-button {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: none;
+  background: #111827;
+  color: #f9fafb;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pill-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pill-button.ghost {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+}
+.pill-button.ghost:hover {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
+}
+
 </style>

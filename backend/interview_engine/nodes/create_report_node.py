@@ -398,9 +398,10 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
         meta = state.get("meta") or {}
         session_id = _safe_str(meta.get("session_id"))
         
-        # ✅ 카테고리/난이도 초기화
+        # ✅ 카테고리/난이도/알고리즘 초기화
         problem_category = "미분류"
         problem_difficulty = "미정"
+        problem_algorithms: List[str] = []
         
         # ✅ problem_evidence가 비어있으면 직접 가져오기
         if not code and session_id:
@@ -419,7 +420,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             problem_text = _safe_str(problem_payload.get("problem") or "")
             print(f"[DEBUG] Redis problem_payload에서 가져온 문제 길이: {len(problem_text)}", flush=True)
             
-            # ✅ 카테고리/난이도도 같이 가져오기!
+            # ✅ 카테고리/난이도/알고리즘도 같이 가져오기!
             if "category" in problem_payload:
                 problem_category = problem_payload.get("category") or "미분류"
                 print(f"[DEBUG] Redis에서 카테고리 가져옴: {problem_category}", flush=True)
@@ -427,6 +428,19 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             if "difficulty" in problem_payload:
                 problem_difficulty = problem_payload.get("difficulty") or "미정"
                 print(f"[DEBUG] Redis에서 난이도 가져옴: {problem_difficulty}", flush=True)
+
+            if "algorithm" in problem_payload:
+                raw_algos = problem_payload.get("algorithm")
+                if isinstance(raw_algos, list):
+                    problem_algorithms = [str(a) for a in raw_algos if a]
+                elif isinstance(raw_algos, str):
+                    try:
+                        import json as _json
+                        parsed = _json.loads(raw_algos)
+                        if isinstance(parsed, list):
+                            problem_algorithms = [str(a) for a in parsed if a]
+                    except Exception:
+                        problem_algorithms = []
             
             # ✅ 그래도 없으면 checkpoint 시도
             if not problem_text:
@@ -436,7 +450,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
                 print(f"[DEBUG] checkpoint에서 가져온 문제 길이: {len(problem_text)}", flush=True)
         
         # ✅ 2순위: 여전히 "미분류"/"미정"이면 meta에서 problem_id 가져와서 DB 조회
-        if (problem_category == "미분류" or problem_difficulty == "미정"):
+        if (problem_category == "미분류" or problem_difficulty == "미정" or not problem_algorithms):
             # meta에서 problem_id 가져오기
             problem_id = meta.get("problem_id")
             
@@ -456,7 +470,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
                     from django.db import connection
                     with connection.cursor() as cursor:
                         cursor.execute("""
-                            SELECT category, difficulty
+                            SELECT category, difficulty, algorithm
                             FROM coding_problem
                             WHERE problem_id = %s
                             LIMIT 1
@@ -467,7 +481,22 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
                                 problem_category = row[0] or "미분류"
                             if problem_difficulty == "미정":
                                 problem_difficulty = row[1] or "미정"
-                            print(f"[DEBUG] DB에서 가져온 정보: 카테고리={problem_category}, 난이도={problem_difficulty}", flush=True)
+                            if not problem_algorithms and row[2]:
+                                if isinstance(row[2], list):
+                                    problem_algorithms = [str(a) for a in row[2] if a]
+                                else:
+                                    try:
+                                        import json as _json
+                                        parsed = _json.loads(row[2])
+                                        if isinstance(parsed, list):
+                                            problem_algorithms = [str(a) for a in parsed if a]
+                                    except Exception:
+                                        problem_algorithms = []
+                            print(
+                                f"[DEBUG] DB에서 가져온 정보: 카테고리={problem_category}, "
+                                f"난이도={problem_difficulty}, 알고리즘={len(problem_algorithms)}",
+                                flush=True,
+                            )
                 except Exception as e:
                     print(f"[WARNING] DB 조회 실패: {e}", flush=True)
                     
@@ -661,6 +690,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
 
             "problem_category": problem_category,
             "problem_difficulty": problem_difficulty,
+            "problem_algorithms": problem_algorithms,
 
             # 문제 해결 능력 평가 추가
             "problem_solving_evaluation": {

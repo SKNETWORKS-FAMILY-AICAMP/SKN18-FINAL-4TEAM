@@ -1,0 +1,26 @@
+{
+  "size": 10,
+  "query": {
+    "bool": {
+      "should": [
+        { "match": { "problem": "<text_query>" } },
+        { "terms": { "problem_id": ["1","2","3"] } }
+      ]
+    }
+  },
+  "knn": {
+    "field": "embedding",
+    "query_vector": [0.0, 0.0, 0.0],
+    "k": 50,
+    "num_candidates": 200,
+    "filter": {
+      "terms": { "problem_id": ["1","2","3"] }
+    }
+  },
+  "rank": {
+    "rrf": {
+      "window_size": 200,
+      "rank_constant": 60
+    }
+  }
+}

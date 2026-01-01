@@ -131,6 +131,18 @@ class LivecodingReport(models.Model):
         indexes = [models.Index(fields=["user", "session_id"], name="idx_lc_report_user_sess")]
 
 
+class ProfileOption(models.Model):
+    id = models.AutoField(primary_key=True)
+    category = models.CharField(max_length=50)
+    value = models.CharField(max_length=200)
+    display_order = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = "profile_option"
+        indexes = [models.Index(fields=["category"], name="idx_profile_option_category")]
+
+
 # 사용자 프로필 (학력/경력/스택 등) - user_profile 테이블과 매핑
 try:
     from django.contrib.postgres.fields import ArrayField

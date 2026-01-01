@@ -2663,7 +2663,7 @@ onBeforeRouteUpdate(() => {
 .session-main {
   flex: 1;
   display: grid;
-  grid-template-columns: 400px 1fr; /* 왼쪽 고정, 오른쪽 가변 */
+  grid-template-columns: 600px 1fr; /* 왼쪽 고정, 오른쪽 가변 */
   gap: 16px;
   padding: 16px;
   overflow: hidden;

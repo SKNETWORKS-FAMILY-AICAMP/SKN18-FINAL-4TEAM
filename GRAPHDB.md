@@ -24,8 +24,8 @@ docker compose -f docker/docker-compose.yml --env-file .env exec neo4j cypher-sh
 로 Neo4j Schema적용함
 
 그럼 실제로 localhost:7474에서 .env에 적힌 계정 값으로 입력 후 로그인 하면 
-![alt text](docs\neo4j\neo4j-1.png)
-같이 확인 가능
+![alt text](docs/neo4j/neo4j-1.png)
+사진과 같이 확인 가능
 
 
 3. 인덱스 생성(*혹시몰라서 해야함)

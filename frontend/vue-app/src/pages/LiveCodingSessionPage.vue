@@ -11,14 +11,18 @@
         @dismiss="resetAntiCheatState"
       />
     </div> 
+
     <header class="session-header">
-      <div class="session-title-block">
-        <h1>JobTory Live Coding</h1>
-        <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
+      <div class="header-left">
+        <div class="brand-badge">JOBTORY LIVE</div>
+        <h1 class="session-title">Live Coding Test</h1>
       </div>
-      <div class="timer-chip">
-        남은 시간
-        <span class="timer-value">{{ formattedRemainingTime }}</span>
+      
+      <div class="header-right">
+        <div class="timer-display" :class="{ 'warning': remainingSeconds < 300 }">
+          <span class="timer-icon">⏳</span>
+          <span class="timer-value">{{ formattedRemainingTime }}</span>
+        </div>
       </div>
     </header>
 
@@ -34,20 +38,23 @@
         </div>
       </div>
 
-      <div class="left-column">
-        <section class="camera-pane">
-          <header class="pane-header">
-            <span class="pane-title">캠 미리보기</span>
-          </header>
-          <div class="camera-body">
-            <div class="camera-placeholder">
-              <video ref="videoRef" autoplay playsinline muted></video>
+        <div class="left-column">
+          <section class="pane camera-pane">
+            <div class="pane-header">
+              <span class="pane-label">Camera Feed</span>
+              <div class="live-indicator">
+                <span class="dot"></span> LIVE
+              </div>
             </div>
-            <p class="camera-message">
-              {{ cameraError || "현재 웹캠으로 녹화 중입니다." }}
-            </p>
-          </div>
-        </section>
+            <div class="camera-body">
+              <div class="camera-frame">
+                <video ref="videoRef" autoplay playsinline muted></video>
+                <div class="camera-overlay">
+                  <span class="status-text">{{ cameraError || "Monitoring Active" }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
         <section class="problem-pane">
           <header class="pane-header">
@@ -2591,69 +2598,107 @@ onBeforeRouteUpdate(() => {
   pointer-events: auto;
 }
 
+/* 1. 헤더 스타일 */
 .session-header {
-  padding: 14px 28px;
-  border-bottom: 1px solid #1f2937;
+  height: 64px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 0 24px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
   gap: 12px;
 }
 
-.session-title-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.brand-badge {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.05em;
 }
 
-.session-header h1 {
-  margin: 0;
+.session-title {
   font-size: 18px;
   font-weight: 700;
-}
-
-.session-subtitle {
+  color: #fff;
   margin: 0;
-  font-size: 13px;
-  color: #9ca3af;
 }
 
-.timer-chip {
-  display: inline-flex;
+.timer-display {
+  display: flex;
   align-items: center;
   gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #0f172a;
-  color: #e5e7eb;
-  font-size: 13px;
-  border: 1px solid #1f2937;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 16px;
+  border-radius: 99px;
+  transition: all 0.3s ease;
+}
+
+.timer-display.warning {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  animation: pulse-border 1.5s infinite;
 }
 
 .timer-value {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
+  font-family: "JetBrains Mono", monospace;
+  font-size: 16px;
+  font-weight: 700;
   color: #38bdf8;
+  font-variant-numeric: tabular-nums;
 }
+.timer-display.warning .timer-value { color: #ef4444; }
 
+/* 2. 메인 컨텐츠 그리드 */
 .session-main {
   flex: 1;
   display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr);
-  gap: 1px;
-  background: #030712;
-  position: relative;
-  height: 100%;       /* 부모(session-page)의 남은 높이를 꽉 채움 */
+  grid-template-columns: 400px 1fr; /* 왼쪽 고정, 오른쪽 가변 */
+  gap: 16px;
+  padding: 16px;
   overflow: hidden;
+  z-index: 1;
 }
 
+
+/* 왼쪽 컬럼 (캠 + 문제) */
 .left-column {
   display: flex;
   flex-direction: column;
-  height: 100%;     
-  overflow: hidden;   
+  gap: 16px;
+  overflow: hidden;
 }
+
+
+.camera-pane {
+  flex: 0 0 auto; /* 크기 고정 */
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ef4444;
+}
+.live-indicator .dot {
+  width: 6px; height: 6px; background: #ef4444; border-radius: 50%;
+  animation: blink 1.5s infinite;
+}
+
 
 .problem-pane {
   display: flex;
@@ -2732,13 +2777,29 @@ onBeforeRouteUpdate(() => {
 }
 
 .camera-body {
-  flex: 0 0 auto;
-  padding: 12px 18px 8px;
-  display: flex;
-  justify-content: center;
-  flex-direction: column;
-  align-items: center;
+  padding: 12px;
+  background: #000;
+  display: flex; justify-content: center;
 }
+
+.camera-frame {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16/9;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid #334155;
+}
+
+.camera-frame video {
+  width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+}
+
+.camera-overlay {
+  position: absolute; bottom: 8px; left: 8px;
+  background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px;
+}
+.status-text { font-size: 10px; color: #fff; }
 
 .camera-placeholder {
   width: auto;
@@ -3239,6 +3300,12 @@ onBeforeRouteUpdate(() => {
   animation: none;
 }
 
+@media (max-width: 900px) {
+  .session-main { grid-template-columns: 1fr; overflow-y: auto; }
+  .left-column { flex-direction: row; height: 300px; }
+  .camera-pane { width: 40%; }
+}
+
 @keyframes recording-mic-breathe {
   0% {
     box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(167, 139, 250, 0.22);
@@ -3285,5 +3352,31 @@ onBeforeRouteUpdate(() => {
   .code-editor {
     height: 260px;
   }
+}
+</style>
+
+<style>
+/*커스텀 스크롤바 디자인 (전역 적용)*/
+::-webkit-scrollbar {
+  width: 10px;  /* 세로 스크롤바 너비 */
+  height: 10px; /* 가로 스크롤바 높이 */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #374151; /* 진한 회색 */
+  border-radius: 5px;
+  border: 2px solid #020617; /* 배경색과 맞춰서 여백 효과 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #4b5563;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 </style>

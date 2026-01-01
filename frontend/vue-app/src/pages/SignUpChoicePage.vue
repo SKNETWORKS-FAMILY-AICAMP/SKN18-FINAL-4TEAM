@@ -37,7 +37,11 @@ const personalIcon = new URL("../assets/개인회원.png", import.meta.url).href
 const companyIcon = new URL("../assets/기업회원.png", import.meta.url).href;
 
 const goToTerms = (type) => {
-  router.push({ name: "signup-terms", query: { type } });
+  if (type === "company") {
+    router.push({ name: "signup-company" });
+  } else {
+    router.push({ name: "signup-personal" });
+  }
 };
 </script>
 

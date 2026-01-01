@@ -10,7 +10,9 @@
 
         <div class="terms-list">
           <div class="term-box">
-            <div class="term-content"></div>
+            <div class="term-content">
+            
+            </div>
             <div class="term-footer">
               <span>개인정보 수집정보 동의 (필수)</span>
               <label class="checkbox-wrap">

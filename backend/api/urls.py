@@ -31,6 +31,7 @@ from .views import (
     save_strategy_answer,
     LiveCodingAntiCheatEventView,
     UserProfileDetailView,
+    UserProfileOptionsView,
 )
 from .timer_views import LiveCodingTimerUpdateView
 
@@ -109,6 +110,7 @@ urlpatterns = [
     # profile
     path("user/profile/", ProfileView.as_view(), name="profile"),
     path("user/profile/detail/", views.UserProfileDetailView.as_view(), name="user-profile-detail"),
+    path("user/profile/options/", views.UserProfileOptionsView.as_view(), name="user-profile-options"),
     path("livecoding/final-eval/start/", views.LiveCodingFinalEvalStartView.as_view()),
     path("livecoding/final-eval/status/", views.LiveCodingFinalEvalStatusView.as_view()),
     path("livecoding/final-eval/report/", views.LiveCodingFinalEvalReportView.as_view()),

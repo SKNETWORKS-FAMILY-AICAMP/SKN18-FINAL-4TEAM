@@ -2,6 +2,10 @@
   <div class="signup-page">
     <div class="bg-grid"></div>
 
+    <nav class="nav-header">
+      <RouterLink to="/" class="brand">JOBTORY</RouterLink>
+    </nav>
+
     <div class="signup-scroll-container">
       <div class="signup-wrapper">
         <header class="page-header">
@@ -87,8 +91,8 @@
                     <option value="">직접 입력</option>
                     <option value="gmail.com">gmail.com</option>
                     <option value="naver.com">naver.com</option>
-                    <option value="kakao.com">kakao.com</option>
                     <option value="daum.net">daum.net</option>
+                    <option value="jobtory.com">jobtory.com</option>
                   </select>
                   <button 
                     type="button" 
@@ -168,7 +172,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, RouterLink } from "vue-router";
 
 const router = useRouter();
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
@@ -214,34 +218,17 @@ const terms = ref([
     content: `
       <div style="line-height: 1.6; color: #374151;">
         <h3 style="margin-bottom: 12px; font-size: 18px; color: #111827;">제1장 총칙</h3>
-        
         <h4 style="margin: 16px 0 8px; font-size: 15px; color: #111827;">제1조 (목적)</h4>
         <p>본 약관은 잡토리(이하 "회사")가 제공하는 기업용 채용 관리 및 코딩 테스트 서비스(이하 "서비스")의 이용과 관련하여 회사와 기업 회원(이하 "회원") 간의 권리, 의무 및 책임사항을 규정함을 목적으로 합니다.</p>
-
         <h4 style="margin: 16px 0 8px; font-size: 15px; color: #111827;">제2조 (용어의 정의)</h4>
         <ol style="padding-left: 20px; margin: 0;">
           <li>"기업 회원"이라 함은 사업자등록증을 소지하고 서비스를 이용하기 위해 약관에 동의하고 가입한 법인 또는 개인사업자를 말합니다.</li>
-          <li>"관리자"라 함은 기업 회원을 대리하여 서비스를 관리하는 담당자를 말합니다.</li>
           <li>"서비스"라 함은 회사가 제공하는 온라인 코딩 테스트, 리포트 열람, 지원자 관리 시스템 등을 말합니다.</li>
         </ol>
-
-        <h4 style="margin: 16px 0 8px; font-size: 15px; color: #111827;">제3조 (약관의 효력 및 변경)</h4>
-        <p>회사는 합리적인 사유가 발생할 경우 관련 법령에 위배되지 않는 범위 내에서 약관을 개정할 수 있으며, 변경된 약관은 서비스 내 공지사항을 통해 효력이 발생합니다.</p>
-
         <hr style="border: 0; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
-
         <h3 style="margin-bottom: 12px; font-size: 18px; color: #111827;">제2장 계약 당사자의 의무</h3>
-
         <h4 style="margin: 16px 0 8px; font-size: 15px; color: #111827;">제4조 (회사의 의무)</h4>
         <p>회사는 지속적이고 안정적인 서비스 제공을 위해 노력하며, 서비스 장애 발생 시 이를 신속하게 복구할 의무가 있습니다.</p>
-
-        <h4 style="margin: 16px 0 8px; font-size: 15px; color: #111827;">제5조 (회원의 의무)</h4>
-        <ul style="padding-left: 20px; margin: 0;">
-          <li>회원은 서비스 이용 시 등록한 정보의 정확성을 유지해야 합니다.</li>
-          <li>회원은 발급받은 계정(ID) 및 비밀번호를 타인에게 양도하거나 대여할 수 없습니다.</li>
-          <li>회원은 서비스 내에서 취득한 지원자의 개인정보를 채용 목적 이외의 용도로 사용하거나 유출해서는 안 됩니다.</li>
-        </ul>
-
         <p style="margin-top: 24px; font-size: 13px; color: #6b7280;">부칙: 본 약관은 2026년 1월 1일부터 시행됩니다.</p>
       </div>
     `
@@ -254,48 +241,20 @@ const terms = ref([
     content: `
       <div style="line-height: 1.6; color: #374151;">
         <p>잡토리(이하 "회사")는 기업 회원 가입 및 서비스 제공을 위해 아래와 같이 개인정보를 수집·이용합니다.</p>
-
         <h4 style="margin: 20px 0 12px; font-size: 15px; color: #111827;">1. 수집하는 개인정보 항목</h4>
         <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; font-size: 14px;">
           <thead style="background: #f9fafb;">
-            <tr>
-              <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">구분</th>
-              <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">수집 항목</th>
-            </tr>
+            <tr><th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">구분</th><th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">수집 항목</th></tr>
           </thead>
           <tbody>
-            <tr>
-              <td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: 600;">필수 항목</td>
-              <td style="padding: 10px; border: 1px solid #e5e7eb;">아이디, 비밀번호, 기업명, 담당자 이름, 담당자 연락처(휴대전화번호), 담당자 이메일</td>
-            </tr>
-            <tr>
-              <td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: 600;">자동 수집</td>
-              <td style="padding: 10px; border: 1px solid #e5e7eb;">접속 로그, 쿠키, 접속 IP 정보</td>
-            </tr>
+            <tr><td style="padding: 10px; border: 1px solid #e5e7eb; font-weight: 600;">필수 항목</td><td style="padding: 10px; border: 1px solid #e5e7eb;">아이디, 비밀번호, 기업명, 담당자 이름, 연락처, 이메일</td></tr>
           </tbody>
         </table>
-
-        <h4 style="margin: 20px 0 12px; font-size: 15px; color: #111827;">2. 수집 및 이용 목적</h4>
-        <ul style="padding-left: 20px; margin: 0;">
-          <li>기업 회원 가입 의사 확인 및 본인 식별</li>
-          <li>서비스 제공(채용 공고 관리, 코딩 테스트 진행 등)</li>
-          <li>고지사항 전달, 불만 처리 등 원활한 의사소통 경로 확보</li>
-          <li>부정 이용 방지 및 비인가 사용 방지</li>
-        </ul>
-
-        <h4 style="margin: 20px 0 12px; font-size: 15px; color: #111827;">3. 보유 및 이용 기간</h4>
-        <p><strong>회원 탈퇴 시까지</strong> (단, 관계 법령에 따라 보존할 필요가 있는 경우 해당 기간 동안 보관)</p>
-        <ul style="padding-left: 20px; margin-top: 8px; font-size: 13px; color: #6b7280;">
-          <li>계약 또는 청약철회 등에 관한 기록: 5년</li>
-          <li>대금결제 및 재화 등의 공급에 관한 기록: 5년</li>
-          <li>소비자의 불만 또는 분쟁처리에 관한 기록: 3년</li>
-        </ul>
-
-        <p style="margin-top: 20px; font-weight: 600;">귀하는 개인정보 수집 및 이용에 동의를 거부할 권리가 있으나, 거부 시 회원가입 및 서비스 이용이 제한됩니다.</p>
+        <h4 style="margin: 20px 0 12px; font-size: 15px; color: #111827;">2. 보유 및 이용 기간</h4>
+        <p><strong>회원 탈퇴 시까지</strong></p>
       </div>
     `
   },
-
   {
     id: "marketing",
     title: "마케팅 활용 동의",
@@ -304,30 +263,10 @@ const terms = ref([
     content: `
       <div style="line-height: 1.6; color: #374151;">
         <p>잡토리에서 제공하는 이벤트, 신규 서비스 안내 등 광고성 정보를 수신하는 것에 동의합니다.</p>
-
         <h4 style="margin: 20px 0 12px; font-size: 15px; color: #111827;">1. 수집 목적 및 항목</h4>
-        <table style="width: 100%; border-collapse: collapse; border: 1px solid #e5e7eb; font-size: 14px;">
-          <thead style="background: #f9fafb;">
-            <tr>
-              <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">목적</th>
-              <th style="padding: 10px; border: 1px solid #e5e7eb; text-align: left;">항목</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              <td style="padding: 10px; border: 1px solid #e5e7eb;">신규 서비스(기능) 안내,<br>이벤트 및 프로모션 정보 제공</td>
-              <td style="padding: 10px; border: 1px solid #e5e7eb;">담당자 이메일, 담당자 휴대전화번호</td>
-            </tr>
-          </tbody>
-        </table>
-
+        <p>신규 서비스(기능) 안내, 이벤트 및 프로모션 정보 제공 (담당자 이메일, 연락처)</p>
         <h4 style="margin: 20px 0 12px; font-size: 15px; color: #111827;">2. 보유 및 이용 기간</h4>
         <p><strong>회원 탈퇴 시 또는 동의 철회 시까지</strong></p>
-
-        <p style="margin-top: 20px; font-size: 13px; color: #6b7280;">
-          ※ 본 동의를 거부하시더라도 기본 서비스 이용에는 제한이 없으나, 이벤트 및 할인 혜택 등의 정보를 받으실 수 없습니다.<br>
-          ※ 수신 동의 이후에도 언제든지 고객센터 또는 마이페이지를 통해 수신 동의를 철회할 수 있습니다.
-        </p>
       </div>
     `
   }
@@ -373,9 +312,7 @@ const buildEmail = () => {
 
 const handleCheckUsername = async () => {
   if (!username.value) return;
-  // API Call Simulation
-  // const res = await fetch(...)
-  // Mock Logic
+  // API Mock Logic
   if (username.value === "admin") {
     usernameStatus.value = "taken";
   } else {
@@ -428,10 +365,7 @@ const handleSubmit = async () => {
 
   pending.value = true;
   try {
-    // API Call
-    // const res = await fetch(...)
     await new Promise(r => setTimeout(r, 1000));
-    
     alert("기업 회원가입이 완료되었습니다.");
     router.push("/login");
   } catch (e) {
@@ -443,7 +377,29 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
+
+/* [추가된 스타일] 상단 네비게이션 (로고) */
+.nav-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 24px 40px;
+  z-index: 50; /* 배경보다 위에 */
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
 
 /* 1. 전체 페이지 설정 */
 .signup-page {
@@ -479,10 +435,10 @@ const handleSubmit = async () => {
   overflow-y: auto;
   padding: 40px 20px;
   
-  /* Firefox: 스크롤바 숨김 */
-  scrollbar-width: none; 
-  /* IE, Edge: 스크롤바 숨김 */
-  -ms-overflow-style: none; 
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE, Edge */
+  -ms-overflow-style: none;
 }
 
 /* Chrome, Safari, Opera: 스크롤바 숨김 */
@@ -504,6 +460,7 @@ const handleSubmit = async () => {
 /* 헤더 */
 .page-header {
   text-align: center;
+  margin-top: 60px; /* 로고 영역 확보 */
 }
 .eyebrow {
   font-size: 13px;
@@ -658,27 +615,21 @@ const handleSubmit = async () => {
   line-height: 1.6;
   font-size: 14px;
   color: #374151;
+  /* Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
 }
 
-.modal-body::-webkit-scrollbar {
-  width: 6px; 
-}
-
-.modal-body::-webkit-scrollbar-track {
-  background: transparent; 
-  margin: 4px 0; 
-}
-
+/* Modal Custom Scrollbar (Webkit) */
+.modal-body::-webkit-scrollbar { width: 6px; }
+.modal-body::-webkit-scrollbar-track { background: transparent; margin: 4px 0; }
 .modal-body::-webkit-scrollbar-thumb {
-  background-color: #374151; 
-  border-radius: 10px; 
+  background-color: #cbd5e1;
+  border-radius: 10px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
-
-.modal-body::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8ff; 
-}
+.modal-body::-webkit-scrollbar-thumb:hover { background-color: #94a3b8; }
 
 .modal-close { background: none; border: none; font-size: 20px; cursor: pointer; }
 
@@ -689,6 +640,7 @@ const handleSubmit = async () => {
 }
 
 @media (max-width: 768px) {
+  .nav-header { padding: 20px; justify-content: center; }
   .signup-card { padding: 32px 24px; }
   .signup-form { grid-template-columns: 1fr; gap: 40px; }
   .email-group { flex-wrap: wrap; }

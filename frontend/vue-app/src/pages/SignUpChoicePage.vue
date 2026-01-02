@@ -2,6 +2,10 @@
   <div class="signup-page">
     <div class="bg-grid"></div>
 
+    <nav class="nav-header">
+      <RouterLink to="/" class="brand">JOBTORY</RouterLink>
+    </nav>
+
     <div class="signup-container">
       <header class="signup-header">
         <p class="eyebrow">MEMBERSHIP</p>
@@ -53,7 +57,7 @@
 </template>
 
 <script setup>
-import { useRouter } from "vue-router";
+import { useRouter, RouterLink } from "vue-router"; // RouterLink 추가
 
 const router = useRouter();
 
@@ -70,23 +74,55 @@ const goToTerms = (type) => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
 
-/* 1. 전체 화면 고정 (스크롤 제거) */
+/* --- [추가된 스타일] 상단 네비게이션 --- */
+.nav-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 24px 40px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+/* 모바일 대응 */
+@media (max-width: 768px) {
+  .nav-header {
+    padding: 20px;
+    justify-content: center;
+  }
+}
+
+/* -------------------------------------- */
+/* ... 기존 스타일 그대로 유지 ... */
+
 .signup-page {
   position: relative;
   width: 100vw;
-  height: 100vh; /* 화면 꽉 채움 */
+  height: 100vh;
   background: #f8f4eb;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   color: #111827;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden; /* 바깥쪽 스크롤 원천 차단 */
+  overflow: hidden;
 }
 
-/* 배경 그리드 */
+/* ... (나머지 스타일 동일) ... */
 .bg-grid {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -99,7 +135,6 @@ const goToTerms = (type) => {
   pointer-events: none;
 }
 
-/* 2. 내부 컨테이너 (필요시 내부 스크롤) */
 .signup-container {
   position: relative;
   z-index: 1;
@@ -108,27 +143,21 @@ const goToTerms = (type) => {
   display: flex;
   flex-direction: column;
   gap: 60px;
-  
-  /* 화면 높이를 초과할 경우 내부 스크롤 허용 */
   max-height: 100vh;
   overflow-y: auto;
-  padding: 40px 20px; /* 패딩을 컨테이너 내부로 이동 */
-
-  /* 스크롤바 숨기기 */
-  scrollbar-width: none;  /* Firefox */
-  -ms-overflow-style: none; /* IE, Edge */
+  padding: 40px 20px;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
 }
 
-/* 크롬, 사파리 스크롤바 숨김 */
 .signup-container::-webkit-scrollbar {
   display: none;
 }
 
-/* --- 이하 스타일 동일 --- */
-
 .signup-header {
   text-align: center;
   animation: fadeUp 0.8s ease-out;
+  margin-top: 40px; /* 로고와 겹치지 않게 여백 추가 */
 }
 
 .eyebrow {
@@ -154,7 +183,6 @@ const goToTerms = (type) => {
   color: #4b5563;
 }
 
-/* 선택 카드 그리드 */
 .choice-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));

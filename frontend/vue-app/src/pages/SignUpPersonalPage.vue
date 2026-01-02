@@ -2,6 +2,10 @@
   <div class="signup-page">
     <div class="bg-grid"></div>
 
+    <nav class="nav-header">
+      <RouterLink to="/" class="brand">JOBTORY</RouterLink>
+    </nav>
+
     <div class="signup-scroll-container">
       <div class="signup-wrapper">
         <header class="page-header">
@@ -95,8 +99,8 @@
                     <option value="">직접 입력</option>
                     <option value="gmail.com">gmail.com</option>
                     <option value="naver.com">naver.com</option>
-                    <option value="kakao.com">kakao.com</option>
                     <option value="daum.net">daum.net</option>
+                    <option value="kakao.com">kakao.com</option>
                   </select>
                   <button 
                     type="button" 
@@ -198,7 +202,7 @@
 
 <script setup>
 import { computed, ref, watch } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, RouterLink } from "vue-router"; // RouterLink 추가
 
 const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const router = useRouter();
@@ -510,9 +514,32 @@ const handleSubmit = async () => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
 
-/* 1. 전체 페이지 설정 (고정) */
+/* --- [추가된 스타일] 상단 네비게이션 --- */
+.nav-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 24px 40px;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
+/* -------------------------------------- */
+
 .signup-page {
   position: relative;
   width: 100vw;
@@ -525,10 +552,12 @@ const handleSubmit = async () => {
   overflow: hidden;
 }
 
-/* 배경 그리드 */
 .bg-grid {
   position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   background-size: 40px 40px;
   background-image:
@@ -538,7 +567,6 @@ const handleSubmit = async () => {
   pointer-events: none;
 }
 
-/* 2. 메인 스크롤 컨테이너 (스크롤바 숨김 처리) */
 .signup-scroll-container {
   position: relative;
   z-index: 1;
@@ -546,19 +574,16 @@ const handleSubmit = async () => {
   height: 100%;
   overflow-y: auto;
   padding: 40px 20px;
-  
-  /* Firefox: 스크롤바 숨김 */
-  scrollbar-width: none; 
-  /* IE, Edge: 스크롤바 숨김 */
-  -ms-overflow-style: none; 
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE, Edge */
+  -ms-overflow-style: none;
 }
 
-/* Chrome, Safari, Opera: 스크롤바 숨김 */
 .signup-scroll-container::-webkit-scrollbar {
   display: none;
 }
 
-/* 3. 컨텐츠 래퍼 */
 .signup-wrapper {
   max-width: 900px;
   margin: 0 auto;
@@ -569,8 +594,11 @@ const handleSubmit = async () => {
   animation: fadeUp 0.6s ease-out;
 }
 
-/* 헤더 */
-.page-header { text-align: center; }
+.page-header {
+  text-align: center;
+  margin-top: 60px; /* 로고와 겹치지 않게 여백 추가 */
+}
+
 .eyebrow {
   font-size: 13px;
   font-weight: 700;
@@ -578,27 +606,27 @@ const handleSubmit = async () => {
   letter-spacing: 0.05em;
   margin-bottom: 8px;
 }
+
 .page-title {
   font-size: 42px;
   font-weight: 800;
   margin: 0 0 12px;
 }
+
 .page-desc {
   font-size: 16px;
   color: #4b5563;
   margin: 0;
 }
 
-/* 카드 스타일 */
 .signup-card {
   background: #ffffff;
   border-radius: 24px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.05);
   padding: 48px;
-  border: 1px solid rgba(0,0,0,0.05);
+  border: 1px solid rgba(0, 0, 0, 0.05);
 }
 
-/* 폼 그리드 */
 .signup-form {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -619,7 +647,6 @@ const handleSubmit = async () => {
   margin-bottom: 8px;
 }
 
-/* 폼 요소 공통 */
 .form-group {
   display: flex;
   flex-direction: column;
@@ -632,7 +659,8 @@ const handleSubmit = async () => {
   color: #374151;
 }
 
-.form-input, .form-select {
+.form-input,
+.form-select {
   width: 100%;
   height: 46px;
   padding: 0 14px;
@@ -645,15 +673,13 @@ const handleSubmit = async () => {
   transition: all 0.2s;
 }
 
-.form-input:focus, .form-select:focus {
+.form-input:focus,
+.form-select:focus {
   background: #fff;
   border-color: #111827;
   box-shadow: 0 0 0 1px #111827;
 }
 
-.input-with-btn { display: flex; gap: 8px; }
-
-/* 버튼 */
 .btn-outline {
   height: 46px;
   padding: 0 16px;
@@ -666,7 +692,11 @@ const handleSubmit = async () => {
   cursor: pointer;
   white-space: nowrap;
 }
-.btn-outline:hover { background: #f3f4f6; border-color: #9ca3af; }
+
+.btn-outline:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
 
 .btn-black {
   height: 46px;
@@ -680,26 +710,62 @@ const handleSubmit = async () => {
   cursor: pointer;
   white-space: nowrap;
 }
-.btn-black:hover { background: #000; }
-.btn-black:disabled { background: #9ca3af; cursor: not-allowed; }
 
-/* 그룹 필드 */
-.phone-group, .birth-group, .email-group, .email-actions {
+.btn-black:hover {
+  background: #000;
+}
+
+.btn-black:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+.input-with-btn {
+  display: flex;
+  gap: 8px;
+}
+
+.phone-group,
+.birth-group,
+.email-group,
+.email-actions {
   display: flex;
   gap: 8px;
   align-items: center;
 }
-.center-text { text-align: center; }
-.dash, .at { color: #9ca3af; font-weight: bold; }
 
-/* 메시지 */
-.msg-text { font-size: 12px; margin-top: 4px; }
-.msg-text.success { color: #16a34a; }
-.msg-text.error { color: #dc2626; }
-.error-border { border-color: #dc2626; background: #fef2f2; }
-.success-border { border-color: #16a34a; }
+.center-text {
+  text-align: center;
+}
 
-/* 약관 및 하단 버튼 */
+.dash,
+.at {
+  color: #9ca3af;
+  font-weight: bold;
+}
+
+.msg-text {
+  font-size: 12px;
+  margin-top: 4px;
+}
+
+.msg-text.success {
+  color: #16a34a;
+}
+
+.msg-text.error {
+  color: #dc2626;
+}
+
+.error-border {
+  border-color: #dc2626;
+  background: #fef2f2;
+}
+
+.success-border {
+  border-color: #16a34a;
+}
+
 .form-footer {
   grid-column: 1 / -1;
   margin-top: 20px;
@@ -726,14 +792,53 @@ const handleSubmit = async () => {
   border-bottom: 1px solid #e5e7eb;
 }
 
-.terms-title { margin: 0; font-size: 16px; font-weight: 700; }
-.terms-all-check { display: flex; align-items: center; gap: 8px; font-weight: 700; cursor: pointer; }
+.terms-title {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
 
-.terms-list { display: flex; flex-direction: column; gap: 12px; }
-.term-item { display: flex; justify-content: space-between; align-items: center; font-size: 14px; }
-.term-label { display: flex; align-items: center; gap: 8px; cursor: pointer; }
-.required { color: #dc2626; font-size: 12px; }
-.term-view-btn { background: none; border: none; text-decoration: underline; color: #6b7280; cursor: pointer; font-size: 12px; }
+.terms-all-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.terms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.term-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+}
+
+.term-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+
+.required {
+  color: #dc2626;
+  font-size: 12px;
+}
+
+.term-view-btn {
+  background: none;
+  border: none;
+  text-decoration: underline;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 12px;
+}
 
 .btn-submit {
   min-width: 280px;
@@ -745,25 +850,48 @@ const handleSubmit = async () => {
   font-weight: 700;
   border: none;
   cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   transition: transform 0.2s;
 }
-.btn-submit:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(0,0,0,0.2); }
-.btn-submit:disabled { background: #9ca3af; cursor: not-allowed; }
 
-/* 모달 */
+.btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.2);
+}
+
+.btn-submit:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
 .modal-overlay {
-  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
-  display: flex; align-items: center; justify-content: center; z-index: 1000;
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
 }
+
 .modal-card {
-  width: min(600px, 90vw); max-height: 80vh; background: #fff;
-  border-radius: 12px; display: flex; flex-direction: column;
+  width: min(600px, 90vw);
+  max-height: 80vh;
+  background: #fff;
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
 }
+
 .modal-header {
-  padding: 16px 20px; border-bottom: 1px solid #eee;
-  display: flex; justify-content: space-between; align-items: center; font-weight: bold;
+  padding: 16px 20px;
+  border-bottom: 1px solid #eee;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: bold;
 }
+
 .modal-body {
   padding: 20px;
   overflow-y: auto;
@@ -773,36 +901,59 @@ const handleSubmit = async () => {
 }
 
 .modal-body::-webkit-scrollbar {
-  width: 6px; 
+  width: 6px;
 }
 
 .modal-body::-webkit-scrollbar-track {
   background: transparent;
-  margin: 4px 0; 
+  margin: 4px 0;
 }
 
 .modal-body::-webkit-scrollbar-thumb {
   background-color: #374151;
-  border-radius: 10px; 
-  border: 2px solid transparent; 
+  border-radius: 10px;
+  border: 2px solid transparent;
   background-clip: content-box;
 }
 
 .modal-body::-webkit-scrollbar-thumb:hover {
-  background-color: #94a3b8; 
+  background-color: #94a3b8;
 }
 
-.modal-close { background: none; border: none; font-size: 20px; cursor: pointer; }
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+}
 
 @keyframes fadeUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @media (max-width: 768px) {
-  .signup-card { padding: 32px 24px; }
-  .signup-form { grid-template-columns: 1fr; gap: 40px; }
-  .email-group { flex-wrap: wrap; }
-  .page-title { font-size: 32px; }
+  .signup-card {
+    padding: 32px 24px;
+  }
+
+  .signup-form {
+    grid-template-columns: 1fr;
+    gap: 40px;
+  }
+
+  .email-group {
+    flex-wrap: wrap;
+  }
+
+  .page-title {
+    font-size: 32px;
+  }
 }
 </style>

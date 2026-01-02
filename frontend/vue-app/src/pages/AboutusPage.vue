@@ -157,7 +157,7 @@ const members = [
   position: relative;
   height: 70vh;
   min-height: 550px;
-  background: #eaddd5;
+  background: #f8f4eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -323,8 +323,6 @@ const members = [
 
 .id-card:hover {
   transform: translateY(-10px);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-  border-color: #caa3b1;
 }
 
 .card-hole {

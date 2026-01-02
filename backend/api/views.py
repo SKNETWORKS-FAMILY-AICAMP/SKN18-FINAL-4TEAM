@@ -1587,6 +1587,11 @@ class CodingQuestionView(APIView):
         graph = get_cached_graph(name="chapter2")
         coding_state = {
             "meta": {"session_id": session_id, "user_id": user.user_id},
+            # LangGraph Redis checkpointer가 thread_id 기준으로 상태를 누적 저장한다.
+            # 직전 호출이 question_answer였다면 event_type이 그대로 남아,
+            # 질문 생성 tick에서도 coding_answer_feedback 노드로 잘못 분기될 수 있어
+            # 여기서는 항상 "질문 생성" 경로로 진입하도록 event_type을 명시한다.
+            "event_type": "coding_tick",
             "code": latest_code,
             "language": language,
             "question_cnt": question_cnt,

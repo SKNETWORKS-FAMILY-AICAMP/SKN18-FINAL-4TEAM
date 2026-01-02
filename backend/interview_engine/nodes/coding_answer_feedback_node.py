@@ -29,4 +29,9 @@ def coding_answer_feedback_agent(state: CodingState) -> CodingState:
 
     state["user_answers"] = user_answers
     state["tts_text"] = message
+    # Redis checkpointer(thread) 기준으로 state가 누적되기 때문에,
+    # event_type을 question_answer로 남겨두면 다음 tick(질문 생성) 호출에서
+    # 엔트리가 잘못 분기되어 다시 이 노드가 실행될 수 있다.
+    # 답변 리액션 이후에는 코딩 진행(tick) 상태로 되돌린다.
+    state["event_type"] = "coding_tick"
     return state

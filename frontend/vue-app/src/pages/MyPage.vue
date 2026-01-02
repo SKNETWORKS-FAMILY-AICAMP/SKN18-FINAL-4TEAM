@@ -5,52 +5,129 @@
     </header>
 
     <main class="mypage-body">
-      <div class="card">
-        <h1 class="title">마이페이지</h1>
-        <p class="subtitle">계정 정보를 확인하고 서비스를 계속 이용하세요.</p>
-        <div class="info-grid" v-if="user">
-          <div class="info-row">
-            <span class="label">아이디</span>
-            <span class="value">{{ user.user_id }}</span>
+      <!-- ✅ 계정 + 프로필 통합 카드 -->
+      <div class="card account-profile-card">
+        <div class="top-header">
+          <div>
+            <h1 class="title">마이페이지</h1>
+            <p class="subtitle">계정 정보와 프로필을 한 번에 확인하고 수정할 수 있어요.</p>
           </div>
-          <div class="info-row">
-            <span class="label">이름</span>
-            <span class="value">{{ user.name }}</span>
-          </div>
-          <div class="info-row">
-            <span class="label">이메일</span>
-            <span class="value">{{ user.email }}</span>
-          </div>
-          <div class="info-row" v-if="user.phone_number">
-            <span class="label">전화번호</span>
-            <span class="value">{{ user.phone_number }}</span>
-          </div>
-          <div class="info-row" v-if="user.birthdate">
-            <span class="label">생년월일</span>
-            <span class="value">{{ user.birthdate }}</span>
+
+          <div class="top-actions" v-if="user">
+            <!-- ✅ 버튼 하나로 고정 (name 기준) -->
+            <RouterLink class="edit-button" :to="{ name: 'profile-edit' }">
+              회원정보 수정
+            </RouterLink>
+
+            <button class="refresh-btn" @click="fetchUserProfile" :disabled="profileLoading">
+              새로고침
+            </button>
           </div>
         </div>
-        <p class="hint" v-else>프로필을 불러오는 중입니다...</p>
-        <div class="actions" v-if="user">
-          <RouterLink to="/profile/edit" class="edit-button">
-            회원정보 수정
-          </RouterLink>
+
+        <!-- 계정 정보 -->
+        <div v-if="user" class="section">
+          <h2 class="section-title">계정</h2>
+
+          <div class="info-grid">
+            <div class="info-row">
+              <span class="label">아이디</span>
+              <span class="value">{{ user.user_id }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">이름</span>
+              <span class="value">{{ user.name }}</span>
+            </div>
+            <div class="info-row">
+              <span class="label">이메일</span>
+              <span class="value">{{ user.email }}</span>
+            </div>
+            <div class="info-row" v-if="user.phone_number">
+              <span class="label">전화번호</span>
+              <span class="value">{{ user.phone_number }}</span>
+            </div>
+            <div class="info-row" v-if="user.birthdate">
+              <span class="label">생년월일</span>
+              <span class="value">{{ user.birthdate }}</span>
+            </div>
+          </div>
+        </div>
+        <p class="hint" v-else>로그인을 불러오는 중입니다...</p>
+
+        <!-- 프로필 -->
+        <div class="section">
+          <h2 class="section-title">프로필</h2>
+          <p class="profile-subtitle">
+            메인페이지 모달에서 입력한 프로필을 여기서도 조회·수정할 수 있어요.
+          </p>
+
+          <div v-if="profileLoading" class="status-text">프로필을 불러오는 중...</div>
+          <div v-else-if="profileError" class="status-text error">{{ profileError }}</div>
+
+          <div v-else class="profile-grid readonly">
+            <div class="profile-field">
+              <span class="field-label">최종 학력</span>
+              <span class="field-value">{{ profileForm.graduated_school || "-" }}</span>
+            </div>
+            <div class="profile-field">
+              <span class="field-label">학교명</span>
+              <span class="field-value">{{ profileForm.university || "-" }}</span>
+            </div>
+            <div class="profile-field">
+              <span class="field-label">전공</span>
+              <span class="field-value">{{ profileForm.major || "-" }}</span>
+            </div>
+            <div class="profile-field">
+              <span class="field-label">학적 상태</span>
+              <span class="field-value">{{ profileForm.academic_status || "-" }}</span>
+            </div>
+            <div class="profile-field">
+              <span class="field-label">졸업(예정) 연도</span>
+              <span class="field-value">{{ profileForm.graduation_year || "-" }}</span>
+            </div>
+
+            <div class="profile-field">
+              <span class="field-label">경력 레벨</span>
+              <span class="field-value">{{ profileForm.career_level || "-" }}</span>
+            </div>
+            <div class="profile-field">
+              <span class="field-label">현재 상태</span>
+              <span class="field-value">{{ profileForm.current_status || "-" }}</span>
+            </div>
+            <div class="profile-field">
+              <span class="field-label">희망 근무지</span>
+              <span class="field-value">{{ profileForm.region_single || "-" }}</span>
+            </div>
+
+            <div class="profile-field full">
+              <span class="field-label">기술 스택</span>
+              <span class="field-value">{{ formatList(profileForm.tech_stack) }}</span>
+            </div>
+            <div class="profile-field full">
+              <span class="field-label">희망 직무</span>
+              <span class="field-value">{{ formatList(profileForm.desired_role) }}</span>
+            </div>
+            <div class="profile-field full">
+              <span class="field-label">세부 희망 직무</span>
+              <span class="field-value">{{ formatList(profileForm.detailed_role) }}</span>
+            </div>
+          </div>
         </div>
       </div>
 
-      <!-- 라이브코딩 리포트 목록 -->
+      <!-- 리포트 카드 (그대로 유지) -->
       <div class="card reports-card">
         <div class="reports-header">
           <div>
             <h2 class="reports-title">라이브코딩 최종 리포트</h2>
-            <p class="reports-subtitle">완료된 세션을 모달로 열어 보고 PDF로 저장하세요.</p>
+            <p class="reports-subtitle">최근 세션들을 모아 보고 PDF로 저장하세요.</p>
           </div>
           <button class="refresh-btn" @click="fetchReports" :disabled="listLoading">새로고침</button>
         </div>
 
         <div v-if="listLoading" class="status-text">리포트 목록을 불러오는 중...</div>
         <div v-else-if="listError" class="status-text error">{{ listError }}</div>
-        <div v-else-if="!reports.length" class="status-text">저장된 리포트가 없습니다.</div>
+        <div v-else-if="!reports.length" class="status-text">아직 저장된 리포트가 없습니다.</div>
 
         <div v-else class="report-list">
           <div v-for="r in reports" :key="r.session_id" class="report-item">
@@ -62,7 +139,9 @@
             </div>
             <div class="report-actions">
               <button class="view-btn" @click="openReport(r.session_id)">보기</button>
-              <a v-if="r.pdf_path" class="pdf-link" :href="r.pdf_path" target="_blank" rel="noopener">저장된 PDF</a>
+              <a v-if="r.pdf_path" class="pdf-link" :href="r.pdf_path" target="_blank" rel="noopener"
+                >저장된 PDF</a
+              >
             </div>
           </div>
         </div>
@@ -196,11 +275,10 @@ const latestGrowthIds = ref([]);
 const AGG_TS_KEY = "jobtory_last_aggregate_ts";
 
 onMounted(() => {
-  if (!user.value) {
-    void fetchProfile();
-  }
+  if (!user.value) void fetchProfile();
   void fetchReports();
   void fetchPayloadAndMaybeAggregate();
+  void fetchUserProfile();
 });
 
 const fetchReports = async () => {
@@ -214,9 +292,7 @@ const fetchReports = async () => {
       return;
     }
     const resp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`,
-      },
+      headers: { Authorization: `Bearer ${token.value}` }
     });
     if (!resp.ok) {
       listError.value = "리포트 목록을 불러오지 못했습니다.";
@@ -241,7 +317,7 @@ const closeModal = () => {
   showModal.value = false;
 };
 
-// 모달에서만 초기화면/새로고침 버튼을 숨기기 위해 iframe 로드 후 스타일 주입
+// 리포트 embed에서 새로고침/종료 버튼을 숨겨 단일 보기용으로 사용
 const onReportFrameLoad = () => {
   const frame = reportFrameRef.value;
   if (!frame || !frame.contentDocument) return;
@@ -250,6 +326,7 @@ const onReportFrameLoad = () => {
     const style = doc.createElement("style");
     style.textContent = `.actions .btn:not(.primary) { display: none !important; }`;
     doc.head.appendChild(style);
+
     const nonPrimary = doc.querySelectorAll(".actions .btn:not(.primary)");
     nonPrimary.forEach((el) => (el.style.display = "none"));
   } catch (e) {
@@ -557,6 +634,48 @@ const fetchPayloadAndMaybeAggregate = async () => {
     void runAggregateAgent();
   }
 };
+const mapProfileToForm = (data) => {
+  profileForm.graduated_school = data.graduated_school || "";
+  profileForm.university = data.university || "";
+  profileForm.major = data.major || "";
+  profileForm.academic_status = data.academic_status || "";
+  profileForm.graduation_year = data.graduation_year || "";
+  profileForm.career_level = data.career_level || "";
+  profileForm.current_status = data.current_status || "";
+  profileForm.tech_stack = data.tech_stack || [];
+  profileForm.desired_role = data.desired_role || [];
+  profileForm.detailed_role = data.detailed_role || [];
+  profileForm.region = data.region || [];
+  profileForm.region_single = (data.region && data.region[0]) || "";
+};
+
+const fetchUserProfile = async () => {
+  profileLoading.value = true;
+  profileError.value = "";
+  try {
+    const ok = await ensureValidSession();
+    if (!ok) {
+      profileError.value = "로그인이 필요합니다.";
+      return;
+    }
+    const res = await fetch(`${BACKEND_BASE}/api/user/profile/detail/`, {
+      headers: token.value ? { Authorization: `Bearer ${token.value}` } : {}
+    });
+    if (!res.ok) throw new Error("프로필을 불러오지 못했습니다.");
+    const data = await res.json();
+    mapProfileToForm(data);
+  } catch (err) {
+    console.error(err);
+    profileError.value = err?.message || "프로필을 불러오지 못했습니다.";
+  } finally {
+    profileLoading.value = false;
+  }
+};
+
+const formatList = (arr) => {
+  if (!arr || !arr.length) return "-";
+  return arr.join(", ");
+};
 </script>
 
 <style scoped>
@@ -620,8 +739,35 @@ const fetchPayloadAndMaybeAggregate = async () => {
   color: #6b7280;
 }
 
+.top-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.top-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.section {
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid #e5e7eb;
+}
+
+.section-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 800;
+  color: #111827;
+}
+
 .info-grid {
-  margin-top: 20px;
+  margin-top: 14px;
   display: grid;
   gap: 12px;
 }
@@ -644,12 +790,6 @@ const fetchPayloadAndMaybeAggregate = async () => {
   color: #111827;
 }
 
-.actions {
-  margin-top: 24px;
-  display: flex;
-  justify-content: flex-end;
-}
-
 .edit-button {
   display: inline-flex;
   align-items: center;
@@ -664,8 +804,7 @@ const fetchPayloadAndMaybeAggregate = async () => {
   border: none;
   cursor: pointer;
   box-shadow: 0 8px 18px rgba(15, 23, 42, 0.18);
-  transition: background 0.15s ease, transform 0.15s ease,
-    box-shadow 0.15s ease;
+  transition: background 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .edit-button:hover {
@@ -677,6 +816,45 @@ const fetchPayloadAndMaybeAggregate = async () => {
 .edit-button:active {
   transform: translateY(0);
   box-shadow: 0 6px 14px rgba(15, 23, 42, 0.2);
+}
+
+.profile-subtitle {
+  margin: 4px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+}
+
+.profile-grid {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px 16px;
+}
+
+.profile-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.profile-field.full {
+  grid-column: 1 / -1;
+}
+
+.profile-grid.readonly .field-label {
+  font-weight: 700;
+  color: #374151;
+}
+
+.profile-grid.readonly .field-value {
+  border: 1px solid #e5e7eb;
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #f9fafb;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
 }
 
 .reports-card {

@@ -105,17 +105,6 @@
           <div class="footer-left">
             <button
               type="button"
-              class="mic-button"
-              @click="onAskButtonClick"
-              :disabled="isSttRunning || isTtsPlaying || isMicCooldown || isHintRecording || isHintLoading"
-              :class="{ 'is-active': isRecording }"
-            >
-              <span class="mic-label">
-                {{ isSttRunning ? "분석 중..." : (isRecording ? "제출하기" : "음성입력") }}
-              </span>
-            </button>
-            <button
-              type="button"
               class="hint-button"
               @click="onHintButtonClick"
               :disabled="isSttRunning || isTtsPlaying || isHintDisabled"
@@ -141,6 +130,29 @@
         </footer>
       </section>
     </main>
+
+    <!-- 자동 녹음(전략 답변 등) 중: 중앙 제출 버튼 -->
+    <div v-if="showAutoRecordingSubmitOverlay" class="recording-submit-overlay">
+      <p class="recording-mic-helper" role="status" aria-live="polite">
+        답변이 끝나면 마이크 버튼을 눌러 제출해 주세요
+      </p>
+      <button
+        type="button"
+        class="recording-mic-button"
+        :class="{ 'is-recording': isRecording }"
+        :style="recordingMicStyle"
+        @click="onAskButtonClick"
+        :disabled="isSttRunning || isTtsPlaying || isMicCooldown"
+        aria-label="답변 제출하기"
+      >
+        <svg viewBox="0 0 24 24" focusable="false" aria-hidden="true">
+          <path
+            fill="currentColor"
+            d="M12 14a3 3 0 0 0 3-3V5a3 3 0 0 0-6 0v6a3 3 0 0 0 3 3zm5-3a1 1 0 1 1 2 0 7 7 0 0 1-6 6.93V20h2a1 1 0 1 1 0 2H9a1 1 0 1 1 0-2h2v-2.07A7 7 0 0 1 5 11a1 1 0 1 1 2 0 5 5 0 0 0 10 0z"
+          />
+        </svg>
+      </button>
+    </div>
 
     <!-- STT → LangGraph → TTS 처리 중 오버레이 -->
     <div v-if="isSttRunning" class="processing-overlay">
@@ -216,11 +228,19 @@ const isRecording = ref(false);
 const isSttRunning = ref(false);
 const isTtsPlaying = ref(false);
 const isMicCooldown = ref(false);
+const micLevel = ref(0);
+let micLevelRafId = null;
+let micAudioContext = null;
+let micAnalyser = null;
+let micTimeDomainData = null;
 
 const answerCountdown = ref(null);
 let answerCountdownTimer = null;
 let micCooldownTimer = null;
 const ANSWER_COUNTDOWN_SECONDS = 30;
+const answerCountdownTotalSeconds = ref(ANSWER_COUNTDOWN_SECONDS);
+
+const isAutoRecording = ref(false);
 
 const HINT_LIMIT = 3;
 const hintCount = ref(0);
@@ -246,6 +266,7 @@ const introSecondChanceUsed = ref(false);
 ----------------------------- */
 const onAskButtonClick = async () => {
   if (isHintRecording.value) return;
+  clearAnswerCountdown();
   if (isMicCooldown.value) return;
   if (micCooldownTimer) {
     clearTimeout(micCooldownTimer);
@@ -260,6 +281,7 @@ const onAskButtonClick = async () => {
   if (isSttRunning.value) return;
 
   if (!isRecording.value) {
+    isAutoRecording.value = false;
     // 사용자가 말하기 시작하면 코딩 질문 타이머는 잠시 정지
     stopCodingQuestionTimer();
     // 수동으로 질문하기 버튼을 눌렀을 때 녹음 시작
@@ -270,6 +292,7 @@ const onAskButtonClick = async () => {
 
   await stopRecording();
   isRecording.value = false;
+  isAutoRecording.value = false;
 
   isSttRunning.value = true;
   try {
@@ -283,14 +306,21 @@ const onAnswerButtonClick = async () => {
   if (isHintRecording.value) return;
   clearAnswerCountdown();
   if (isSttRunning.value || isRecording.value) return;
-   // 자동 답변 타이머로 말하기 시작할 때도 코딩 질문 타이머 정지
+	 // 자동 답변 타이머로 말하기 시작할 때도 코딩 질문 타이머 정지
   stopCodingQuestionTimer();
-  await startRecording();
-  isRecording.value = true;
+  isAutoRecording.value = true;
+  try {
+    await startRecording();
+    isRecording.value = true;
+  } catch (e) {
+    isAutoRecording.value = false;
+    throw e;
+  }
 };
 
 const startAnswerCountdown = (seconds = 30) => {
   clearAnswerCountdown();
+  answerCountdownTotalSeconds.value = seconds;
   answerCountdown.value = seconds;
   answerCountdownTimer = setInterval(() => {
     if (answerCountdown.value === null) return;
@@ -308,16 +338,89 @@ const clearAnswerCountdown = () => {
     answerCountdownTimer = null;
   }
   answerCountdown.value = null;
+  answerCountdownTotalSeconds.value = ANSWER_COUNTDOWN_SECONDS;
 };
 
 const ringStrokeOffset = computed(() => {
   if (answerCountdown.value === null) return ringCircumference;
+  const totalSeconds =
+    typeof answerCountdownTotalSeconds.value === "number" && answerCountdownTotalSeconds.value > 0
+      ? answerCountdownTotalSeconds.value
+      : ANSWER_COUNTDOWN_SECONDS;
   const progress = Math.max(
     0,
-    Math.min(1, answerCountdown.value / ANSWER_COUNTDOWN_SECONDS)
+    Math.min(1, answerCountdown.value / totalSeconds)
   );
   return ringCircumference * (1 - progress);
 });
+
+const showAutoRecordingSubmitOverlay = computed(() => {
+  if (!isRecording.value) return false;
+  if (!isAutoRecording.value) return false;
+  if (isHintRecording.value) return false;
+  if (isSttRunning.value || isTtsPlaying.value) return false;
+  return true;
+});
+
+const recordingMicStyle = computed(() => {
+  const level = Math.max(0, Math.min(1, micLevel.value || 0));
+  const waveOpacity = Math.max(0.15, Math.min(0.6, 0.18 + level * 0.42));
+  const waveScale = Math.max(1.7, Math.min(2.8, 1.85 + level * 0.9));
+  return {
+    "--mic-level": level.toFixed(3),
+    "--mic-wave-opacity": waveOpacity.toFixed(3),
+    "--mic-wave-scale": waveScale.toFixed(3),
+  };
+});
+
+const stopMicLevelMeter = () => {
+  if (micLevelRafId) {
+    cancelAnimationFrame(micLevelRafId);
+    micLevelRafId = null;
+  }
+  micAnalyser = null;
+  micTimeDomainData = null;
+  if (micAudioContext) {
+    try {
+      micAudioContext.close();
+    } catch {
+      // ignore
+    }
+    micAudioContext = null;
+  }
+  micLevel.value = 0;
+};
+
+const startMicLevelMeter = (stream) => {
+  stopMicLevelMeter();
+  try {
+    const AudioCtx = window.AudioContext || window.webkitAudioContext;
+    if (!AudioCtx) return;
+    micAudioContext = new AudioCtx();
+    const source = micAudioContext.createMediaStreamSource(stream);
+    micAnalyser = micAudioContext.createAnalyser();
+    micAnalyser.fftSize = 2048;
+    micTimeDomainData = new Uint8Array(micAnalyser.fftSize);
+    source.connect(micAnalyser);
+
+    const tick = () => {
+      if (!micAnalyser || !micTimeDomainData) return;
+      micAnalyser.getByteTimeDomainData(micTimeDomainData);
+      let sumSquares = 0;
+      for (let i = 0; i < micTimeDomainData.length; i += 1) {
+        const centered = (micTimeDomainData[i] - 128) / 128;
+        sumSquares += centered * centered;
+      }
+      const rms = Math.sqrt(sumSquares / micTimeDomainData.length);
+      const normalized = Math.max(0, Math.min(1, (rms - 0.02) / 0.25));
+      micLevel.value = normalized;
+      micLevelRafId = requestAnimationFrame(tick);
+    };
+    micLevelRafId = requestAnimationFrame(tick);
+  } catch (e) {
+    console.warn("mic level meter init failed:", e);
+  }
+};
 
 /* -----------------------------
   📤 코드 제출 버튼 (렌더링 페이지 이동 예정)
@@ -435,6 +538,7 @@ const startRecording = async () => {
     audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
     mediaRecorder = new MediaRecorder(audioStream);
     audioChunks = [];
+    startMicLevelMeter(audioStream);
 
     mediaRecorder.ondataavailable = (e) => {
       audioChunks.push(e.data);
@@ -449,6 +553,7 @@ const startRecording = async () => {
     console.log("🎙️ 녹음 시작됨");
   } catch (err) {
     console.error("마이크 오류:", err);
+    stopMicLevelMeter();
     showAntiCheat("micError", "마이크 접근 권한이 필요합니다.");
   }
 };
@@ -464,13 +569,14 @@ const stopRecording = () => {
       return;
     }
 
-    mediaRecorder.onstop = () => {
-      audioBlob.value = new Blob(audioChunks, { type: "audio/webm" });
-      console.log("🎤 녹음 완료:", audioBlob.value);
-      if (audioStream) {
-        audioStream.getTracks().forEach((t) => t.stop());
-        audioStream = null;
-      }
+	    mediaRecorder.onstop = () => {
+	      audioBlob.value = new Blob(audioChunks, { type: "audio/webm" });
+	      console.log("🎤 녹음 완료:", audioBlob.value);
+	      stopMicLevelMeter();
+	      if (audioStream) {
+	        audioStream.getTracks().forEach((t) => t.stop());
+	        audioStream = null;
+	      }
       resolve();
     };
 
@@ -650,9 +756,11 @@ const runSttClient = async () => {
       if (!shouldAutoReRecord) return;
       if (isRecording.value || isSttRunning.value || isHintRecording.value) return;
       try {
+        isAutoRecording.value = true;
         await startRecording();
         isRecording.value = true;
       } catch (err) {
+        isAutoRecording.value = false;
         console.error("인트로 재답변 자동 녹음 시작 실패:", err);
         showAntiCheat(
           "micError",
@@ -720,6 +828,13 @@ const runSttClient = async () => {
     startCodingQuestionTimer();
   }
 };
+
+watch(isRecording, (recording) => {
+  if (!recording) {
+    isAutoRecording.value = false;
+    stopMicLevelMeter();
+  }
+});
 
 // 힌트용 STT: 현재 녹음된 음성을 텍스트로만 변환
 const transcribeHintAudio = async () => {
@@ -1456,6 +1571,7 @@ const playIntroTtsFromSession = async () => {
 ------------------------------ */
 const currentStage = ref("intro");
 const CODING_QUESTION_INTERVAL_MS = 120000; // 2분
+const CODING_ANSWER_AUTOSTART_DELAY_SECONDS = 5;
 let codingQuestionTimer = null;
 const isQuestionPolling = ref(false);
 
@@ -1493,24 +1609,42 @@ const requestCodingQuestion = async () => {
     }
 
     // 서버에서 이미 TTS 오디오까지 내려온 경우
+    const preserveTtsPlaying = isTtsPlaying.value;
+    let ttsOk = false;
     if (Array.isArray(data.tts_audio) && data.tts_audio.length) {
-      await playTtsChunks(data.tts_audio);
-      return;
+      try {
+        if (!preserveTtsPlaying) isTtsPlaying.value = true;
+        ttsOk = await playTtsChunks(data.tts_audio);
+      } catch (err) {
+        console.error("coding question TTS 재생 실패:", err);
+      } finally {
+        if (!preserveTtsPlaying) isTtsPlaying.value = false;
+      }
+    } else {
+      const questionText = (data.question || "").trim();
+      if (!questionText) return;
+
+      // 텍스트만 온 경우, 인트로 TTS API를 통해 읽어준다.
+      try {
+        if (!preserveTtsPlaying) isTtsPlaying.value = true;
+        ttsOk = await fetchAndPlayTts({
+          token,
+          sessionId,
+          text: questionText,
+          maxSentences: 10,
+        });
+      } catch (err) {
+        console.error("coding question TTS 요청 실패:", err);
+      } finally {
+        if (!preserveTtsPlaying) isTtsPlaying.value = false;
+      }
     }
 
-    const questionText = (data.question || "").trim();
-    if (!questionText) return;
-
-    // 텍스트만 온 경우, 인트로 TTS API를 통해 읽어준다.
-    try {
-      await fetchAndPlayTts({
-        token,
-        sessionId,
-        text: questionText,
-        maxSentences: 10,
-      });
-    } catch (err) {
-      console.error("coding question TTS 요청 실패:", err);
+    if (ttsOk) {
+      if (myGeneration !== ttsStopGeneration || !isCodingSessionRouteActive()) return;
+      if (currentStage.value !== "coding") return;
+      if (isRecording.value || isSttRunning.value || isHintRecording.value) return;
+      startAnswerCountdown(CODING_ANSWER_AUTOSTART_DELAY_SECONDS);
     }
   } catch (err) {
     console.error("coding question 요청 실패:", err);
@@ -2982,6 +3116,119 @@ onBeforeRouteUpdate(() => {
   margin: 0;
   font-size: 13px;
   color: #9ca3af;
+}
+
+.recording-submit-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: center;
+  justify-content: center;
+  z-index: 998;
+  pointer-events: none;
+}
+
+.recording-mic-helper {
+  pointer-events: none;
+  margin: 0;
+  padding: 10px 14px;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.7);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  color: #f9fafb;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: center;
+  backdrop-filter: blur(6px);
+  box-shadow: 0 16px 34px rgba(0, 0, 0, 0.45);
+}
+
+.recording-mic-button {
+  pointer-events: auto;
+  width: 104px;
+  height: 104px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  background: radial-gradient(circle at 30% 20%, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.08)),
+    linear-gradient(135deg, rgba(167, 139, 250, 0.6), rgba(99, 102, 241, 0.55));
+  color: #0b1220;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  position: relative;
+  overflow: visible;
+  transition: transform 0.12s ease, filter 0.12s ease, opacity 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(6px);
+  animation: recording-mic-breathe 1.8s ease-in-out infinite;
+}
+
+.recording-mic-button.is-recording::before,
+.recording-mic-button.is-recording::after {
+  content: "";
+  position: absolute;
+  inset: -10px;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.38);
+  opacity: var(--mic-wave-opacity, 0.22);
+  transform: scale(1);
+  animation: recording-mic-wave 1.35s ease-out infinite;
+  pointer-events: none;
+}
+
+.recording-mic-button.is-recording::after {
+  animation-delay: 0.65s;
+}
+
+.recording-mic-button svg {
+  width: 28px;
+  height: 28px;
+  display: block;
+  color: #0b1220;
+}
+
+.recording-mic-button:hover {
+  transform: translateY(-1px);
+  filter: brightness(1.03);
+}
+
+.recording-mic-button:active {
+  transform: translateY(0);
+}
+
+.recording-mic-button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+  filter: none;
+  box-shadow: none;
+  animation: none;
+}
+
+@keyframes recording-mic-breathe {
+  0% {
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(167, 139, 250, 0.22);
+  }
+  50% {
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55), 0 0 0 14px rgba(167, 139, 250, 0.06);
+  }
+  100% {
+    box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(167, 139, 250, 0.22);
+  }
+}
+
+@keyframes recording-mic-wave {
+  0% {
+    transform: scale(1);
+    opacity: var(--mic-wave-opacity, 0.22);
+  }
+  100% {
+    transform: scale(var(--mic-wave-scale, 2.2));
+    opacity: 0;
+  }
 }
 
 @keyframes intro-spinner-fade {

@@ -459,14 +459,17 @@ const fetchReport = async () => {
     finalScore.value = data.final_score ?? null;
     finalGrade.value = data.final_grade ?? null;
 
-    problemText.value = data.problem_text || "";
-    latestCode.value = (data.latest_code && (data.latest_code.code || data.latest_code.value)) || "";
+    const output = data.graph_output || {};
+
+    problemText.value = data.problem_text || output.problem_text || "";
+    latestCode.value =
+      data.submitted_code ||
+      output.submitted_code ||
+      (data.latest_code && (data.latest_code.code || data.latest_code.value)) ||
+      "";
 
     // ✅ 최종 output에서 세부 정보 추출
-    graphOutput.value = data.graph_output || {};
-    
-    // LangGraph output에서 상세 점수와 피드백 추출
-    const output = data.graph_output || {};
+    graphOutput.value = output;
     
     // ✅ 점수 추출 (수정됨)
     codeQualityScore.value = output.code_quality_score ?? null;  // 100점 환산

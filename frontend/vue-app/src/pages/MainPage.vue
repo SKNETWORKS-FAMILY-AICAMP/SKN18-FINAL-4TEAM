@@ -84,6 +84,14 @@
           </p>
           <div class="hero-actions">
             <RouterLink to="/coding-test" class="secondary hover-scale">라이브 코딩 테스트 보기</RouterLink>
+            <button
+              v-if="isAuthenticated"
+              type="button"
+              class="primary hover-scale"
+              @click="openProfileModal"
+            >
+              프로필 입력/수정
+            </button>
           </div>
         </div>
 
@@ -188,22 +196,208 @@
       :visible="showForcedExit"
       @close="showForcedExit = false"
     />
+
+    <!-- 프로필 입력 모달 -->
+    <div v-if="showProfileModal" class="modal-overlay" @click.self="closeProfileModal">
+      <div class="modal-card profile-card">
+        <div class="modal-header">
+          <h3>프로필 입력</h3>
+          <button type="button" class="modal-close" @click="closeProfileModal">✕</button>
+        </div>
+        <div class="modal-body profile-body">
+          <template v-if="currentProfileStep === 1">
+            <label class="modal-field">
+              <span>최종 학력 *</span>
+              <select v-model="profileForm.graduated_school">
+                <option value="">선택</option>
+                <option v-for="opt in graduatedOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>학교명</span>
+              <input v-model="profileForm.university" type="text" placeholder="학교명" />
+            </label>
+            <label class="modal-field">
+              <span>전공 여부</span>
+              <select v-model="profileForm.major">
+                <option value="">선택</option>
+                <option v-for="opt in majorOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>재학 상태</span>
+              <select v-model="profileForm.academic_status">
+                <option value="">선택</option>
+                <option v-for="opt in academicOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>졸업(예정) 연도</span>
+              <input v-model="profileForm.graduation_year" type="number" min="1900" max="2100" />
+            </label>
+          </template>
+
+          <template v-else>
+            <label class="modal-field">
+              <span>경력 레벨 *</span>
+              <select v-model="profileForm.career_level">
+                <option value="">선택</option>
+                <option v-for="opt in careerOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>현재 상태</span>
+              <select v-model="profileForm.current_status">
+                <option value="">선택</option>
+                <option v-for="opt in statusOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+            <label class="modal-field">
+              <span>기술 스택</span>
+              <div class="checkbox-group">
+                <label
+                  v-for="opt in techStackOptions"
+                  :key="opt"
+                  class="checkbox-item"
+                >
+                <input
+                  type="checkbox"
+                  :value="opt"
+                  v-model="profileForm.tech_stack"
+                />
+                <span>{{ opt }}</span>
+              </label>
+            </div>
+          </label>
+
+            <label class="modal-field">
+              <span>희망 직무</span>
+              <div class="checkbox-group">
+                <label
+                  v-for="opt in desiredRoleOptions"
+                  :key="opt"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="opt"
+                    v-model="profileForm.desired_role"
+                  />
+                  <span>{{ opt }}</span>
+                </label>
+              </div>
+            </label>
+
+            <label class="modal-field">
+              <span>세부 희망 직무</span>
+              <div class="checkbox-group">
+                <label
+                  v-for="opt in detailedRoleOptions"
+                  :key="opt"
+                  class="checkbox-item"
+                >
+                  <input
+                    type="checkbox"
+                    :value="opt"
+                    v-model="profileForm.detailed_role"
+                  />
+                  <span>{{ opt }}</span>
+                </label>
+              </div>
+            </label>
+
+            <label class="modal-field">
+              <span>희망 근무지</span>
+              <select v-model="profileForm.region">
+                <option value="">선택</option>
+                <option v-for="opt in regionOptions" :key="opt" :value="opt">{{ opt }}</option>
+              </select>
+            </label>
+          </template>
+        </div>
+        <div class="modal-footer">
+          <div class="modal-steps">
+            <span :class="{ active: currentProfileStep === 1 }">1</span>
+            <span :class="{ active: currentProfileStep === 2 }">2</span>
+          </div>
+          <div class="modal-actions">
+            <button v-if="currentProfileStep === 2" type="button" class="pill-button ghost" @click="currentProfileStep = 1">
+              이전
+            </button>
+            <button
+              v-if="currentProfileStep === 1"
+              type="button"
+              class="pill-button"
+              @click="currentProfileStep = 2"
+            >
+              다음
+            </button>
+            <button
+              v-else
+              class="pill-button"
+              :disabled="savingProfile"
+              @click="saveProfile"
+            >
+              {{ savingProfile ? "저장 중..." : "저장" }}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 import ForcedExitAlert from "../components/ForcedExitAlert.vue";
+import { useProfileOptions } from "../hooks/useProfileOptions";
+
+const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
 const route = useRoute();
 const router = useRouter();
-const { isAuthenticated, user, fetchProfile, logout } = useAuth();
+const { isAuthenticated, user, fetchProfile, logout, token } = useAuth();
+const { options: optionData, loading: optionsLoading, error: optionsError, fetchProfileOptions } = useProfileOptions();
 const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false);
 const isLoggingOut = ref(false);
 const showForcedExit = ref(false);
+const showProfileModal = ref(false);
+const currentProfileStep = ref(1);
+const savingProfile = ref(false);
+const profileForm = reactive({
+  graduated_school: "",
+  university: "",
+  major: "",
+  academic_status: "",
+  graduation_year: "",
+  career_level: "",
+  current_status: "",
+  tech_stack: [],
+  desired_role: [],
+  detailed_role: [],
+  region: [],
+  region_single: ""
+});
+
+const graduatedOptions = computed(() => optionData.value?.graduated_school || []);
+const majorOptions = computed(() => optionData.value?.major || []);
+const academicOptions = computed(() => optionData.value?.academic_status || []);
+const careerOptions = computed(() => optionData.value?.career_level || []);
+const statusOptions = computed(() => optionData.value?.current_status || []);
+const techStackOptions = computed(() => optionData.value?.tech_stack || []);
+const desiredRoleOptions = computed(() => optionData.value?.desired_role || []);
+const detailedRoleOptions = computed(() => optionData.value?.detailed_role || []);
+const regionOptions = computed(() => optionData.value?.region || []);
+
+const toggleMultiSelect = (field, value) => {
+  const current = Array.isArray(profileForm[field]) ? profileForm[field] : [];
+  profileForm[field] = current.includes(value)
+    ? current.filter((item) => item !== value)
+    : [...current, value];
+};
 
 const userName = computed(() => user.value?.name || "회원");
 
@@ -242,6 +436,79 @@ const syncProfile = () => {
   }
 };
 
+const needProfileModal = (profile) => {
+  // 간단한 기준: 학력/경력 레벨이 비어 있으면 추가 입력 안내
+  return !profile?.graduated_school || !profile?.career_level;
+};
+
+const loadProfile = async () => {
+  if (!isAuthenticated.value) return;
+  try {
+    const res = await fetch(`${API_BASE}/api/user/profile/detail/`, {
+      headers: token.value ? { Authorization: `Bearer ${token.value}` } : {},
+    });
+    if (!res.ok) throw new Error("프로필 조회 실패");
+    const data = await res.json();
+    Object.assign(profileForm, {
+      graduated_school: data.graduated_school || "",
+      university: data.university || "",
+      major: data.major || "",
+      academic_status: data.academic_status || "",
+      graduation_year: data.graduation_year || "",
+      career_level: data.career_level || "",
+      current_status: data.current_status || "",
+      tech_stack: data.tech_stack || [],
+      desired_role: data.desired_role || [],
+      detailed_role: data.detailed_role || [],
+      region: data.region || [],
+      region_single: (data.region && data.region[0]) || ""
+    });
+    if (needProfileModal(data)) {
+      showProfileModal.value = true;
+    }
+  } catch (err) {
+    // 조회 실패 시 새 입력을 안내
+    showProfileModal.value = true;
+  }
+};
+
+const saveProfile = async () => {
+  savingProfile.value = true;
+  try {
+    const res = await fetch(`${API_BASE}/api/user/profile/detail/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token.value ? { Authorization: `Bearer ${token.value}` } : {}),
+      },
+      body: JSON.stringify({
+        ...profileForm,
+        region: profileForm.region_single ? [profileForm.region_single] : []
+      }),
+    });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const detail = data?.detail || "프로필 저장에 실패했습니다.";
+      throw new Error(detail);
+    }
+    showProfileModal.value = false;
+  } catch (err) {
+    window.alert(err.message || "프로필 저장 중 오류가 발생했습니다.");
+  } finally {
+    savingProfile.value = false;
+  }
+};
+
+const openProfileModal = () => {
+  showProfileModal.value = true;
+  currentProfileStep.value = 1;
+};
+
+const closeProfileModal = () => {
+  showProfileModal.value = false;
+  currentProfileStep.value = 1;
+};
+
 const checkForcedAlert = () => {
   if (route.query.alert === "anti-cheat") {
     showForcedExit.value = true;
@@ -254,6 +521,8 @@ const checkForcedAlert = () => {
 onMounted(() => {
   window.addEventListener("storage", syncProfile);
   syncProfile();
+  void fetchProfileOptions().catch(() => {});
+  void loadProfile();
   checkForcedAlert();
 });
 
@@ -470,6 +739,21 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   background: #f9fafb;
   color: #111827;
   transition: all 0.3s ease;
+}
+.primary {
+  border-radius: 999px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 700;
+  border: none;
+  background: #111827;
+  color: #f9fafb;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
 .hover-scale:hover {
   transform: scale(1.05);
@@ -698,6 +982,138 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   background: #111827;
 }
 
+/* Profile modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card.profile-card {
+  width: min(900px, 92vw);
+  max-height: 85vh;
+  background: #ffffff;
+  border-radius: 16px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.modal-body.profile-body {
+  padding: 20px;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 14px 16px;
+}
+
+.modal-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 14px;
+}
+
+.modal-field input,
+.modal-field select {
+  border: 1px solid #d1d5db;
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 13px;
+}
+
+.modal-field select[multiple] {
+  min-height: 120px;
+}
+.modal-field select[multiple] {
+  width: 100%;
+}
+
+.modal-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid #e5e7eb;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+}
+.modal-steps {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+}
+.modal-steps span {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid #d1d5db;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b7280;
+}
+.modal-steps span.active {
+  background: #111827;
+  color: #f9fafb;
+  border-color: #111827;
+}
+.pill-button.ghost {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  color: #111827;
+}
+.tag-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+.tag-option {
+  border: 1px solid #d1d5db;
+  background: #fff;
+  padding: 6px 10px;
+  border-radius: 12px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+.tag-option.active {
+  background: #111827;
+  color: #f9fafb;
+  border-color: #111827;
+}
+.tag-option:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+}
+
 /* Mobile Styles */
 @media (max-width: 768px) {
   .landing-header { padding: 16px 20px; }
@@ -719,4 +1135,142 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   }
   .marquee-content span { font-size: 48px; }
 }
+
+/* ===== Profile Modal polish ===== */
+.modal-card.profile-card {
+  border: 1px solid rgba(0,0,0,0.08);
+}
+
+.modal-header {
+  background: rgba(248, 244, 235, 0.75);
+  backdrop-filter: blur(8px);
+}
+
+.modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.modal-close {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.2s ease;
+}
+.modal-close:hover {
+  background: rgba(17, 24, 39, 0.08);
+}
+
+/* form grid inside modal */
+.modal-body.profile-body {
+  background: #ffffff;
+}
+
+/* field label */
+.modal-field > span {
+  font-weight: 800;
+  color: #111827;
+}
+
+/* inputs */
+.modal-field input,
+.modal-field select {
+  background: #ffffff;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+.modal-field input:focus,
+.modal-field select:focus {
+  outline: none;
+  border-color: #111827;
+  box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.12);
+}
+
+/* checkbox group -> chip style */
+.checkbox-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  background: #f9fafb;
+}
+
+.checkbox-item {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+  user-select: none;
+}
+
+/* hide native checkbox */
+.checkbox-item input[type="checkbox"] {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* chip */
+.checkbox-item span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 12px;
+  border-radius: 999px;
+  border: 1px solid #d1d5db;
+  background: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  color: #111827;
+  transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.checkbox-item:hover span {
+  transform: translateY(-1px);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10);
+}
+
+/* checked style */
+.checkbox-item input[type="checkbox"]:checked + span {
+  background: #111827;
+  color: #f9fafb;
+  border-color: #111827;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+}
+
+/* footer polish */
+.modal-footer {
+  background: rgba(248, 244, 235, 0.65);
+  backdrop-filter: blur(8px);
+}
+
+.pill-button {
+  padding: 10px 16px;
+  border-radius: 999px;
+  border: none;
+  background: #111827;
+  color: #f9fafb;
+  font-weight: 800;
+  cursor: pointer;
+}
+.pill-button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.pill-button.ghost {
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #111827;
+}
+.pill-button.ghost:hover {
+  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
+}
+
 </style>

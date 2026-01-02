@@ -11,6 +11,8 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
       POSTGRES_DB: ${DB_NAME}
       PGDATA: /var/lib/postgresql/data
+      TZ: Asia/Seoul
+    command: ["postgres", "-c", "timezone=Asia/Seoul"]
     volumes:
       - ./postgres-data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -22,6 +24,6 @@ services:
     container_name: redis-stack
     restart: always
     ports:
-      - "6380:6379"
+      - "6379:6379"
     volumes:
       - ./redis-data:/data

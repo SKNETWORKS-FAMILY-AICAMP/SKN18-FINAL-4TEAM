@@ -18,7 +18,7 @@
 
       <div class="hero-content fade-in-up">
         <div class="glass-panel">
-          <h1 class="hero-title">About Us</h1>
+          <h1 class="hero-title">About us</h1>
           <div class="hero-line"></div>
           <p class="hero-desc">The story of how we build together.</p>
         </div>
@@ -106,7 +106,7 @@ const members = [
   { name: "김규리", role: "Project Manager", img: new URL("../assets/김규리.png", import.meta.url).href, github: "https://github.com/GyuriKimm" },
   { name: "김준규", role: "Assoc. PM", img: new URL("../assets/김준규.png", import.meta.url).href, github: "https://github.com/JungyuOO" },
   { name: "김민주", role: "Crew", img: new URL("../assets/김민주.png", import.meta.url).href, github: "https://github.com/kmjj0801" },
-  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong-00" },
+  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong00" },
   { name: "정동석", role: "Crew", img: new URL("../assets/정동석.jpg", import.meta.url).href, github: "https://github.com/dsj-1004" },
   { name: "채린", role: "Crew", img: new URL("../assets/채린.png", import.meta.url).href, github: "https://github.com/cofls99" },
 ];
@@ -126,7 +126,7 @@ const members = [
 .aboutus {
   min-height: 100vh;
   background-color: var(--bg-color);
-  font-family: "Pretendard", sans-serif;
+  font-family: "Inter", sans-serif;
   color: var(--text-primary);
   overflow-x: hidden;
 }
@@ -215,7 +215,7 @@ const members = [
 }
 
 .hero-title {
-  font-family: "Playfair Display", serif;
+  font-family: "SF Pro", sans-serif, Inter;
   font-size: clamp(50px, 6vw, 90px);
   margin: 0;
   line-height: 1;
@@ -269,7 +269,7 @@ const members = [
   text-align: center;
 }
 .manifesto-title {
-  font-family: "Playfair Display", serif;
+  font-family: "Inter", sans-serif;
   font-size: 36px;
   line-height: 1.5;
   margin-bottom: 50px;
@@ -299,7 +299,7 @@ const members = [
   color: #9ca3af; margin-bottom: 12px; display: block;
 }
 .section-header h2 {
-  font-family: "Playfair Display", serif;
+  font-family: "Inter", sans-serif;
   font-size: 48px; color: #111827; margin: 0;
 }
 
@@ -361,7 +361,7 @@ const members = [
 }
 
 .info-area h3 {
-  font-family: "Playfair Display", serif;
+  font-family: "Inter", sans-serif;
   font-size: 20px;
   margin: 0 0 6px;
   color: #111827;

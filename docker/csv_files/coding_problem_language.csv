@@ -1,4 +1,4 @@
-problem_id,function_name,starter_code,language
+﻿problem_id,function_name,starter_code,language
 1,solution,"def solution(n, roads):
     answer = 0
     return answer",python
@@ -682,3 +682,351 @@ problem_id,function_name,starter_code,language
 210,solution,"def solution(n, m, tests):
     answer = 0
     return answer",python
+511,solution,"def solution(x):
+    # x: List[float]
+    # return: List[float] rounded to 6 decimals
+    answer = []
+    return answer",python
+512,solution,"def solution(x):
+    answer = []
+    return answer",python
+513,solution,"def solution(y_true, y_pred):
+    # return 2D list confusion matrix
+    answer = []
+    return answer",python
+514,solution,"def solution(y_true, topk_pred):
+    # y_true: List[int], topk_pred: List[List[int]]
+    answer = 0.0
+    return round(answer, 6)",python
+515,solution,"def solution(q, docs):
+    # return index of best doc by cosine similarity
+    answer = 0
+    return answer",python
+516,solution,"def solution(logits):
+    answer = 0.0
+    return round(answer, 6)",python
+517,solution,"def solution(logits):
+    probs = []
+    return probs",python
+518,solution,"def solution(probs, y):
+    loss = 0.0
+    return round(loss, 6)",python
+519,solution,"def solution(y_true, y_pred):
+    precision = recall = f1 = 0.0
+    return [round(precision, 6), round(recall, 6), round(f1, 6)]",python
+520,solution,"def solution(y_true, y_score):
+    auc = 0.0
+    return round(auc, 6)",python
+521,solution,"def solution(y, test_ratio):
+    train_idx, test_idx = [], []
+    return [train_idx, test_idx]",python
+522,solution,"def solution(sentences):
+    vocab = []
+    vectors = []
+    return [vocab, vectors]",python
+523,solution,"def solution(sentences):
+    vocab = []
+    tfidf_vectors = []
+    return [vocab, tfidf_vectors]",python
+524,solution,"def solution(points, centroids):
+    # points: List[List[float]], centroids: List[List[float]]
+    counts = [0] * len(centroids)
+    return counts",python
+525,solution,"def solution(points, assignments, k):
+    centroids = [[0.0, 0.0] for _ in range(k)]
+    return centroids",python
+526,solution,"def solution(X, y, w, lr):
+    new_w = []
+    return new_w",python
+527,solution,"def solution(seqs, pad):
+    ans = []
+    return ans",python
+528,solution,"def solution(s, n):
+    answer = []
+    return answer",python
+529,solution,"def solution(y_true, y_prob, B):
+    ece = 0.0
+    return round(ece, 6)",python
+530,solution,"def solution(val_losses, patience):
+    stop_epoch = -1
+    return stop_epoch",python
+10001,solution,"def solution(nums):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10002,solution,"def solution(x, y):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10003,solution,"def solution(counts):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10004,solution,"def solution(p, q):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10005,solution,"def solution(y_true, y_pred):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10006,solution,"def solution(y, score):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10007,solution,"def solution(nums):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10008,solution,"def solution(mat):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10009,solution,"def solution(points, centroids):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10010,solution,"def solution(arr):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10011,solution,"def solution(corpus, target_idx):
+    answer = ''
+    # TODO: implement
+    return answer
+",python
+10012,solution,"def solution(nums, k):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10013,solution,"def solution(nums, q):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10014,solution,"def solution(nums):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10015,solution,"def solution(nums, z):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10017,solution,"def solution(nums, width):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10018,solution,"def solution(nums, x):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10021,solution,"def solution(nums, r):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10022,solution,"def solution(y, y_hat):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10024,solution,"def solution(nums, r):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10025,solution,"def solution(y, p):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10035,solution,"def solution(pairs):
+    answer = {}
+    # TODO: implement
+    return answer
+",python
+10037,solution,"def solution(s):
+    answer = ''
+    # TODO: implement
+    return answer
+",python
+10038,solution,"def solution(arr, lo, hi):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10039,solution,"def solution(left, right):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10040,solution,"def solution(scores):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10041,solution,"def solution(data):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10042,solution,"def solution(arr, k):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10043,solution,"def solution(line):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10044,solution,"def solution(arr):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10045,solution,"def solution(times, gap):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10047,solution,"def solution(nums, b):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10048,solution,"def solution(days):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10050,solution,"def solution(items):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10052,solution,"def solution(rows):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10053,solution,"def solution(items):
+    answer = {}
+    # TODO: implement
+    return answer
+",python
+10055,solution,"def solution(vals, thr):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10058,solution,"def solution(cats):
+    answer = {}
+    # TODO: implement
+    return answer
+",python
+10068,solution,"def solution(a, b):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10069,solution,"def solution(x):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10070,solution,"def solution(x):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10071,solution,"def solution(x, k):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10073,solution,"def solution(tokens, L):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10074,solution,"def solution(d, pos):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10075,solution,"def solution(a, b):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10076,solution,"def solution(q, k):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10077,solution,"def solution(probs, p):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10078,solution,"def solution(x, mask):
+    answer = 0.0
+    # TODO: implement
+    return answer
+",python
+10080,solution,"def solution(d1, d2):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10082,solution,"def solution(logits, T):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10083,solution,"def solution(v):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10084,solution,"def solution(probs, threshold):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10086,solution,"def solution(s, n):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10087,solution,"def solution(y_true, probs):
+    answer = []
+    # TODO: implement
+    return answer
+",python
+10088,solution,"def solution(lens, budget):
+    answer = 0
+    # TODO: implement
+    return answer
+",python
+10089,solution,"def solution(beams, k):
+    answer = []
+    # TODO: implement
+    return answer
+",python

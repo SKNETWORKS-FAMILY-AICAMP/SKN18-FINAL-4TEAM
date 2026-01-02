@@ -241,11 +241,29 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, reactive } from "vue";
 import { RouterLink } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 
 const { user, fetchProfile, ensureValidSession, token, BACKEND_BASE } = useAuth();
+
+// 프로필 폼/로딩 상태
+const profileForm = reactive({
+  graduated_school: "",
+  university: "",
+  major: "",
+  academic_status: "",
+  graduation_year: "",
+  career_level: "",
+  current_status: "",
+  tech_stack: [],
+  desired_role: [],
+  detailed_role: [],
+  region: [],
+  region_single: "",
+});
+const profileLoading = ref(false);
+const profileError = ref("");
 
 const reports = ref([]);
 const listLoading = ref(false);

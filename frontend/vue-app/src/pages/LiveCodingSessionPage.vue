@@ -2469,7 +2469,11 @@ onMounted(async () => {
   }
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 360 },
+      video: { 
+        width: 640,  
+        height: 360,
+        frameRate: { ideal: 30 }
+      },
       audio: false,
     });
     if (videoRef.value) {
@@ -2579,7 +2583,7 @@ onBeforeRouteUpdate(() => {
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #111827;
+  background: #0B1120;
   color: #e5e7eb;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   position: relative;
@@ -2681,7 +2685,7 @@ onBeforeRouteUpdate(() => {
 
 
 .camera-pane {
-  flex: 0 0 auto; /* 크기 고정 */
+  flex: 0 0 auto; 
 }
 
 .live-indicator {
@@ -2724,6 +2728,7 @@ onBeforeRouteUpdate(() => {
 .pane-header {
   padding: 10px 18px;
   border-bottom: 1px solid #1e293b;
+  background: #0B1120;
   font-size: 13px;
   color: #9ca3af;
   display: flex;
@@ -2738,6 +2743,7 @@ onBeforeRouteUpdate(() => {
 .problem-body {
   padding: 20px;
   overflow-y: auto;
+  background: #0B1120;
 }
 
 .retry-button {
@@ -2779,20 +2785,27 @@ onBeforeRouteUpdate(() => {
 }
 
 .camera-body {
-  display: flex; justify-content: center;
+  display: flex; 
+  justify-content: center;
+  padding: 0; 
+  background: #000;
+  overflow: hidden;
+  border-radius: 0 0 12px 12px; 
 }
 
 .camera-frame {
   position: relative;
   width: 100%;
-  aspect-ratio: 16/9;
-  border-radius: 5px;
-  overflow: hidden;
-  border: 1px solid #334155;
+  height: 200px;
+  border: none;
+  background: #000;
 }
 
 .camera-frame video {
-  width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1);
+  width: 100%;
+  height: 100%;
+  object-fit: cover; 
+  transform: scaleX(-1);
 }
 
 .camera-overlay {
@@ -2926,7 +2939,7 @@ onBeforeRouteUpdate(() => {
 
 .editor-footer {
   height: 60px;
-  background: #1e1e1e;
+  background: #0B1120;
   border-top: 1px solid #333;
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 20px;

@@ -1,7 +1,40 @@
 import re
 from langchain_core.tools import tool
+import json
+import re
+from typing import Any, Dict
 
 
+def safe_json_parse(text: str) -> Dict[str, Any]:
+    """
+    LLM 응답에서 JSON을 최대한 안전하게 파싱한다.
+    """
+    if not text:
+        return {}
+
+    # 1) 바로 파싱 시도
+    try:
+        return json.loads(text)
+    except Exception:
+        pass
+
+    # 2) ```json ``` 코드블록 제거
+    cleaned = re.sub(r"```json|```", "", text).strip()
+    try:
+        return json.loads(cleaned)
+    except Exception:
+        pass
+
+    # 3) JSON object 부분만 추출
+    match = re.search(r"\{[\s\S]*\}", text)
+    if match:
+        try:
+            return json.loads(match.group())
+        except Exception:
+            pass
+
+    # 4) 실패 시 로그용 반환
+    raise ValueError(f"JSON parsing failed. raw text:\n{text}")
 
 
 def _normalize_for_judge(text: str, max_chars: int = 20000) -> str:
@@ -34,7 +67,7 @@ def judge_calc_tool(missing: list, lint: list) -> dict:
 
     if missing_cnt == 0 and severe == 0 and mild <= 1:
         level = "COMPLETE"
-    elif missing_cnt >= 2 or severe >= 1:
+    elif missing_cnt >= 3 or severe >= 2:
         level = "NEEDS_WORK"
     else:
         level = "POLISH"

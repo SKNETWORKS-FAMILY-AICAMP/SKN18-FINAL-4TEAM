@@ -1,9 +1,9 @@
 import json
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Any, Dict
 from utils import _normalize_for_judge
 from state import EvidenceCoachState
-from agents import create_judge_agent
-
+from agents import create_judge_agent, create_feedback_agent
+from utils import safe_json_parse
 # ---------- node ----------
 def evidence_ingest_node(state: EvidenceCoachState) -> EvidenceCoachState:
     ''' 
@@ -13,7 +13,6 @@ def evidence_ingest_node(state: EvidenceCoachState) -> EvidenceCoachState:
     # 1) normalize draft
     draft = _normalize_for_judge(state.get("draft", ""))
     state["normalized_draft"] = draft
-    
     return state
 
 def judge_progress_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
@@ -24,33 +23,63 @@ def judge_progress_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
     video_summary = state.get("video_summary")
     draft = state.get("normalized_draft", "")
 
-    # 메인 judge 에이전트 생성
-    agent = create_judge_agent()
-
     # user 메시지: 영상 요약 + 사용자 요약
     user_prompt = f"[영상 요약]\\n{video_summary}\\n\\n[사용자 요약]\\n{draft}"
 
+    # 메인 judge 에이전트 생성
+    agent = create_judge_agent()
+    parsed: Dict[str, Any] = {}
     try:
         res = agent.invoke({"messages": [{"role": "user", "content": user_prompt}]})
-        parsed = res.get("structured_response")
-        if not parsed:
-            # deepagent 표준 응답이 아닐 경우, 마지막 메시지에서 JSON 추출 시도
-            last = (res.get("messages") or [])[-1] if isinstance(res, dict) else None
-            content = getattr(last, "content", None) if last else None
-            if content:
-                parsed = json.loads(content)
-        if not isinstance(parsed, dict):
-            parsed = {}
-    except Exception:
-        parsed = {}
+        raw = res["messages"][-1].content
+        parsed = safe_json_parse(raw)
+    except Exception as e:
+        print(f"agent 호출 오류: {e}")
 
     state["completion_level"] = parsed.get("completion_level", "NEEDS_WORK")
     state["missing_slots"] = parsed.get("missing_slots", [])
+    # coach 단계에서 부분 반영/모호 슬롯 활용
+    state["ambiguous_slots"] = parsed.get("ambiguous_slots",[])
     state["lint"] = parsed.get("lint", [])
     return state
 
-
 def final_feedback_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
-    pass
+    """
+    judge 결과와 원문을 받아 인라인 코멘트 및 정돈본을 생성한다.
+    """
+    video_summary = state.get("video_summary", "")
+    draft = state.get("draft")
+    missing = state.get("missing_slots", [])
+    ambiguous = state.get("ambiguous_slots", [])
+    lint = state.get("lint", [])
+    completion = state.get("completion_level", "NEEDS_WORK")
 
+    agent = create_feedback_agent()
+    try:
+        res = agent.invoke(
+            {
+                "messages": [
+                    {
+                        "role": "user",
+                        "content": f"""
+                            [video_summary]
+                            {video_summary}
 
+                            [draft]
+                            {draft}
+
+                            [completion_level]{completion}
+                            [missing_slots]{missing}
+                            [ambiguous_slots]{ambiguous}
+                            [lint]{lint}
+                        """,
+                    }]
+            }
+        )
+        raw = res["messages"][-1].content
+        parsed = safe_json_parse(raw)   
+    except Exception as e:
+        print(f"agent 호출 오류: {e}")
+
+    state["coach_output"] = parsed.get("annotated_draft")
+    return state

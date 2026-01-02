@@ -129,6 +129,8 @@ STRATEGY_KEYWORDS = {
         "투포인터",
         "투 포인터",
         "투포인타",
+        "2포인터",
+        "2 포인터",
         "two pointer",
         "two pointers",
         "two-pointer",
@@ -452,11 +454,48 @@ def _get_test_cases_from_db(problem_id: int) -> List[Dict[str, Any]]:
             rows = cursor.fetchall()
             test_cases = []
             
+            def _parse_input(raw: str):
+                import ast
+                if raw is None:
+                    raise ValueError("empty input")
+                text = str(raw).strip()
+                if not text:
+                    raise ValueError("empty input")
+
+                # 1) Python literal (예: "[1,2,3]" or "{'a':1}")
+                try:
+                    return ast.literal_eval(text)
+                except Exception:
+                    pass
+
+                # 2) 공백 분리 포맷: "2 4 [3, 3, 3]" -> [2, 4, [3,3,3]]
+                parts = text.split()
+                parsed = []
+                for part in parts:
+                    try:
+                        parsed.append(ast.literal_eval(part))
+                    except Exception:
+                        parsed.append(part)
+                if len(parsed) == 1:
+                    return parsed[0]
+                return parsed
+
+            def _parse_output(raw: str):
+                import ast
+                if raw is None:
+                    raise ValueError("empty output")
+                text = str(raw).strip()
+                if not text:
+                    raise ValueError("empty output")
+                try:
+                    return ast.literal_eval(text)
+                except Exception:
+                    return text
+
             for row in rows:
                 try:
-                    import ast
-                    test_input = ast.literal_eval(row[0])
-                    test_output = ast.literal_eval(row[1])
+                    test_input = _parse_input(row[0])
+                    test_output = _parse_output(row[1])
                     test_cases.append({
                         "input": test_input,
                         "expected": test_output
@@ -726,6 +765,22 @@ def _evaluate_strategy_hybrid(
             if "deque" in str(tree) or "popleft" in function_calls or any(v in {"graph", "adj", "adj_list"} for v in variable_names):
                 rule_consistency_score += 1.0
 
+        if "tree" in active_groups and _mentions_any(strategy_lower, keyword_groups["tree"]):
+            has_node = any(v in {"node", "nodes", "root", "left", "right", "parent", "child"} for v in variable_names)
+            has_tree_call = any(c in {"dfs", "bfs"} for c in function_calls)
+            has_recursion = any(isinstance(n, ast.FunctionDef) for n in ast.walk(tree)) and any(
+                isinstance(n, ast.Call) and isinstance(n.func, ast.Name) and n.func.id in {"dfs", "traverse", "search"}
+                for n in ast.walk(tree)
+            )
+            if has_node or has_tree_call or has_recursion:
+                rule_consistency_score += 1.0
+
+        if "greedy" in active_groups and _mentions_any(strategy_lower, keyword_groups["greedy"]):
+            has_sort = "sort" in function_calls or "sorted" in function_calls
+            has_minmax = any(c in {"min", "max"} for c in function_calls)
+            if has_sort or has_minmax:
+                rule_consistency_score += 0.5
+
         if "string" in active_groups and _mentions_any(strategy_lower, keyword_groups["string"]):
             if "'" in code or "\"" in code or "str" in function_calls:
                 rule_consistency_score += 0.5
@@ -748,7 +803,8 @@ def _evaluate_strategy_hybrid(
 
         if "simulation" in active_groups and _mentions_any(strategy_lower, keyword_groups["simulation"]):
             has_loop = any(isinstance(node, (ast.For, ast.While)) for node in ast.walk(tree))
-            if has_loop:
+            has_state = any(v in {"state", "cur", "curr", "now", "pos"} for v in variable_names)
+            if has_loop and has_state:
                 rule_consistency_score += 0.5
         
         if ("완전탐색" in strategy_lower or "모든" in strategy_lower or "조합" in strategy_lower):

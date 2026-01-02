@@ -1,10 +1,10 @@
 <template>
   <div class="landing">
     <header class="landing-header">
-      <div class="nav-dropdown">
+      <div class="nav-dropdown" ref="dropdownContainer">
         <button
           class="nav-pill"
-          @click="isMenuOpen = !isMenuOpen"
+          @click="toggleMenu"
           aria-haspopup="true"
           :aria-expanded="isMenuOpen"
         >
@@ -14,10 +14,10 @@
         
         <Transition name="dropdown">
           <div class="dropdown-menu" v-show="isMenuOpen">
-            <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+            <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="closeMenu">
               ABOUT US
             </RouterLink>
-            <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+            <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="closeMenu">
               LIVE CODING
             </RouterLink>
           </div>
@@ -26,10 +26,10 @@
 
       <h1 class="nav-logo">JOBTORY</h1>
 
-      <div class="nav-dropdown">
+      <div class="nav-dropdown" ref="userDropdownContainer">
         <button
           class="nav-pill"
-          @click="isDropdownOpen = !isDropdownOpen"
+          @click="toggleUserMenu"
           aria-haspopup="true"
           :aria-expanded="isDropdownOpen"
         >
@@ -40,7 +40,7 @@
         <Transition name="dropdown">
           <div class="dropdown-menu right-align" v-show="isDropdownOpen">
             <template v-if="isAuthenticated">
-              <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeDropdown">
+              <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeUserMenu">
                 MYPAGE
               </RouterLink>
               <button
@@ -55,11 +55,11 @@
               </button>
             </template>
             <template v-else>
-              <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeDropdown">
+              <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeUserMenu">
                 LOGIN
               </RouterLink>
-              <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeDropdown">
-                SIGN-IN
+              <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeUserMenu">
+                SIGNUP
               </RouterLink>
             </template>
           </div>
@@ -323,18 +323,18 @@
             >
               이전
             </button>
-            <button
-              v-if="currentProfileStep === 1"
-              type="button"
-              class="btn-primary"
+            <button 
+              v-if="currentProfileStep === 1" 
+              type="button" 
+              class="btn-primary" 
               @click="currentProfileStep = 2"
             >
               다음 단계
             </button>
-            <button
-              v-else
-              class="btn-primary"
-              :disabled="savingProfile"
+            <button 
+              v-else 
+              class="btn-primary" 
+              :disabled="savingProfile" 
               @click="saveProfile"
             >
               {{ savingProfile ? "저장 중..." : "설정 완료" }}
@@ -360,7 +360,13 @@ const router = useRouter();
 const { isAuthenticated, user, fetchProfile, logout, token } = useAuth();
 const { options: optionData, loading: optionsLoading, error: optionsError, fetchProfileOptions } = useProfileOptions();
 const isMenuOpen = ref(false);
-const isDropdownOpen = ref(false);
+const isDropdownOpen = ref(false); 
+const dropdownContainer = ref(null); 
+const userDropdownContainer = ref(null); 
+const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value; };
+const closeMenu = () => { isMenuOpen.value = false; };
+const toggleUserMenu = () => { isDropdownOpen.value = !isDropdownOpen.value; };
+const closeUserMenu = () => { isDropdownOpen.value = false; };
 const isLoggingOut = ref(false);
 const showForcedExit = ref(false);
 const showProfileModal = ref(false);
@@ -399,6 +405,15 @@ const toggleMultiSelect = (field, value) => {
 };
 
 const userName = computed(() => user.value?.name || "회원");
+
+const handleClickOutside = (event) => {
+  if (dropdownContainer.value && !dropdownContainer.value.contains(event.target)) {
+    closeMenu();
+  }
+  if (userDropdownContainer.value && !userDropdownContainer.value.contains(event.target)) {
+    closeUserMenu();
+  }
+};
 
 const handleMouseMove = (e) => {
   const card = e.currentTarget;
@@ -512,6 +527,12 @@ const checkForcedAlert = () => {
 };
 
 onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+  window.addEventListener("storage", syncProfile);
+  syncProfile();
+  void fetchProfileOptions().catch(() => {});
+  void loadProfile();
+  checkForcedAlert();
   window.addEventListener("storage", syncProfile);
   syncProfile();
   void fetchProfileOptions().catch(() => {});
@@ -520,6 +541,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("click", handleClickOutside);
+  window.removeEventListener("storage", syncProfile);
   window.removeEventListener("storage", syncProfile);
 });
 
@@ -552,6 +575,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   position: relative;
   z-index: 100;
 }
+
 .nav-logo {
   position: absolute;
   width: 471px;
@@ -566,6 +590,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   line-height: 116px;
   color: #000000;
 }
+
 .nav-pill {
   display: inline-flex;
   align-items: center;
@@ -579,9 +604,18 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   font-size: 16px;
   font-weight: 600;
 }
-.nav-pill .chevron { font-size: 12px; }
-.chevron.rotate { transform: rotate(180deg); }
-.nav-dropdown { position: relative; }
+
+.nav-pill .chevron {
+  font-size: 12px;
+}
+
+.chevron.rotate {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown {
+  position: relative;
+}
 
 .dropdown-menu {
   position: absolute;
@@ -592,7 +626,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   flex-direction: column;
   min-width: 160px;
   padding: 8px 0;
-  background: #111827; 
+  background: #111827;
   border: 1px solid #374151;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
@@ -600,7 +634,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .dropdown-menu.right-align {
-  left: auto; 
+  left: auto;
   right: 0;
 }
 
@@ -642,7 +676,10 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   animation: spin 0.8s linear infinite;
 }
 
-.dropdown-button:disabled { opacity: 0.7; cursor: not-allowed; }
+.dropdown-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 
 /* Dropdown Animation */
 .dropdown-enter-active,
@@ -650,11 +687,13 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: top center;
 }
+
 .dropdown-enter-from,
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-10px) scaleY(0.95);
 }
+
 .dropdown-enter-to,
 .dropdown-leave-from {
   opacity: 1;
@@ -671,7 +710,10 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 /* Grid Background */
 .hero-bg-grid {
   position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   background-size: 40px 40px;
   background-image:
@@ -691,11 +733,13 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   position: relative;
   z-index: 1;
 }
+
 .hero-text {
   text-align: left;
   position: relative;
   z-index: 1;
 }
+
 .hero-title {
   max-width: 640px;
   font-family: "Inter", sans-serif;
@@ -704,18 +748,21 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   line-height: 1.30;
   color: #000000;
 }
+
 .hero-description {
   max-width: 540px;
   margin: 0 0 32px;
   font-size: 17px;
   color: #4b5563;
 }
+
 .hero-actions {
   display: inline-flex;
   justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .secondary {
   border-radius: 999px;
   padding: 10px 20px;
@@ -728,6 +775,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   color: #111827;
   transition: all 0.3s ease;
 }
+
 .primary {
   border-radius: 999px;
   padding: 10px 20px;
@@ -739,22 +787,26 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   cursor: pointer;
   transition: all 0.3s ease;
 }
+
 .primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
+
 .hover-scale:hover {
   transform: scale(1.05);
   background: #111827;
   color: #ffffff;
   border-color: #111827;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
 .hero-image-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
 }
+
 .hero-image {
   width: 100%;
   max-width: 620px;
@@ -762,9 +814,11 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   box-shadow: 0 22px 40px rgba(15, 23, 42, 0.4);
   object-fit: cover;
 }
+
 .floating-anim {
   animation: float 6s ease-in-out infinite;
 }
+
 @keyframes float {
   0% { transform: translateY(0px); }
   50% { transform: translateY(-15px); }
@@ -887,13 +941,18 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   --mouse-x: -500px;
   --mouse-y: -500px;
 }
+
 .spotlight-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
 }
+
 .spotlight-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   pointer-events: none;
   z-index: 1;
   background: radial-gradient(
@@ -904,14 +963,19 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   opacity: 0;
   transition: opacity 0.3s;
 }
-.spotlight-card:hover .spotlight-overlay { opacity: 1; }
-.spotlight-card:hover .card-image-content { transform: scale(1.05); }
+
+.spotlight-card:hover .spotlight-overlay {
+  opacity: 1;
+}
+
+.spotlight-card:hover .card-image-content {
+  transform: scale(1.05);
+}
 
 /* Card Colors */
 .card-one { background: #f9c5d5; }
 .card-two { background: #f7d56f; }
 .card-three { background: #bfacf9; }
-
 
 /* Footer Marquee Section */
 .footer-marquee {
@@ -992,7 +1056,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   width: min(800px, 100%);
   max-height: 85vh;
   background: #ffffff;
-  border-radius: 12px; /* 24px -> 12px (단정함) */
+  border-radius: 12px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   overflow: hidden;
   display: flex;
@@ -1031,6 +1095,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   border-radius: 4px;
   transition: all 0.2s;
 }
+
 .modal-close:hover {
   background: #f3f4f6;
   color: #111827;
@@ -1068,15 +1133,15 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   margin-left: 2px;
 }
 
-/* Input & Select: Filled Style (최신 트렌드) */
+/* Input & Select: Filled Style */
 .modal-field input,
 .modal-field select {
   width: 100%;
-  height: 46px; /* 넉넉한 터치 영역 */
+  height: 46px;
   padding: 0 16px;
-  border-radius: 8px; /* Standard rounded */
+  border-radius: 8px;
   border: 1px solid transparent;
-  background: #f3f4f6; /* 밝은 회색 배경 */
+  background: #f3f4f6;
   color: #111827;
   font-size: 14px;
   font-family: inherit;
@@ -1089,7 +1154,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .modal-field input:focus,
 .modal-field select:focus {
   background: #ffffff;
-  border-color: #111827; /* 블랙 보더 */
+  border-color: #111827;
   box-shadow: 0 0 0 1px #111827;
 }
 
@@ -1124,13 +1189,13 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   height: 0;
 }
 
-/* Chip Style: 직사각형 태그 느낌 */
+/* Chip Style */
 .checkbox-item span {
   display: inline-flex;
   align-items: center;
   height: 34px;
   padding: 0 14px;
-  border-radius: 6px; /* 사각에 가까운 라운드 */
+  border-radius: 6px;
   background: #ffffff;
   border: 1px solid #d1d5db;
   color: #4b5563;
@@ -1162,7 +1227,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   align-items: center;
 }
 
-/* 단계 표시기 (Line Style) */
+/* 단계 표시기 */
 .step-indicator {
   display: flex;
   align-items: center;
@@ -1195,16 +1260,16 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   gap: 10px;
 }
 
-.btn-primary, .btn-secondary {
+.btn-primary,
+.btn-secondary {
   height: 44px;
   padding: 0 20px;
-  border-radius: 999px; 
+  border-radius: 999px;
   font-size: 14px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s;
 }
-
 
 .btn-primary {
   background: #111827;
@@ -1240,11 +1305,14 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
     flex-direction: column-reverse;
     gap: 16px;
   }
+
   .modal-actions {
     width: 100%;
     justify-content: stretch;
   }
-  .btn-primary, .btn-secondary {
+
+  .btn-primary,
+  .btn-secondary {
     flex: 1;
   }
 }

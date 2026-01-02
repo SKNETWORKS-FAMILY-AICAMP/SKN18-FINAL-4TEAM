@@ -129,3 +129,43 @@ class LivecodingReport(models.Model):
         managed = False
         db_table = "livecoding_reports"
         indexes = [models.Index(fields=["user", "session_id"], name="idx_lc_report_user_sess")]
+
+
+class ProfileOption(models.Model):
+    id = models.AutoField(primary_key=True)
+    category = models.CharField(max_length=50)
+    value = models.CharField(max_length=200)
+    display_order = models.IntegerField(default=0)
+
+    class Meta:
+        managed = False
+        db_table = "profile_option"
+        indexes = [models.Index(fields=["category"], name="idx_profile_option_category")]
+
+
+# 사용자 프로필 (학력/경력/스택 등) - user_profile 테이블과 매핑
+try:
+    from django.contrib.postgres.fields import ArrayField
+except Exception:  # pragma: no cover - postgres extension 가용성
+    ArrayField = None
+
+
+class UserProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, primary_key=True, db_column="user_id")
+    graduated_school = models.CharField(max_length=100, null=True, blank=True)
+    university = models.CharField(max_length=200, null=True, blank=True)
+    major = models.CharField(max_length=20, null=True, blank=True)
+    academic_status = models.CharField(max_length=20, null=True, blank=True)
+    graduation_year = models.IntegerField(null=True, blank=True)
+    career_level = models.CharField(max_length=50, null=True, blank=True)
+    current_status = models.CharField(max_length=50, null=True, blank=True)
+    tech_stack = ArrayField(models.TextField(), null=True, blank=True) if ArrayField else models.JSONField(null=True, blank=True)
+    desired_role = ArrayField(models.TextField(), null=True, blank=True) if ArrayField else models.JSONField(null=True, blank=True)
+    detailed_role = ArrayField(models.TextField(), null=True, blank=True) if ArrayField else models.JSONField(null=True, blank=True)
+    region = ArrayField(models.TextField(), null=True, blank=True) if ArrayField else models.JSONField(null=True, blank=True)
+    created_at = models.DateTimeField(null=True, blank=True)
+    updated_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        managed = False
+        db_table = "user_profile"

@@ -143,6 +143,43 @@
               </button>
             </div>
           </div>
+
+          <!-- 약관 동의 -->
+          <div class="field-block terms-block">
+            <div class="terms-header">
+              <label class="field-label">약관 동의</label>
+
+              <label class="terms-all">
+                <input type="checkbox" v-model="allChecked" />
+                전체동의
+              </label>
+            </div>
+
+            <div class="terms-list">
+              <div v-for="term in terms" :key="term.id" class="terms-item">
+                <label class="term-check">
+                  <input type="checkbox" v-model="term.checked" />
+                  <button type="button" class="term-link" @click="openTerm(term)">
+                    {{ term.title }}
+                  </button>
+                  <span v-if="term.required" class="term-required">*</span>
+                </label>
+                <span v-if="term.subtext" class="term-subtext">{{ term.subtext }}</span>
+              </div>
+            </div>
+          </div>
+
+
+          <div v-if="activeTerm" class="modal-overlay" @click.self="closeModal">
+            <div class="modal-card">
+              <div class="modal-header">
+                <h3>{{ activeTerm.title }}</h3>
+                <button type="button" class="modal-close" @click="closeModal">✕</button>
+              </div>
+              <div class="modal-body" v-html="activeTerm.content"></div>
+            </div>
+          </div>
+
           <div class="form-actions">
             <button type="submit" class="submit-button" :disabled="pending" formnovalidate>
               {{ pending ? "가입 중..." : "회원가입" }}
@@ -195,6 +232,204 @@ const emailVerifying = ref(false);
 const emailInlineMessage = ref("");
 const emailInlineType = ref("info");
 const usernameStatus = ref(""); // '', 'ok', 'taken', 'empty'
+const activeTerm = ref(null);
+const terms = ref([
+  /* =========================
+   * 1. 이용약관 동의 (필수)
+   * ========================= */
+  {
+    id: "tos",
+    title: "[필수] 이용약관 동의",
+    required: true,
+    checked: false,
+    content: `
+      <h3>잡토리 서비스 이용약관</h3>
+      <p>본 약관은 잡토리(이하 “회사”)가 제공하는 서비스 이용과 관련하여 회사와 이용자 간의 권리·의무 및 책임사항을 규정합니다.</p>
+
+      <h4>제1조 (목적)</h4>
+      <p>본 약관은 회사가 제공하는 코딩 학습, 라이브 코딩 테스트, 면접 대비 서비스의 이용 조건 및 절차를 규정함을 목적으로 합니다.</p>
+
+      <h4>제2조 (용어 정의)</h4>
+      <table style="border-collapse:collapse; width:100%; border:1px solid #d1d5db;">
+        <thead style="background:#f3f4f6;">
+          <tr>
+            <th style="padding:10px; border:1px solid #d1d5db; width:25%;">용어</th>
+            <th style="padding:10px; border:1px solid #d1d5db;">정의</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>이용자</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">본 약관에 동의하고 서비스를 이용하는 자</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>회원</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">회원가입을 완료하고 서비스를 이용하는 자</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>계정</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">회원 식별을 위해 설정한 아이디(ID)와 비밀번호</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>제3조 (서비스 제공)</h4>
+      <ul>
+        <li>회사는 코딩 문제 풀이, 라이브 코딩 테스트, 면접 대비 콘텐츠 등을 제공합니다.</li>
+        <li>서비스 내용은 개선을 위해 변경될 수 있습니다.</li>
+      </ul>
+
+      <h4>제4조 (금지행위)</h4>
+      <table style="border-collapse:collapse; width:100%; border:1px solid #d1d5db;">
+        <thead style="background:#f3f4f6;">
+          <tr>
+            <th style="padding:10px; border:1px solid #d1d5db; width:22%;">구분</th>
+            <th style="padding:10px; border:1px solid #d1d5db;">행위 예시</th>
+            <th style="padding:10px; border:1px solid #d1d5db; width:22%;">조치</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>계정 도용</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">타인 명의 가입, 계정 공유</td>
+            <td style="padding:10px; border:1px solid #d1d5db;">경고, 이용 제한</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>운영 방해</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">비정상 트래픽, 자동화 도구 사용</td>
+            <td style="padding:10px; border:1px solid #d1d5db;">즉시 차단</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>권리 침해</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">저작권 침해 콘텐츠 업로드</td>
+            <td style="padding:10px; border:1px solid #d1d5db;">삭제, 이용 제한</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>제5조 (면책)</h4>
+      <p>회사는 천재지변, 이용자 귀책 사유로 인한 서비스 장애에 대해 책임을 지지 않습니다.</p>
+
+      <hr/>
+      <p style="font-size:12px; color:#6b7280;">시행일: 2026-01-01</p>
+    `
+  },
+
+  /* =========================
+   * 2. 개인정보 수집·이용 동의 (필수)
+   * ========================= */
+  {
+    id: "privacy",
+    title: "[필수] 개인정보 수집 및 이용 동의",
+    required: true,
+    checked: false,
+    content: `
+      <h3>잡토리 개인정보 수집·이용 동의</h3>
+      <p>회사는 개인정보 보호법에 따라 아래와 같이 개인정보를 수집·이용합니다.</p>
+
+      <h4>1. 수집 항목 및 이용 목적</h4>
+      <table style="border-collapse:collapse; width:100%; border:1px solid #d1d5db;">
+        <thead style="background:#f3f4f6;">
+          <tr>
+            <th style="padding:10px; border:1px solid #d1d5db; width:18%;">구분</th>
+            <th style="padding:10px; border:1px solid #d1d5db; width:42%;">수집 항목</th>
+            <th style="padding:10px; border:1px solid #d1d5db;">이용 목적</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>필수</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">아이디, 비밀번호, 이름, 이메일</td>
+            <td style="padding:10px; border:1px solid #d1d5db;">회원 식별, 서비스 제공</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>선택</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">전화번호, 생년월일</td>
+            <td style="padding:10px; border:1px solid #d1d5db;">고객 문의 대응, 통계 분석</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h4>2. 보유 및 이용기간</h4>
+      <table style="border-collapse:collapse; width:100%; border:1px solid #d1d5db;">
+        <tr>
+          <th style="padding:10px; border:1px solid #d1d5db; width:40%;">항목</th>
+          <th style="padding:10px; border:1px solid #d1d5db;">보유 기간</th>
+        </tr>
+        <tr>
+          <td style="padding:10px; border:1px solid #d1d5db;">회원 정보</td>
+          <td style="padding:10px; border:1px solid #d1d5db;">회원 탈퇴 시까지</td>
+        </tr>
+      </table>
+
+      <p>필수 항목 동의 거부 시 서비스 이용이 제한될 수 있습니다.</p>
+
+      <hr/>
+      <p style="font-size:12px; color:#6b7280;">시행일: 2026-01-01</p>
+    `
+  },
+
+  /* =========================
+   * 3. 마케팅 활용 동의 (선택)
+   * ========================= */
+  {
+    id: "marketing",
+    title: "[선택] 마케팅 활용 동의",
+    required: false,
+    checked: false,
+    content: `
+      <h3>마케팅 정보 수신 동의</h3>
+
+      <table style="border-collapse:collapse; width:100%; border:1px solid #d1d5db;">
+        <thead style="background:#f3f4f6;">
+          <tr>
+            <th style="padding:10px; border:1px solid #d1d5db; width:25%;">항목</th>
+            <th style="padding:10px; border:1px solid #d1d5db;">내용</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>수신 채널</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">이메일, 문자(SMS)</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>안내 내용</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">이벤트, 프로모션, 신규 기능 안내</td>
+          </tr>
+          <tr>
+            <td style="padding:10px; border:1px solid #d1d5db;"><b>보유 기간</b></td>
+            <td style="padding:10px; border:1px solid #d1d5db;">동의 철회 시까지</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>동의하지 않아도 서비스 이용에는 제한이 없습니다.</p>
+
+      <hr/>
+      <p style="font-size:12px; color:#6b7280;">시행일: 2026-01-01</p>
+    `
+  }
+]);
+
+
+const allChecked = computed({
+  get() {
+    return terms.value.length > 0 && terms.value.every((t) => t.checked);
+  },
+  set(val) {
+    terms.value.forEach((t) => {
+      t.checked = val;
+    });
+  }
+});
+
+const openTerm = (term) => {
+  activeTerm.value = term;
+};
+
+const closeModal = () => {
+  activeTerm.value = null;
+};
 
 watch(emailDomainSelect, (val) => {
   if (val) {
@@ -343,6 +578,12 @@ const handleSubmit = async () => {
 
   if (!birthYear.value || !birthMonth.value || !birthDay.value) {
     window.alert("생년월일을 모두 선택해 주세요.");
+    return;
+  }
+
+  const notAgreed = terms.value.filter((t) => t.required && !t.checked);
+  if (notAgreed.length) {
+    window.alert("필수 약관에 동의해 주세요.");
     return;
   }
 
@@ -729,6 +970,108 @@ const handleVerifyEmailCode = async () => {
 
 .email-inline-msg.error {
   color: #b91c1c;
+}
+
+.terms-block {
+  grid-column: 1 / -1;
+  padding: 12px 0 4px;
+}
+
+.terms-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.terms-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.terms-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.terms-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.term-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 700;
+}
+
+.term-link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: #111827;
+  text-decoration: underline;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.term-required {
+  color: #dc2626;
+}
+
+.term-subtext {
+  font-size: 12px;
+  color: #6b7280;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-card {
+  width: min(800px, 90vw);
+  max-height: 80vh;
+  background: #ffffff;
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
+}
+
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid #e5e7eb;
+  font-weight: 800;
+  font-size: 18px;
+}
+
+.modal-body {
+  padding: 20px;
+  overflow-y: auto;
+  line-height: 1.6;
+  font-size: 14px;
+}
+
+.modal-close {
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
 }
 
 @media (max-width: 768px) {

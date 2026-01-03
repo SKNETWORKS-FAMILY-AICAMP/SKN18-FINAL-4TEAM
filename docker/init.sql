@@ -219,3 +219,14 @@ SELECT cat, val, ord FROM (
 WHERE NOT EXISTS (
   SELECT 1 FROM profile_option po WHERE po.category = seed.cat AND po.value = seed.val
 );
+
+
+CREATE TABLE IF NOT EXISTS recommended_videos (
+  id            SERIAL       PRIMARY KEY,
+  code_lang     TEXT[]       NULL,
+  video_url     VARCHAR(200) NOT NULL,
+  summary       TEXT         NOT NULL,
+  category      TEXT[]       NOT NULL,
+  doamin        VARCHAR(50)  NOT NULL,
+  created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+);

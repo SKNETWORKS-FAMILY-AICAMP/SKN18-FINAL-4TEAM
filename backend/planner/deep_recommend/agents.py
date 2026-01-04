@@ -1,141 +1,68 @@
-from typing import Any, Dict, List
-
 from deepagents import create_deep_agent
-from langchain_core.tools import tool
 from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv
+from tools import video_search_tool, validate_plan_tool
+load_dotenv()
 
+# 기본 모델명: 튜플이 되지 않도록 쉼표를 제거한다.
 DEFAULT_MODEL_NAME = "gpt-4o-mini"
 
+ALGO_CATEGORIES = [
+    "DP", "Greedy", "Math", "Sorting", "Hashing", "Two Pointers", "Prefix Sum", "BFS",
+    "Tree", "Backtracking", "DFS", "Binary Search", "Graph", "Statistics", "Stack",
+    "Bitmask", "Divide and Conquer", "HashMap", "Queue", "Sliding Window", "Parsing",
+    "Metrics", "String", "Dijkstra", "Shortest Path", "Array", "Heap", "Preprocessing",
+    "Aggregation", "Counting", "Quantile", "Vector", "NLP", "Numerical Stability",
+    "HashSet", "Intervals", "Simulation", "Sampling", "Transformer", "Set", "Join",
+    "Ranking", "Frequency", "Thresholding", "Normalization", "Streaming", "Sparse",
+    "Padding", "Masking", "Cosine Similarity", "Softmax", "Attention", "Edit Distance",
+    "Top-K", "Positional Encoding", "Z-Score", "Regex", "MinMax Scaling",
+    "Topological Sort", "KMP", "Mean", "Variance", "Covariance", "Entropy",
+    "KL Divergence", "Confusion Matrix", "AUC", "Matrix", "Log Loss", "Clustering",
+    "Nearest Centroid", "LIS", "TF-IDF", "IQR", "Confidence Interval", "Histogram",
+    "Winsorization", "MAE", "Beam Search",
+]
 
-@tool
-def video_search_tool(query: str) -> Dict[str, Any]:
-    """
-    RecommendedVideo 모델(recommended_videos 테이블)을 조회해 요약/카테고리/도메인 기반 후보를 찾는다.
-    - summary에 대한 icontains 검색
-    - ArrayField(category)에도 부분 일치 검색 시도
-    """
-    try:
-        from django.apps import apps
-        from django.db.models import Q
-    except Exception as exc:  # pragma: no cover - Django 미초기화 시
-        return {"query": query, "results": [], "note": f"Django import 실패: {exc}"}
+LIVE_CODING_CATEGORIES = [
+    "REQUIREMENT_CHECK",
+    "LOGIC_DESIGN",
+    "THINK_ALOUD",
+    "CRISIS_MGMT",
+    "CODE_VERIFICATION",
+]
 
-    model = apps.get_model(app_label="planner", model_name="RecommendedVideo")
-    if not model:
-        return {"query": query, "results": [], "note": "planner.RecommendedVideo 모델을 찾을 수 없습니다"}
+ALGO_CATEGORY_HINT = ", ".join(ALGO_CATEGORIES)
+LIVE_CODING_CATEGORY_HINT = ", ".join(LIVE_CODING_CATEGORIES)
 
-    try:
-        qs = model.objects.all()
-        if query:
-            qs = qs.filter(Q(summary__icontains=query) | Q(category__icontains=query) | Q(domain__icontains=query))
-        qs = qs.order_by("-created_at")[:10]
-
-        results = [
-            {
-                "id": obj.id,
-                "video_url": getattr(obj, "video_url", None),
-                "summary": getattr(obj, "summary", None),
-                "category": getattr(obj, "category", None),
-                "code_lang": getattr(obj, "code_lang", None),
-                "domain": getattr(obj, "domain", None),
-                "created_at": getattr(obj, "created_at", None).isoformat() if getattr(obj, "created_at", None) else None,
-            }
-            for obj in qs
-        ]
-    except Exception as exc:  # pragma: no cover - DB 접근 실패 시
-        return {"query": query, "results": [], "note": f"DB 조회 실패: {exc}"}
-
-    return {"query": query, "results": results, "note": "RecommendedVideo 조회 결과"}
-
-
-@tool
-def validate_plan_tool(plan: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """7일 플랜 품질을 검증한다."""
-    issues: List[str] = []
-    plan = plan or []
-
-    if len(plan) != 7:
-        issues.append("slots_count: 7일 플랜이 아닙니다")
-
-    topics = [item.get("topic") for item in plan if isinstance(item, dict)]
-    urls = [item.get("video_url") for item in plan if isinstance(item, dict)]
-
-    def _find_dupes(values: List[Any]) -> List[str]:
-        seen = set()
-        dupes = set()
-        for val in values:
-            if not val:
-                continue
-            if val in seen:
-                dupes.add(val)
-            else:
-                seen.add(val)
-        return sorted(list(dupes))
-
-    dup_topics = _find_dupes(topics)
-    dup_urls = _find_dupes(urls)
-    if dup_topics:
-        issues.append(f"topic_duplication: {dup_topics}")
-    if dup_urls:
-        issues.append(f"video_url_duplication: {dup_urls}")
-
-    for idx, item in enumerate(plan):
-        if not isinstance(item, dict):
-            issues.append(f"slot_{idx+1}: invalid item")
-            continue
-
-        diff = item.get("difficulty")
-        if diff is None:
-            issues.append(f"slot_{idx+1}: difficulty 누락")
-        else:
-            try:
-                diff_val = int(diff)
-                if diff_val < 1 or diff_val > 5:
-                    issues.append(f"slot_{idx+1}: difficulty 범위(1~5) 위반")
-            except Exception:
-                issues.append(f"slot_{idx+1}: difficulty 숫자 아님")
-
-        if not item.get("topic"):
-            issues.append(f"slot_{idx+1}: topic 누락")
-        if not item.get("video_title"):
-            issues.append(f"slot_{idx+1}: video_title 누락")
-        if not item.get("video_url"):
-            issues.append(f"slot_{idx+1}: video_url 누락")
-
-        criteria = item.get("success_criteria") or []
-        if not criteria or not isinstance(criteria, list):
-            issues.append(f"slot_{idx+1}: success_criteria 누락")
-
-
-
-    return {"ok": len(issues) == 0, "issues": issues}
 
 
 REPORT_ANALYZER_PROMPT = """
 너는 ReportAnalyzerAgent다.
-입력 growth_reports(누적 코딩테스트 강점/약점/변화/개선사항)를 학습 니즈 프로필로 정규화한다.
-사용자 선호 직무/언어 등 추가 프로필은 별도로 주어지므로, 여기서는 growth_reports 텍스트에 등장하는 정보만 사용한다. growth_reports는 단일 텍스트이며, 강점/약점/변화/개선 키워드가 문장 속에 섞여 있을 수 있으나 JSON이 아니다.
+입력: growth_reports(누적 코딩테스트 강점/약점/변화/개선사항 텍스트) + user_profile(선호 직무/언어/시간 예산 등).
+둘을 합쳐 학습 니즈 프로필을 정규화한다.
 
 반드시 아래 JSON만 반환:
 {
-    "needs_profile": {
-      "goal": "당장 개선이 필요한 영역(약점/개선사항 기반)",
-      "current_level": "전체 수준 또는 최근 등급/점수",
-      "focus_topics": ["반복적으로 약한 알고리즘/도메인 최대 3개"],
-      "review_topics": ["최근 악화/잊은 영역 1~2개"],
-      "strengths": ["유지/활용할 강점 1~2개"]
-    }
+  "needs_profile": {
+    "goal": "당장 개선이 필요한 영역(약점/개선사항 기반)",
+    "current_level": "전체 수준 또는 최근 등급/점수",
+    "focus_topics": ["반복적으로 약한 알고리즘/도메인 최대 3개"],
+    "review_topics": ["최근 악화/잊은 영역 1~2개"],
+    "strengths": ["유지/활용할 강점 1~2개"],
+    "preferences": ["user_profile 기반 선호 주제/형식"],
+    "language": "주 학습/설명 언어 코드",
   }
+}
 
 추출 가이드:
-- growth_reports에 있는 내용으로만 구성한다.
+- growth_reports에서 goal/current_level/focus_topics/review_topics/strengths만 뽑고, 없으면 빈값.
+- user_profile에서 preferences/language 채운다. 없으면 빈 문자열/빈 배열
 - goal: improvements/weaknesses에서 가장 긴급한 것 1문장.
 - focus_topics: 반복된 약점 알고리즘/도메인 키워드 위주 최대 3개.
 - review_topics: 최근 악화/퇴보/미완료 영역이 있으면 1~2개.
-- preferences/avoid/language/time_budget은 추출하지 않는다(외부 프로필 입력으로 대체 예정).
 
 규칙:
-- 새 정보 발명 금지. 근거 없으면 null/빈 문자열/빈 배열.
+- 새 정보 발명 금지. 근거 없으면 null/빈 문자열/빈 배열/로 둔다.
 - JSON 외 텍스트 출력 금지.
 """
 
@@ -149,9 +76,9 @@ needs_profile을 참고해 7일치 슬롯을 만든다.
   "slots": [
     {
       "day": 1,
-      "topic": "정확한 학습 주제",
-      "category": "base|practice|review 중 하나",
-      "difficulty": 1,
+      "day_plan_topic": "정확한 학습 주제",
+      "domain": "algorithm | live_coding 중 하나",
+      "category": "domain별 세부 카테고리",
       "reason": "선택 이유(30자 이내)"
     }
   ]
@@ -159,8 +86,13 @@ needs_profile을 참고해 7일치 슬롯을 만든다.
 
 규칙:
 - day는 1부터 7까지 1씩 증가.
-- topic 중복 금지, category 비율은 base 3 / practice 3 / review 1.
-- difficulty는 1~5, needs_profile.current_level을 기준으로 day 1을 설정하고 점진 상승(이전 대비 +0~1, 최대 5). 정보 부족 시 day 1을 1로 시작.
+- topic 중복 금지.
+- domain은 algorithm | live_coding 중 하나만 사용.
+- category는 domain에 따라 선택:
+    - domain=algorithm → ALGO_CATEGORIES 중 선택 (예: DP, Greedy, BFS)
+    - domain=live_coding → LIVE_CODING_CATEGORIES 중 선택 (REQUIREMENT_CHECK 등)
+- focus_topics는 algorithm 도메인을 우선 채우고, review_topics는 review/유사 카테고리로 최소 1개 배정, strengths는 최대 1개.
+- video_search_tool이 topic+category+domain+difficulty로 쿼리할 수 있도록 category/domain을 반드시 채운다.
 - needs_profile.preferences/avoid 반영.
 """
 
@@ -171,24 +103,19 @@ VIDEO_SELECTOR_PROMPT = """
 
 절차:
 - 각 슬롯마다 video_search_tool을 호출해 query를 날리고 후보 3~5개를 고른다.
-- query는 topic+category+difficulty+target_language를 포함한다. 슬롯 difficulty가 없으면 day 순서에 맞춰 1~3 범위로 보수적으로 설정한다.
-- 각 후보에 fit_reason(왜 맞는지)과 risks(길이/언어 불일치 등)을 포함한다.
+- query는 topic+category+domain 포함한다.
+- 각 후보에 fit_reason(왜 맞는지)을 포함한다.
 
 출력(JSON만):
 {
   "candidates": [
     {
       "day": 1,
-      "topic": "...",
+      "day_plan_topic": "...",
       "videos": [
         {
           "id": "video_id",
-          "title": "...",
-          "url": "...",
-          "video_language": "ko",
-          "duration_min": 25,
           "fit_reason": "30자",
-          "risks": "20자"
         }
       ]
     }
@@ -206,33 +133,25 @@ slots와 candidates를 받아 최종 7일 플랜(final_plan)을 만든다.
   "final_plan": [
     {
       "day": 1,
-      "topic": "...",
-      "difficulty": 1,
-      "video_title": "...",
-      "video_url": "...",
-      "video_language": "ko",
+      "day_plan_title": "...",
+      "video_id": "...",
       "learning_goals": ["2~3개"],
       "success_criteria": ["2개"],
-      "time_plan": "총 40분 (시청 25 + 노트 10 + 복습 5)",
       "why_selected": "30자",
-      "warmup": "5분 개념 훑기",
-      "review": "5분 전일 복습"
     }
   ]
 }
 
 규칙:
-- day 1~7 순서 맞추기, video_url 중복 금지.
-- difficulty는 슬롯 값을 기본으로 하되 누락 시 day 1=1에서 +0~1씩 증가(최대 5).
+- day 1~7 순서 맞추기, video_id 중복 금지
 - learning_goals는 슬롯 topic과 직결.
-- success_criteria는 체크 가능 표현 사용.
-- 필요 시 candidates 없으면 topic 기준으로 placeholder를 작성하되 url은 빈 문자열 금지(검색 링크라도 넣기).
+- success_criteria는 사용자의 이해도 점검 기준이 될 수 있도록 성공 기준 설정
 """
 
 
 MAIN_PROMPT = """
 너는 WeeklyStudyPlannerDeepAgent다.
-입력: user_id, target_language, growth_reports
+입력: user_id, user_profile, growth_reports
 출력: final_plan(7개), slots, needs_profile
 
 호출 순서:
@@ -262,9 +181,10 @@ MAIN_PROMPT = """
 """
 
 
-def create_weekly_study_planner_agent(model_name: str = DEFAULT_MODEL_NAME):
+def create_weekly_study_planner_agent(model_name: str = None):
     """7일 학습 추천 deep-agent를 생성한다."""
-    base_model = ChatOpenAI(model=model_name, temperature=0)
+    resolved_model = model_name or DEFAULT_MODEL_NAME
+    base_model = ChatOpenAI(model=resolved_model, temperature=0)
 
     return create_deep_agent(
         model=base_model,
@@ -301,10 +221,3 @@ def create_weekly_study_planner_agent(model_name: str = DEFAULT_MODEL_NAME):
         ],
         system_prompt=MAIN_PROMPT,
     )
-
-
-__all__ = [
-    "create_weekly_study_planner_agent",
-    "validate_plan_tool",
-    "video_search_tool",
-]

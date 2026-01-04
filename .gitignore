@@ -12,3 +12,6 @@ docker/redis-data/
 docker/redis-data/**
 backend\__pycache__
 backend/**/__pycache__/
+
+docker/database/
+docker/database/**

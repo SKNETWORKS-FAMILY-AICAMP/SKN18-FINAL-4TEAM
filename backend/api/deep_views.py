@@ -6,8 +6,8 @@ from rest_framework.permissions import IsAuthenticated
 from .authentication import JWTAuthentication
 from .models import UserGrowthInsight
 from django.db.utils import ProgrammingError
-from growth_report.graph import run_growth_report
-from growth_report.utils import append_growth_state
+from planner.growth_report.graph import run_growth_report
+from planner.growth_report.utils import append_growth_state
 
 
 class UserReportsPayloadView(APIView):
@@ -75,6 +75,13 @@ class UserReportsPayloadView(APIView):
                     {
                         "session_id": r.session_id,
                         "report_md": r.report_md or "",
+                        "final_score": r.final_score,
+                        "code_feedback":r.code_feedback,
+                        "consistency_feedback":r.consistency_feedback,
+                        "improvement":r.improvement,
+                        "comprehensive_evaluation":r.comprehensive_evaluation,
+                        "problem_algorithm": r.problem['algorithm']
+                        
                     }
                 )
         if not has_previous_growth: # 처음 성장 리포트 실행

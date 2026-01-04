@@ -5,7 +5,7 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-from .agents.graph import agent_app
+#from .deep_recommandation.graph import agent_app
 from .models import StudyPlan, DailyTask
 from api.models import UserGrowthInsight
 

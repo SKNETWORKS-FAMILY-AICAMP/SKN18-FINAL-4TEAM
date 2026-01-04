@@ -1,44 +1,13 @@
 import json
-from typing import Any, Dict, List, TypedDict
-from langchain_core.messages import SystemMessage, HumanMessage
-from interview_engine.llm import get_llm
+from .state import ReportState
+from .utils import (
+    _call_llm,
+    _reports_to_text,
+    _parse_json,
+    collect_low_score_algorithms,
+    collect_high_score_algorithms,
+)
 
-
-class ReportState(TypedDict, total=False):
-    # 이전 성장 리포트가 있을 때 True로 설정하거나 growth_report를 채웁니다.
-    growth_true: bool
-    reports: List[Dict[str, Any]]
-    growth_report: Any  # 이전 성장 리포트 원문/객체
-    growth_delta: Dict[str, Any]
-    weaknesses: List[Dict[str, Any]]
-    strengths: List[Dict[str, Any]]
-    improvements: List[Dict[str, Any]]
-    final_report: str
-
-
-def _call_llm(system_prompt: str, user_prompt: str) -> str:
-    model = get_llm("report")
-    resp = model.invoke([SystemMessage(content=system_prompt), HumanMessage(content=user_prompt)])
-    return getattr(resp, "content", None) or str(resp)
-
-
-def _parse_json(content: str) -> Dict[str, Any]:
-    try:
-        return json.loads(content)
-    except Exception:
-        return {}
-
-
-def _reports_to_text(state: ReportState) -> str:
-    reps = state.get("reports") or []
-    if not reps:
-        return "(보고서 없음)"
-    texts: List[str] = []
-    for idx, r in enumerate(reps, 1):
-        md = (r.get("report_md") or "").strip()
-        header = f"[리포트 {idx}]"
-        texts.append(f"{header}\n{md}")
-    return "\n\n".join(texts)
 
 def growth_delta_analyst(state: ReportState) -> ReportState:
     system_prompt = """
@@ -89,7 +58,8 @@ def weakness_analyst(state: ReportState) -> ReportState:
 
         # TASK
         - 반복적으로 관찰된 개선 필요 패턴만 식별한다.
-
+        - reports와 problem_algorithm 태그를 참고하여 알고리즘/자료구조 취약 영역을 포함한다.
+          (예: BFS/DP/Greedy/Stack/Heap/Tree/Graph/Array/Hash 등)
         # CONSTRAINTS
         - 단발성 실수 제외
         - 최소 2개 이상의 report 근거 필요
@@ -100,13 +70,15 @@ def weakness_analyst(state: ReportState) -> ReportState:
         # OUTPUT FORMAT (JSON only)
         {
             "weaknesses": [
-                {"title": "약점 요약", "evidence": "반복 패턴 또는 report_ids"},
-                {"title": "약점 요약", "evidence": "..."},
-                {"title": "약점 요약", "evidence": "..."}
+                {"title": "약점 요약(알고리즘/행동 포함)", "evidence": "반복 패턴 또는 report_ids"},
+                {"title": "약점 요약(알고리즘/행동 포함)", "evidence": "..."},
+                {"title": "약점 요약(알고리즘/행동 포함)", "evidence": "..."}
             ]
         }
     """
-    user_prompt = _reports_to_text(state)
+    low_algos = collect_low_score_algorithms(state.get("reports") or [], threshold=70.0)
+    algos_text = json.dumps(low_algos, ensure_ascii=False)
+    user_prompt = f"{_reports_to_text(state)}\n\n### 약한 알고리즘 리스트\n{algos_text}"
     content = _call_llm(system_prompt, user_prompt)
     parsed = _parse_json(content)
     state["weaknesses"] = parsed.get("weaknesses") if isinstance(parsed, dict) else []
@@ -119,7 +91,8 @@ def strength_analyst(state: ReportState) -> ReportState:
         너는 사용자의 라이브코딩 면접 누적 기록을 분석하는 강점 패턴 분석 노드다.
 
         # TASK
-        - 누적 report 전체에서 반복적으로 관찰된 긍정적 행동 패턴만 추출한다.
+        - 누적 report 전체에서 반복적으로 관찰된 긍정적 행동/알고리즘 패턴만 추출한다.
+          (알고리즘/자료구조 태그 problem_algorithm 및 report_md/code_feedback를 함께 고려)
 
         # CONSTRAINTS
         - 최소 2개 이상의 report에서 반복된 패턴만 인정한다.
@@ -130,13 +103,15 @@ def strength_analyst(state: ReportState) -> ReportState:
         # OUTPUT FORMAT (JSON Only)
         {
             "strengths": [
-                {"title": "강점 요약", "evidence": "반복된 행동 또는 report_ids"},
-                {"title": "강점 요약", "evidence": "..."},
-                {"title": "강점 요약", "evidence": "..."}
+                {"title": "강점 요약(알고리즘/행동 포함)", "evidence": "반복된 행동/알고리즘 또는 report_ids"},
+                {"title": "강점 요약(알고리즘/행동 포함)", "evidence": "..."},
+                {"title": "강점 요약(알고리즘/행동 포함)", "evidence": "..."}
             ]
         }
     """
-    user_prompt = _reports_to_text(state)
+    high_algos = collect_high_score_algorithms(state.get("reports") or [], threshold=90.0)
+    algos_text = json.dumps(high_algos, ensure_ascii=False)
+    user_prompt = f"{_reports_to_text(state)}\n\n### 강한 알고리즘 리스트\n{algos_text}"
     content = _call_llm(system_prompt, user_prompt)
     parsed = _parse_json(content)
     state["strengths"] = parsed.get("strengths") if isinstance(parsed, dict) else []

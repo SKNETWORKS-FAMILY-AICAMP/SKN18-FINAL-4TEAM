@@ -1,148 +1,223 @@
-1. .env에
+Deep Recommend Graph (Neo4j + ES)
+
+요약
+- GraphDB는 리포트 기반 Evidence/Gap/Similarity 경로로 문제 후보를 만들고,
+  ES가 임베딩+키워드 재랭킹을 수행한다.
+- User-Role 직접 연결은 제거한다. Role은 사용하지 않는다.
+- 리포트 생성 시 자동으로 Postgres → Neo4j 동기화 큐가 돌고,
+  추천은 Neo4j 후보 → ES 재랭킹으로 결정된다.
+
+입력/출력
+- 입력(리포트): livecoding_reports (graph_output 포함)
+- 출력(추천): graph_output.recommended_problems
+
+
+1. 구성 요소
+
+1) Neo4j
+- 문제 그래프: Problem, AlgoSkill, Difficulty
+- 유저 그래프: User, Evidence + 엣지 weight/ts
+- 유사도: User-SIMILAR, AlgoSkill-RELATED
+
+2) ES
+- 인덱스: coding_problem
+- 문서: problem_id, problem, category, algorithm, difficulty, embedding
+- 임베딩 모델: text-embedding-3-large (OPENAI_EMBEDDING_MODEL로 변경 가능)
+
+3) Backend 동기화
+- graph_sync/neo4j_sync.py: 스키마/문제 그래프/리포트 갱신
+- graph_sync/user_similarity.py: 유저 유사도 계산
+- graph_sync/recommendations.py: 후보 추출 + ES 재랭킹
+- graph_sync/graph_queue.py: 비동기 큐 워커
+- graph_sync/es_sync.py: ES 인덱스/문서/임베딩 생성
+
+
+2. 그래프 구조 (현재 구현)
+
+노드
+- User
+- Evidence
+- AlgoSkill
+- Problem
+- Difficulty
+
+관계
+- (User)-[:SHOWED_GAP {weight, ts}]->(AlgoSkill)
+- (User)-[:HAS_EVIDENCE {weight, ts}]->(Evidence)
+- (Evidence)-[:SUPPORTS {weight}]->(AlgoSkill)
+- (Problem)-[:USES_ALGO]->(AlgoSkill)
+- (Problem)-[:HAS_DIFFICULTY]->(Difficulty)
+- (User)-[:SIMILAR {score, overlap, activity_weight, ts}]->(User)
+- (AlgoSkill)-[:RELATED {score, reason}]->(AlgoSkill)
+
+주의
+- Role 노드/관계는 제거됨 (category는 Problem 속성으로 사용).
+
+
+3. 리포트 → Neo4j 반영 규칙
+
+입력 source
+- livecoding_reports.graph_output
+  - problem_algorithms, strategy_algorithms
+  - problem_solving_evaluation.consistency_status
+
+생성 규칙
+1) Gap 스킬 결정
+- problem_algorithms 있으면 그것을 gap으로 사용
+- 없으면 strategy_algorithms 사용
+
+2) Evidence
+- strategy_mismatch: gap_algos 중 strategy_algorithms에 없는 것
+- implementation_mismatch: consistency_status가 "불일치" 또는 "개선하여 구현"
+
+3) 엣지 속성
+- SHOWED_GAP.weight = 1.0, ts=created_at
+- HAS_EVIDENCE.weight = 1.0 또는 consistency_weight, ts=created_at
+- SUPPORTS.weight = 1.0 또는 consistency_weight
+
+적용 위치
+- backend/graph_sync/neo4j_sync.py: sync_report()
+
+
+4. Algo 유사도 (RELATED)
+
+초기 수동 테이블 (예시)
+- BFS ↔ DFS (0.7)
+- DFS ↔ Backtracking (0.6)
+- DP ↔ Knapsack (0.7)
+- Greedy ↔ Priority Queue (0.55)
+- Dijkstra ↔ Priority Queue (0.8)
+- Graph ↔ Tree (0.5)
+- Two Pointers ↔ Sliding Window (0.6)
+- Binary Search ↔ Parametric Search (0.7)
+
+생성 위치
+- backend/graph_sync/neo4j_sync.py: ensure_algo_similarity()
+
+
+5. User 유사도 (SIMILAR)
+
+입력
+- livecoding_reports.graph_output의 알고리즘 리스트
+- created_at, final_score
+
+프로파일
+- 알고리즘별 가중치 합산 + 최근성 가중치 적용
+- recent_weight = exp(-days/30)
+
+활동량/성장성
+- activity_score = log(1 + report_count) * recent_weight
+- growth_score = (최신점수 - 최초점수) / (count - 1)
+- activity_level
+  - count >= 5 && growth_score > 0 → heavy_growth
+  - count >= 5 && growth_score <= 0 → heavy_rand
+  - else → light
+
+추천 경로 반영(heavy/light 분기)
+- heavy_growth: SIMILAR 경로 가중치 1.3x
+- heavy_rand: SIMILAR 경로 가중치 0.6x
+- light: SIMILAR 경로 제외(0x)
+
+유사도 점수
+- cosine(profile_u, profile_v) * (1 + sqrt(activity_u * activity_v))
+
+생성 위치
+- backend/graph_sync/user_similarity.py
+- 리포트 저장 후 큐에서 자동 갱신
+
+
+6. 추천 경로 (Hop)
+
+현재 후보 합산 경로
+1) Evidence 경로 (3-hop)
+  User → Evidence → AlgoSkill → Problem
+
+2) Gap 경로 (2-hop)
+  User → AlgoSkill → Problem
+
+3) User-Sim 경로 (4-hop)
+  User → SIMILAR(User) → SHOWED_GAP → AlgoSkill → Problem
+
+4) Algo-Sim 경로 (4-hop)
+  User → AlgoSkill → RELATED → AlgoSkill → Problem
+
+Neo4j 후보 쿼리
+- backend/graph_sync/recommendations.py
+- 각 경로에서 weight를 모아 Problem score 합산 후 상위 N개 추출
+
+
+7. ES 하이브리드 재랭킹
+
+입력
+- Neo4j 후보 problem_id 리스트
+- graph_output.recommendation_query (LLM 요약)
+
+쿼리
+- keyword match(problem)
+- knn(embedding, cosine)
+- terms filter: problem_id, difficulty
+- RRF 결합(가능 시)
+
+구현
+- backend/graph_sync/recommendations.py::_es_hybrid_rerank
+
+
+8. 실행 흐름
+
+1) 백엔드 실행 (자동 큐 워커 시작)
 ```
-NEO4J_AUTH=neo4j/gyulcross0113
-ELASTIC_PASSWORD=gyulcross0113
-KIBANA_PASSWORD=gyulcross0113
-```
-값 먼저 추가한다.
-
-
-2. 
-```
- docker-compose -f docker/docker-compose.yml --env-file .env up -d   
-```
- 로 먼저 docker 실행 up 해줌
-
-```
- docker compose -f docker/docker-compose.yml --env-file .env up -d setup
+python backend/manage.py runserver
 ```
 
-이거로 setup 별도 실행 후 
-```
-docker compose -f docker/docker-compose.yml --env-file .env exec neo4j cypher-shell -u neo4j -p gyulcross0113 -f /var/lib/neo4j/import/schema.cypher
-```
-로 Neo4j Schema적용함
+2) 리포트 생성 시 자동 동기화
+- views.py에서 report 저장 후 큐에 작업 등록
+- graph_sync/graph_queue.py가 Neo4j/ES 동기화 및 추천 생성
 
-그럼 실제로 localhost:7474에서 .env에 적힌 계정 값으로 입력 후 로그인 하면 
-![alt text](docs/neo4j/neo4j-1.png)
-사진과 같이 확인 가능
-
-
-3. 인덱스 생성(*혹시몰라서 해야함)
+3) 초기 데이터 전체 동기화 (1회)
 ```
-curl.exe -u elastic:gyulcross0113 -X PUT "http://localhost:9200/coding_problem" -H "Content-Type: application/json" --data-binary "@docker/elasticsearch/coding_problem_mapping.json"
+python backend/graph_sync/sync_from_postgres.py
 ```
 
-4. csv를 Neo4j import에 복사
+4) 리포트 CSV 적재(light_user/heavy_user 만든 거 용도)
 ```
-powershell -ExecutionPolicy Bypass -File docker/scripts/sync_neo4j_import.ps1
-```
-
-5. Neo4j 문제 로드
-```
-docker compose -f docker/docker-compose.yml --env-file .env exec neo4j cypher-shell -u neo4j -p gyulcross0113 -f /var/lib/neo4j/import/load_coding_problems.cypher
+python backend/graph_sync/import_seed_data.py
 ```
 
-6. ES 인덱싱 진행
+
+9. 환경 변수
+- NEO4J_AUTH=neo4j/<password>
+- ELASTIC_PASSWORD=<password>
+- OPENAI_API_KEY=<key>
+- OPENAI_EMBEDDING_MODEL (옵션, 기본: text-embedding-3-large)
+
+
+10. 운영/개발 시 체크리스트
+
+추천이 안 나오는 경우
+- Neo4j 동기화 여부 확인
+- graph_output.recommendation_query 생성 여부 확인
+- ES 인덱스/임베딩 생성 여부 확인
+
+User-Role 잔존 엣지 제거
 ```
-python docker/scripts/index_coding_problems_es.py --es-password gyulcross0113
+MATCH (:User)-[r:WANTS_ROLE]->(:Role) DELETE r;
 ```
 
-> Done이 뜨면 된거
-
-7. 임베딩 확인
-```
-$body = @{ query = @{ match_all = @{} }; _source = @("embedding") } | ConvertTo-Json -Compress
-Invoke-RestMethod -Method Post -Uri "http://localhost:9200/coding_problem/_search?size=1" -Headers @{Authorization=("Basic " + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("elastic:gyulcross0113")))} -ContentType "application/json" -Body $body
-```
-
-7-1. 임베딩 필드 값 확인
-
-```
-$body = @{ query = @{ match_all = @{} }; _source = @("embedding") } | ConvertTo-Json -Compress
-$res = Invoke-RestMethod -Method Post -Uri "http://localhost:9200/coding_problem/_search?size=1" -Headers @{Authorization=("Basic " + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("elastic:gyulcross0113")))} -ContentType "application/json" -Body $body
-$res.hits.hits[0]._source.embedding
-```
-
-8. 리포트 생성 후에
-```
-powershell -ExecutionPolicy Bypass -File docker/scripts/export_livecoding_reports_to_neo4j.ps1
-```
-로 리포트 데이터 csv export함
-
-8-1. 
-```
-docker compose -f docker/docker-compose.yml --env-file .env exec neo4j cypher-shell -u neo4j -p gyulcross0113 -f /var/lib/neo4j/import/load_livecoding_reports.cypher
-```
-로  Neo4j에 로드함
-
-8-2. 
-```
-MATCH (u:User)-[:TOOK]->(i:Interview)-[:SHOWED_GAP]->(s:AlgoSkill)
-RETURN u, i, s LIMIT 25
-```
-위 명령어를 localhost:7474에 접속해서 브라우저에서 실행하면 연결 뜸 그거 보고 된지 확인 필요
+추천 개수 변경
+- backend/graph_sync/graph_queue.py의 limit 조정
 
 
-9.
-``` 
-python docker/scripts/recommend_from_neo4j_es.py --user-id asd5456677 --query "dp 최적화 전략" --auto-grade --top-k 10
-```
-로 이제 추천 문제들 뽑을 수 있음
-근데 이건 일단 테스트를 위해 직접 csv들을 export하는 방식임
+11. 추가로 발전해야 할 부분
 
+1) Algo 유사도 자동화
+- co-occurrence 기반으로 RELATED 갱신 (배치 작업)
 
-10. 현재 그래프 구조/경로 개념
+2) User 유사도 고도화
+- 최근 N회 기반 프로파일
+- 성장형 점수에 알고리즘 다양성 포함
 
-- 노드: User, Interview, Problem, AlgoSkill, Difficulty, Role, Evidence
-- 핵심 경로(기본):
-  User → Interview → AlgoSkill → Problem
-- Evidence 기반 경로:
-  User → Interview → Evidence → AlgoSkill → Problem
+3) 설명 생성
+- LLM이 “어떤 경로로 추천됐는지” 요약하도록 추가
 
-Hop / Distance
-- hop = 관계 1번 이동
-- 예시 3-hop 경로: User → Interview → AlgoSkill → Problem
-- distance = 최단 hop 수
-
-왜 이렇게 구성했는지
-- 리포트의 “무엇이 부족했는지”를 Evidence로 명시하면 추천 근거를 경로로 설명 가능
-- 테스트 실패/전략 불일치/전략-문제 불일치 같은 신호를 Evidence로 분리해 점수화
-- GraphDB는 경로 기반 추천과 근거 추적이 강점, ES는 문장/의미 기반 재랭킹에 강점
-
-Evidence 생성 규칙(현재)
-- strategy_mismatch: 전략에서 언급하지 않은 요구 알고리즘
-- implementation_mismatch: consistency_status가 불일치/개선하여 구현
-
-Evidence 반영 방식
-- Neo4j 로딩 시 Evidence 노드 생성
-- Evidence → AlgoSkill로 SUPPORTS(가중치) 생성
-- 추천 후보 추출 시 Evidence가 있으면 Evidence 기반 스코어를 우선 사용
-
-추가로 해야될 일(다음 단계)
-- Evidence 가중치/스코어 조정 (리포트 신뢰도에 따라 가중치 튜닝)
-- 사용자 희망 직무(Role) 가중치 강화
-- 2~3 hop 확장 경로(선수지식 REQUIRES) 추가
-- 실시간 동기화 방식 결정(Outbox or 동시 쓰기)
-
-
-
-
-
-
-
-
-내일 아마 수정할 예정
-방식은 총 2가지
-
-1) 애플리케이션에서 동시에 쓰기
-
-livecoding_reports 저장될 때 Postgres + Neo4j 같이 저장
-실패 대비로 재시도 큐 사용
-장점: 실시간, 단순
-
-2) Outbox 패턴 + 워커 (실무 표준)
-
-Postgres에 outbox 테이블 기록
-워커가 읽어서 Neo4j에 반영
-장점: 안정성 높음, 장애 복구 쉬움
+4) ES 재랭킹 실패시 fallback 강화
+- Neo4j 점수 + 문자열 매칭 혼합 점수

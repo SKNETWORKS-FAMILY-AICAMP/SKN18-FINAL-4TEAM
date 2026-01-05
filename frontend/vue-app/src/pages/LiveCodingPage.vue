@@ -1,6 +1,7 @@
 <template>
   <div class="live-page">
-    <div class="live-hero">
+    
+    <div class="live-hero" @mousemove="handleHeroMove" @mouseleave="resetHero">
       <div class="hero-text">
         <p class="eyebrow">JobTory Live Coding</p>
         <h1 class="title">
@@ -8,7 +9,12 @@
           <br />
           Live Coding Test!
         </h1>
-        <button type="button" class="start-btn" @click="handleStartClick">테스트 시작</button>
+        
+        <button type="button" class="start-btn" @click="handleStartClick">
+          <span>테스트 시작</span>
+          <div class="btn-glow"></div>
+        </button>
+
         <div v-if="showSessionChoice" class="session-choice">
           <p>이전에 진행하던 라이브 코딩 세션이 있습니다.</p>
           <div class="session-choice-buttons">
@@ -29,8 +35,15 @@
           </div>
         </div>
       </div>
+      
       <div class="hero-visual">
-        <img :src="typingLogo" alt="Live coding illustration" class="hero-image" />
+        <img 
+          ref="heroImageRef"
+          :src="typingLogo" 
+          alt="Live coding illustration" 
+          class="hero-image"
+          :style="heroStyle"
+        />
       </div>
     </div>
 
@@ -61,27 +74,19 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, reactive } from "vue";
 import { useRouter } from "vue-router";
-import { RouterLink } from "vue-router";
 
 const router = useRouter();
 const typingLogo = new URL("../assets/mainpage_image2.png", import.meta.url).href;
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 
+/* ----- Session Logic (기존 유지) ----- */
 const activeSessionId = ref(null);
 const showSessionChoice = ref(false);
 const isCheckingActiveSession = ref(false);
 const hasCheckedActiveSession = ref(false);
-
 const hasActiveSession = computed(() => !!activeSessionId.value);
-
-const resetLivecodingCaches = () => {
-  sessionStorage.removeItem("jobtory_intro_tts_text");
-  sessionStorage.removeItem("jobtory_intro_tts_audio");
-  sessionStorage.removeItem("jobtory_livecoding_problem_data");
-  localStorage.removeItem("jobtory_livecoding_session_id");
-};
 
 const loadActiveSession = async (token) => {
   if (isCheckingActiveSession.value || hasCheckedActiveSession.value) return;
@@ -89,14 +94,10 @@ const loadActiveSession = async (token) => {
   try {
     const resp = await fetch(`${BACKEND_BASE}/api/livecoding/session/active/`, {
       method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`
-      }
+      headers: { Authorization: `Bearer ${token}` }
     });
 
     if (!resp.ok) {
-      // 서버 기준으로는 진행 중인 세션이 없으므로
-      // 로컬에 남아 있는 세션 정보도 정리합니다.
       activeSessionId.value = null;
       localStorage.removeItem("jobtory_livecoding_session_id");
       return;
@@ -107,8 +108,6 @@ const loadActiveSession = async (token) => {
       activeSessionId.value = data.session_id;
       localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
     } else {
-      // 정상 응답이지만 session_id가 없으면 역시
-      // 유효한 진행 중 세션이 없다고 보고 정리합니다.
       activeSessionId.value = null;
       localStorage.removeItem("jobtory_livecoding_session_id");
     }
@@ -137,18 +136,13 @@ const handleStartClick = async () => {
     router.push({ name: "login" });
     return;
   }
-
-  // 아직 진행 중 세션 여부를 체크하지 않았으면 한 번 확인하고 시작합니다.
   if (!hasCheckedActiveSession.value) {
     await loadActiveSession(token);
   }
-
-  // 이미 진행 중인 세션이 있으면 이어하기/새로하기 선택 UI를 보여줍니다.
   if (hasActiveSession.value) {
     showSessionChoice.value = true;
     return;
   }
-
   router.push({ name: "coding-settings" });
 };
 
@@ -158,7 +152,6 @@ const handleResumeSession = () => {
     return;
   }
   showSessionChoice.value = false;
-  // 이어하기 진입임을 명시하기 위해 resume 플래그를 함께 전달
   router.push({
     name: "coding-session",
     query: { session_id: activeSessionId.value, resume: "1" },
@@ -172,28 +165,25 @@ const handleStartNewSession = async () => {
     router.push({ name: "login" });
     return;
   }
-
   try {
-    // 기존 진행 중인 세션이 있으면 종료 요청
     if (hasActiveSession.value) {
       await fetch(`${BACKEND_BASE}/api/livecoding/session/end/`, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`
-        }
+        headers: { Authorization: `Bearer ${token}` }
       }).catch(() => {});
       activeSessionId.value = null;
       localStorage.removeItem("jobtory_livecoding_session_id");
     }
-
     router.push({ name: "coding-settings" });
   } catch (err) {
     console.error(err);
-    window.alert("새로운 라이브 코딩 세션을 시작하는 중 오류가 발생했습니다.");
+    window.alert("오류가 발생했습니다.");
   } finally {
     showSessionChoice.value = false;
   }
 };
+
+
 </script>
 
 <style scoped>
@@ -208,8 +198,10 @@ const handleStartNewSession = async () => {
   display: flex;
   flex-direction: column;
   gap: 64px;
+  overflow: hidden; 
 }
 
+/* ----- Hero Section ----- */
 .live-hero {
   max-width: 1200px;
   margin: 0 auto;
@@ -217,12 +209,14 @@ const handleStartNewSession = async () => {
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   align-items: center;
   gap: 32px;
+  perspective: 1000px; /* 3D 효과를 위한 원근감 */
 }
 
 .hero-text {
   display: flex;
   flex-direction: column;
   gap: 18px;
+  z-index: 10;
 }
 
 .eyebrow {
@@ -242,7 +236,9 @@ const handleStartNewSession = async () => {
   color: #f8fafc;
 }
 
+/* 버튼 스타일 강화 */
 .start-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -254,13 +250,40 @@ const handleStartNewSession = async () => {
   font-weight: 700;
   font-size: 18px;
   text-decoration: none;
-  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
+  overflow: hidden;
+  border: none;
+  cursor: pointer;
+}
+
+.start-btn span {
+  position: relative;
+  z-index: 2;
+}
+
+/* 버튼 내부 글로우 효과 */
+.btn-glow {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: linear-gradient(120deg, transparent, rgba(255,255,255,0.4), transparent);
+  transform: translateX(-100%);
+  transition: 0.5s;
+  z-index: 1;
 }
 
 .start-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 16px 32px rgba(0, 0, 0, 0.22);
+  transform: translateY(-4px) scale(1.02);
+  box-shadow: 0 20px 30px rgba(0, 0, 0, 0.3);
+  background: #fff;
+}
+
+.start-btn:hover .btn-glow {
+  transform: translateX(100%);
+}
+
+.start-btn:active {
+  transform: translateY(0) scale(0.98);
 }
 
 .hero-visual {
@@ -273,6 +296,8 @@ const handleStartNewSession = async () => {
   max-width: 455px;
   height: auto;
   display: block;
+  filter: drop-shadow(0 20px 40px rgba(0,0,0,0.5));
+  will-change: transform;
 }
 
 .feature-grid {
@@ -284,6 +309,7 @@ const handleStartNewSession = async () => {
 }
 
 .feature-card {
+  position: relative;
   border-radius: 20px;
   padding: 60px 20px;
   display: grid;
@@ -291,8 +317,22 @@ const handleStartNewSession = async () => {
   gap: 12px;
   align-items: center;
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.15);
-  border: 1px solid rgba(0, 0, 0, 0.06);
+  overflow: hidden;
   color: #111827;
+  transition: transform 0.3s ease; /* 기본 호버 움직임 */
+}
+
+.feature-card:hover {
+  transform: translateY(-5px); /* 깔끔하게 위로 살짝 뜨는 효과만 유지 */
+}
+
+.feature-one { background: #f6c7d9; }
+.feature-two { background: #f8d46f; }
+.feature-three { background: #c5b3f5; }
+
+.feature-icon, .feature-content {
+  position: relative;
+  z-index: 2;
 }
 
 .feature-icon {
@@ -304,6 +344,7 @@ const handleStartNewSession = async () => {
   justify-content: center;
   font-size: 24px;
   background: rgba(255, 255, 255, 0.35);
+  backdrop-filter: blur(4px);
 }
 
 .feature-content h3 {
@@ -318,18 +359,7 @@ const handleStartNewSession = async () => {
   color: #374151;
 }
 
-.feature-one {
-  background: #f6c7d9;
-}
-
-.feature-two {
-  background: #f8d46f;
-}
-
-.feature-three {
-  background: #c5b3f5;
-}
-
+/* ----- Session Choice ----- */
 .session-choice {
   margin-top: 16px;
   padding: 14px 18px;
@@ -339,6 +369,13 @@ const handleStartNewSession = async () => {
   display: inline-flex;
   flex-direction: column;
   gap: 8px;
+  backdrop-filter: blur(10px);
+  animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 .session-choice-buttons {
@@ -354,6 +391,12 @@ const handleStartNewSession = async () => {
   cursor: pointer;
   font-size: 13px;
   font-weight: 600;
+  transition: transform 0.2s, filter 0.2s;
+}
+
+.session-choice-button:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
 }
 
 .session-choice-button--primary {
@@ -365,43 +408,5 @@ const handleStartNewSession = async () => {
   background: transparent;
   border: 1px solid rgba(249, 250, 251, 0.6);
   color: #f9fafb;
-}
-
-@media (max-width: 640px) {
-  .live-page {
-    padding: 56px 20px 80px;
-  }
-
-  .title {
-    font-size: 38px;
-  }
-
-  .start-btn {
-    width: fit-content;
-  }
-}
-
-.tts-test-footer {
-  margin-top: 16px;
-  padding: 24px 0 40px;
-  border-top: 1px dashed rgba(248, 250, 252, 0.25); /* 연한 흰색 점선 */
-  display: flex;
-  justify-content: center;
-}
-
-.tts-test-button {
-  padding: 8px 18px;
-  border-radius: 999px;
-  border: 1px solid rgba(248, 250, 252, 0.6);
-  background: transparent;
-  color: #f8fafc;
-  font-size: 14px;
-  font-weight: 500;
-  text-decoration: none;
-}
-
-.tts-test-button:hover {
-  background: #f8fafc;
-  color: #111827;
 }
 </style>

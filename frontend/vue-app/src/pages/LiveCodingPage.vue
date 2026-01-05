@@ -70,11 +70,54 @@
         </div>
       </div>
     </div>
+
+    <div v-if="showRecommendationModal" class="recommend-modal-overlay" @click.self="closeRecommendationModal">
+      <div class="recommend-modal">
+        <div class="recommend-modal-header">
+          <h3>이번 리포트 추천 문제</h3>
+          <button type="button" class="recommend-close" @click="closeRecommendationModal">닫기</button>
+        </div>
+        <div v-if="recommendedCandidates.length" class="recommend-body">
+          <p class="recommend-desc">
+            최신 리포트 기반으로 이어서 풀기 좋은 문제입니다. 상위 3개 추천만 노출됩니다.
+          </p>
+          <div class="recommend-grid">
+            <article
+              v-for="item in recommendedCandidates"
+              :key="item.problem_id"
+              class="recommend-card"
+            >
+              <div class="recommend-title">
+                #{{ item.problem_id }} {{ truncateText(item.title || item.problem, 10) }}
+              </div>
+              <div class="recommend-meta">
+                <span class="recommend-chip">{{ item.category || "미분류" }}</span>
+                <span class="recommend-chip" :class="difficultyChipClass(item.difficulty)">
+                  {{ item.difficulty || "미정" }}
+                </span>
+              </div>
+              <div v-if="item.algorithm && item.algorithm.length" class="recommend-algo">
+                {{ formatAlgoList(item.algorithm) }}
+              </div>
+              <pre class="recommend-snippet">{{ getProblemPreview(item) }}</pre>
+              <button
+                type="button"
+                class="recommend-btn primary"
+                @click="startWithRecommendation(item)"
+              >
+                추천 문제 풀이하기
+              </button>
+            </article>
+          </div>
+        </div>
+        <div v-else class="recommend-empty">추천 문제를 불러오는 중입니다.</div>
+      </div>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref, reactive } from "vue";
+import { computed, onMounted, ref } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -87,6 +130,9 @@ const showSessionChoice = ref(false);
 const isCheckingActiveSession = ref(false);
 const hasCheckedActiveSession = ref(false);
 const hasActiveSession = computed(() => !!activeSessionId.value);
+const showRecommendationModal = ref(false);
+const recommendedCandidates = ref([]);
+const isLoadingRecommendations = ref(false);
 
 const loadActiveSession = async (token) => {
   if (isCheckingActiveSession.value || hasCheckedActiveSession.value) return;
@@ -119,14 +165,17 @@ const loadActiveSession = async (token) => {
   }
 };
 
-onMounted(() => {
+onMounted(async () => {
   const storedSid = localStorage.getItem("jobtory_livecoding_session_id");
   if (storedSid) {
     activeSessionId.value = storedSid;
   }
   const token = localStorage.getItem("jobtory_access_token");
   if (!token) return;
-  void loadActiveSession(token);
+  await loadActiveSession(token);
+  if (!activeSessionId.value) {
+    await loadLatestRecommendation(token);
+  }
 });
 
 const handleStartClick = async () => {
@@ -152,6 +201,7 @@ const handleResumeSession = () => {
     return;
   }
   showSessionChoice.value = false;
+  showRecommendationModal.value = false;
   router.push({
     name: "coding-session",
     query: { session_id: activeSessionId.value, resume: "1" },
@@ -174,6 +224,7 @@ const handleStartNewSession = async () => {
       activeSessionId.value = null;
       localStorage.removeItem("jobtory_livecoding_session_id");
     }
+    showRecommendationModal.value = false;
     router.push({ name: "coding-settings" });
   } catch (err) {
     console.error(err);
@@ -181,6 +232,83 @@ const handleStartNewSession = async () => {
   } finally {
     showSessionChoice.value = false;
   }
+};
+
+const loadLatestRecommendation = async (token) => {
+  if (isLoadingRecommendations.value) return;
+  isLoadingRecommendations.value = true;
+  try {
+    const listResp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!listResp.ok) return;
+    const listData = await listResp.json().catch(() => ({}));
+    const latest = Array.isArray(listData.results) ? listData.results[0] : null;
+    if (!latest?.session_id) return;
+
+    const detailResp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/${latest.session_id}/`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if (!detailResp.ok) return;
+    const detailData = await detailResp.json().catch(() => ({}));
+    const recs = detailData?.graph_output?.recommended_problems;
+    if (Array.isArray(recs) && recs.length) {
+      recommendedCandidates.value = recs.slice(0, 3);
+      showRecommendationModal.value = true;
+    }
+  } catch (err) {
+    console.error("failed to load recommendation modal", err);
+  } finally {
+    isLoadingRecommendations.value = false;
+  }
+};
+
+const closeRecommendationModal = () => {
+  showRecommendationModal.value = false;
+};
+
+const startWithRecommendation = (item) => {
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    window.alert("라이브 코딩을 시작하려면 먼저 로그인해 주세요.");
+    router.push({ name: "login" });
+    return;
+  }
+  if (!item) return;
+  sessionStorage.setItem("jobtory_livecoding_problem_data", JSON.stringify(item));
+  showRecommendationModal.value = false;
+  router.push({ name: "coding-settings", query: { from: "recommendation" } });
+};
+
+const formatAlgoList = (algos) => {
+  if (!algos) return "";
+  if (Array.isArray(algos)) return algos.filter(Boolean).join(", ");
+  return String(algos);
+};
+
+const getProblemPreview = (item) => {
+  const raw = String(
+    item?.problem_text || item?.problem_description || item?.description || item?.problem || ""
+  ).trim();
+  if (!raw) return "문제 요약을 불러오지 못했습니다.";
+  const preview = raw.replace(/\s+/g, " ").trim().slice(0, 200);
+  return preview + (raw.length > 200 ? "..." : "");
+};
+
+const truncateText = (value, max) => {
+  const text = String(value || "").replace(/\s+/g, " ").trim();
+  if (!text) return "제목 없음";
+  return text.length > max ? `${text.slice(0, max)}...` : text;
+};
+
+const difficultyChipClass = (value) => {
+  const diff = String(value || "").toLowerCase();
+  if (diff.includes("easy") || diff.includes("쉬움")) return "chip-easy";
+  if (diff.includes("medium") || diff.includes("중간") || diff.includes("normal")) return "chip-medium";
+  if (diff.includes("hard") || diff.includes("어려움")) return "chip-hard";
+  return "chip-default";
 };
 
 
@@ -408,5 +536,177 @@ const handleStartNewSession = async () => {
   background: transparent;
   border: 1px solid rgba(249, 250, 251, 0.6);
   color: #f9fafb;
+}
+
+/* 추천 모달 */
+.recommend-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(3, 7, 18, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 24px;
+}
+
+.recommend-modal {
+  width: min(980px, 94vw);
+  background: #111827;
+  color: #e5e7eb;
+  border-radius: 16px;
+  border: 1px solid rgba(255,255,255,0.08);
+  box-shadow: 0 20px 40px rgba(0,0,0,0.4);
+  padding: 20px;
+  max-height: min(78vh, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.recommend-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.recommend-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.recommend-close {
+  background: transparent;
+  border: 1px solid rgba(255,255,255,0.15);
+  color: #cbd5f5;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.recommend-body {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding-right: 6px;
+}
+
+.recommend-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.recommend-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.recommend-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  height: 320px;
+}
+
+.recommend-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.recommend-algo {
+  font-size: 12px;
+  color: #a5b4fc;
+}
+
+.recommend-snippet {
+  margin: 0;
+  white-space: normal;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #94a3b8;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 8px;
+  padding: 8px 10px;
+  flex: 1;
+  min-height: 120px;
+  max-height: 160px;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 8;
+  -webkit-box-orient: vertical;
+}
+
+.recommend-chip {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #cbd5e1;
+}
+
+.recommend-chip.chip-easy { color: #4ade80; border-color: rgba(74,222,128,0.4); }
+.recommend-chip.chip-medium { color: #facc15; border-color: rgba(250,204,21,0.4); }
+.recommend-chip.chip-hard { color: #f87171; border-color: rgba(248,113,113,0.4); }
+.recommend-chip.chip-default { color: #cbd5e1; }
+
+.recommend-desc {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: #9ca3af;
+  line-height: 1.5;
+}
+
+.recommend-empty {
+  font-size: 13px;
+  color: #9ca3af;
+  padding: 8px 0;
+}
+
+.recommend-actions {
+  margin-top: 16px;
+  display: flex;
+  gap: 10px;
+  justify-content: flex-end;
+}
+
+.recommend-btn {
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 13px;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.recommend-btn.primary {
+  background: #6366f1;
+  color: #fff;
+}
+
+.recommend-card .recommend-btn.primary {
+  align-self: flex-end;
+  margin-top: auto;
+}
+
+.recommend-btn.ghost {
+  background: transparent;
+  border-color: rgba(255,255,255,0.2);
+  color: #cbd5e1;
+}
+
+@media (max-width: 900px) {
+  .recommend-grid {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

@@ -102,6 +102,28 @@
             <div class="text-block">{{ comprehensiveEvaluationText }}</div>
           </div>
 
+          <div class="recommend-section">
+            <h3 class="sub-heading">Recommended Problems</h3>
+            <p class="recommend-desc">이번 리포트 기준으로 바로 이어서 풀어볼 수 있는 문제입니다.</p>
+            <div v-if="!recommendedProblems.length" class="recommend-empty">
+              아직 추천 문제가 없습니다.
+            </div>
+            <div v-else class="recommend-grid">
+              <article v-for="item in recommendedProblems" :key="item.problem_id" class="recommend-card">
+                <div class="recommend-title">#{{ item.problem_id }} {{ item.problem }}</div>
+                <div class="recommend-meta">
+                  <span class="recommend-chip">{{ item.category || "미분류" }}</span>
+                  <span class="recommend-chip" :class="difficultyChipClass(item.difficulty)">
+                    {{ item.difficulty || "미정" }}
+                  </span>
+                </div>
+                <div v-if="item.algorithm && item.algorithm.length" class="recommend-algos">
+                  {{ formatAlgoList(item.algorithm) }}
+                </div>
+              </article>
+            </div>
+          </div>
+
           <hr class="divider-line" />
 
           <div class="analysis-section">
@@ -362,22 +384,6 @@ const formatAlgoList = (algos) => {
   return String(algos);
 };
 
-const startWithProblem = (item) => {
-  const token = localStorage.getItem("jobtory_access_token");
-  if (!token) {
-    router.replace({ name: "login" });
-    return;
-  }
-  const required = ["problem_id", "problem", "difficulty", "category", "language", "function_name", "starter_code", "test_cases"];
-  const missing = required.filter((k) => item[k] == null);
-  if (missing.length) {
-    window.alert("문제 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
-    return;
-  }
-  sessionStorage.setItem("jobtory_livecoding_problem_data", JSON.stringify(item));
-  router.push({ name: "coding-settings", query: { from: "report", session_id: sessionId } });
-};
-
 const fetchReport = async () => {
   if (!sessionId) {
     error.value = "session_id가 없습니다.";
@@ -432,6 +438,11 @@ const fetchReport = async () => {
       "";
 
     graphOutput.value = output;
+    if (Array.isArray(output.recommended_problems)) {
+      recommendedProblems.value = output.recommended_problems.slice(0, 3);
+    } else {
+      recommendedProblems.value = [];
+    }
     
     codeQualityScore.value = output.code_quality_score ?? null;
     problemSolvingScore.value = output.problem_solving_score ?? null;
@@ -685,6 +696,33 @@ const extractProblemDescription = (fullText) => {
 
 /* 3. 종합 코멘트 */
 .text-block { font-size: 14px; line-height: 1.7; color: #e5e7eb; white-space: pre-wrap; }
+
+/* 3-1. 추천 문제 */
+.recommend-section { margin-top: 16px; }
+.recommend-desc { font-size: 12px; color: #94a3b8; margin: -6px 0 12px; }
+.recommend-empty { font-size: 12px; color: #94a3b8; }
+.recommend-grid { display: grid; gap: 12px; }
+.recommend-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 10px;
+  padding: 12px;
+}
+.recommend-title { font-size: 13px; font-weight: 600; color: #e5e7eb; }
+.recommend-meta { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+.recommend-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  color: #cbd5e1;
+}
+.recommend-chip.chip-easy { color: #4ade80; border-color: rgba(74,222,128,0.4); }
+.recommend-chip.chip-medium { color: #facc15; border-color: rgba(250,204,21,0.4); }
+.recommend-chip.chip-hard { color: #f87171; border-color: rgba(248,113,113,0.4); }
+.recommend-chip.chip-default { color: #cbd5e1; }
+.recommend-algos { margin-top: 6px; font-size: 12px; color: #9ca3af; }
 
 .divider-line { height: 1px; background: rgba(255,255,255,0.08); border: none; margin: 0; }
 

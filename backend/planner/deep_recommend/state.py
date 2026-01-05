@@ -1,4 +1,4 @@
-from typing import Any, Dict, List, Literal, TypedDict,Optional
+from typing import Any, Dict, List, TypedDict
 
 class UserProfile(TypedDict, total=False):
     teck_stack: List[str]

@@ -16,9 +16,9 @@ class DailyTask(models.Model):
     plan = models.ForeignKey(StudyPlan, related_name='tasks', on_delete=models.CASCADE)
     day = models.IntegerField()
     topic = models.CharField(max_length=255)
-    video_title = models.CharField(max_length=255, null=True, blank=True)
+    video_id = models.IntegerField(null=True, blank=True)
     video_url = models.URLField(null=True, blank=True)
-    is_completed = models.BooleanField(default=False)
+    is_completed = models.CharField(max_length=30, null=True, blank=True)
     why_selected = models.CharField(max_length=255,null=True, blank=True)
     lecture_note = models.CharField(blank=True, default="")
 

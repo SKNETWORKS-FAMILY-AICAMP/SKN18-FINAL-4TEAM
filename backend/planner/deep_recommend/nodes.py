@@ -2,7 +2,7 @@ import json
 
 from dotenv import load_dotenv
 from .state import RecommendState
-from .prompt import REPORT_ANALYZER_PROMPT, SLOT_PLANNER_PROMPT, VIDEO_SELECTOR_PROMPT,PLAN_BUILDER_PROMPT
+from .prompt import REPORT_ANALYZER_PROMPT, SLOT_PLANNER_PROMPT, VIDEO_SELECTOR_PROMPT
 from .tools import _create_agent, safe_json_parse, video_search_tool
 load_dotenv()
 
@@ -66,8 +66,10 @@ def video_selector(state: RecommendState) -> RecommendState:
         parsed = safe_json_parse(raw)
         candidates = parsed.get("candidates") or []
         state["candidates"] = candidates
+        print(f"[video_selector] candidates={len(candidates)}", flush=True)
+        print(f"[video_selector] candidates={candidates[0]}", flush=True)
     except Exception as exc:
-        state["video_selector_error"] = str(exc)
+        print(f"[video_selector] error: {exc}", flush=True)
 
     return state
 
@@ -86,19 +88,19 @@ def plan_builder(state: RecommendState) -> RecommendState:
         if not isinstance(slot, dict):
             continue
         day = slot.get("day")
-        topic = slot.get("day_plan_topic") or slot.get("topic") or ""
+        topic = slot.get("day_plan_topic")
         category = slot.get("category") or ""
         domain = slot.get("domain") or ""
-
+        why_selected = slot.get("reason") 
         cand = cand_by_day.get(day) or {}
-        videos = cand.get("videos") or []
-        video = videos[0] if videos else {}
+        video = cand.get("video") or {}
 
-        video_id = video.get("id")
-        video_title = video.get("video_title")
-        video_url = video.get("video_url")
-        why_selected = video.get("fit_reason") 
-        
+        raw_id = video.get("id")
+        try:
+            video_id = int(raw_id) if raw_id not in (None, "") else None
+        except Exception:
+            video_id = None
+        video_url = video.get("video_url") or ""
         final_plan.append(
             {
                 "day": day,
@@ -107,10 +109,10 @@ def plan_builder(state: RecommendState) -> RecommendState:
                 "domain": domain,
                 "video_id": video_id,
                 "video_url": video_url,
-                "video_title": video_title,
                 "why_selected": why_selected,
             }
         )
 
     state["final_plan"] = final_plan
+    print(f"[plan_builder] slots={len(slots)} final_plan={len(final_plan)}", flush=True)
     return state

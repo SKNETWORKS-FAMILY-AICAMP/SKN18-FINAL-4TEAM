@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -26,12 +26,6 @@ const calendarOptions = reactive({
     center: 'title',
     right: 'dayGridMonth'
   },
-  eventClassNames: (arg) => {
-    if (arg.event?.extendedProps?.is_completed) {
-      return [ 'is-completed' ];
-    }
-    return [ 'is-pending' ];
-  },
   events: [], // 여기에 API 데이터가 들어갑니다
   eventClick: handleEventClick,
   height: 'auto'
@@ -39,13 +33,9 @@ const calendarOptions = reactive({
 
 const isVideoOpen = ref(false);
 const activeVideo = ref(null);
-const reflectionDifficulty = ref(3);
 const lectureNote = ref('');
+const completionLevel = ref('완료');
 const reflectionSaving = ref(false);
-
-const isActiveCompleted = computed(() => {
-  return Boolean(activeVideo.value?.extendedProps?.is_completed);
-});
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return '';
@@ -65,8 +55,8 @@ function getYouTubeEmbedUrl(url) {
 
 function openVideoModal(event) {
   activeVideo.value = event;
-  reflectionDifficulty.value = event?.extendedProps?.reflection_difficulty ?? 3;
   lectureNote.value = event?.extendedProps?.lecture_note ?? '';
+  completionLevel.value = event?.extendedProps?.is_completed ?? '완료';
   isVideoOpen.value = true;
 }
 
@@ -98,8 +88,8 @@ async function saveReflection() {
       `${BACKEND_BASE}/api/tasks/reflection/`,
       {
         task_id: taskId,
-        difficulty: reflectionDifficulty.value,
-        lecture_note: lectureNote.value
+        lecture_note: lectureNote.value,
+        completion_level: completionLevel.value
       },
       {
         headers: {
@@ -108,17 +98,14 @@ async function saveReflection() {
       }
     );
 
-    const updatedDifficulty = response.data?.difficulty ?? reflectionDifficulty.value;
     const updatedComment = response.data?.lecture_note ?? lectureNote.value;
-    const updatedCompleted = response.data?.is_completed ?? true;
+    const updatedCompleted = response.data?.is_completed ?? completionLevel.value;
     if (typeof activeVideo.value.setExtendedProp === 'function') {
-      activeVideo.value.setExtendedProp('reflection_difficulty', updatedDifficulty);
       activeVideo.value.setExtendedProp('lecture_note', updatedComment);
       activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
     } else {
       activeVideo.value.extendedProps = {
         ...(activeVideo.value.extendedProps || {}),
-        reflection_difficulty: updatedDifficulty,
         lecture_note: updatedComment,
         is_completed: updatedCompleted
       };
@@ -256,11 +243,6 @@ onMounted(() => {
           </div>
           <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
         </div>
-        <div class="video-status">
-          <span :class="['video-badge', isActiveCompleted ? 'video-badge--done' : 'video-badge--todo']">
-            {{ isActiveCompleted ? '학습 완료' : '학습 진행 중' }}
-          </span>
-        </div>
         <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
         <div class="video-frame">
             <iframe
@@ -276,19 +258,12 @@ onMounted(() => {
         <div class="reflection-block">
           <div class="reflection-fields">
             <label class="reflection-label">
-              난이도
-              <div class="reflection-slider">
-                <input
-                  v-model.number="reflectionDifficulty"
-                  type="range"
-                  min="1"
-                  max="5"
-                  step="1"
-                  class="reflection-range"
-                  aria-label="난이도 선택"
-                />
-                <div class="reflection-range-value">{{ reflectionDifficulty }}</div>
-              </div>
+              완료 상태
+              <select v-model="completionLevel" class="reflection-select" aria-label="완료 상태 선택">
+                <option value="미진행">미진행</option>
+                <option value="진행중">진행중</option>
+                <option value="완료">완료</option>
+              </select>
             </label>
             <label class="reflection-label">
               공부한 내용
@@ -455,33 +430,6 @@ onMounted(() => {
   font-weight: 700;
 }
 
-:global(.video-status) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-:global(.video-badge) {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-:global(.video-badge--todo) {
-  background: #fff4e5;
-  color: #9a6a35;
-}
-
-:global(.video-badge--done) {
-  background: #e7f5ff;
-  color: #2c3e50;
-}
-
-
 :global(.video-frame) {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -523,26 +471,7 @@ onMounted(() => {
   color: #2f2a1f;
 }
 
-:global(.reflection-slider) {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-:global(.reflection-range) {
-  width: 140px;
-  accent-color: #1f6f54;
-  height: 6px;
-}
-
-:global(.reflection-range-value) {
-  min-width: 28px;
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #2c3e50;
-}
-
+:global(.reflection-select),
 :global(.reflection-input) {
   border: 1px solid #d2d6dc;
   border-radius: 12px;

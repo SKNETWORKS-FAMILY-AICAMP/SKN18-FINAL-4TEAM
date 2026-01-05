@@ -66,7 +66,7 @@ def safe_json_parse(text: str) -> Dict[str, Any]:
 
 
 @tool
-def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 3) -> Dict[str, Any]:
+def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 5) -> Dict[str, Any]:
     """
     RecommendedVideo 검색 (ArrayField 대응).
     - dict 입력 권장: domain(필수) + category(필수) + code_lang(옵션) AND 필터
@@ -106,7 +106,6 @@ def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 3) -> Dict
         domain = (query.get("domain") or "").strip()
         category_vals = _as_list(query.get("category"))
         code_lang_vals = [s.lower() for s in _as_list(query.get("code_lang"))]
-        algo_vals = _as_list(query.get("algorithm"))  # 있으면 추가로 AND
 
         # domain은 반드시 둘 중 하나라고 했으니 equality로 강하게
         if domain in ("algorithm", "live_coding"):
@@ -129,7 +128,6 @@ def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 3) -> Dict
         if code_lang_vals:
             filters &= Q(code_lang__overlap=code_lang_vals)
 
-
         debug = {
             "mode": "dict",
             "domain": domain,
@@ -148,20 +146,15 @@ def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 3) -> Dict
     try:
         qs = (
             model.objects.all()
-            .only("id", "video_url", "summary", "category", "code_lang", "domain", "created_at")
+            .only("id", "video_url", "summary")
             .filter(filters)
-            .order_by("-created_at")[:limit]
+            .order_by("?")[:limit]
         )
         results = [
             {
                 "id": obj.id,
                 "video_url": getattr(obj, "video_url", None),
                 "summary": getattr(obj, "summary", None),
-                "category": getattr(obj, "category", None),
-                "code_lang": getattr(obj, "code_lang", None),
-                "domain": getattr(obj, "domain", None),
-                "created_at": getattr(obj, "created_at", None).isoformat()
-                if getattr(obj, "created_at", None) else None,
             }
             for obj in qs
         ]

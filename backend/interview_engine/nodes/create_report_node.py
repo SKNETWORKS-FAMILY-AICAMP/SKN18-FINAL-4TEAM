@@ -1,7 +1,7 @@
 # backend/interview_engine/nodes/create_report_node.py
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 from interview_engine.llm import get_llm
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -75,7 +75,8 @@ def _generate_problem_solving_evaluation(
     문제 해결 능력 평가 생성
     """
     system_prompt = """당신은 코딩 면접 평가 전문가입니다. 
-응시자의 초기 전략 답변과 최종 코드를 비교하여 문제 해결 능력을 평가하세요."""
+응시자의 초기 전략 답변과 최종 코드를 비교하여 문제 해결 능력을 평가하세요.
+출력은 반드시 JSON만 반환하세요."""
 
     qa_text = _format_qa_history(qa_history)
     
@@ -96,26 +97,15 @@ def _generate_problem_solving_evaluation(
 
 ---
 
-다음 형식으로 평가해주세요:
+다음 JSON 형식으로만 출력하세요. 다른 텍스트는 절대 포함하지 마세요.
 
-중요 규칙:
-- 각 라벨(PROBLEM_UNDERSTANDING, APPROACH_VALIDITY, CONSISTENCY_STATUS)은 반드시 한 줄만 작성합니다.
-- 라벨 줄에는 평가 단어만 작성하고, 설명/피드백/기타 문장은 절대 포함하지 마세요.
-
-### PROBLEM_UNDERSTANDING
-(문제를 정확히 이해했는지: "우수", "양호", "부족" 중 하나만 작성. 다른 단어 금지)
-
-### UNDERSTANDING_FEEDBACK
-(문제 이해도에 대한 2-3문장 설명)
-
-### APPROACH_VALIDITY
-(접근 방법의 적절성: "우수", "양호", "부족" 중 하나만 작성. 다른 단어 금지)
-
-### CONSISTENCY_STATUS
-(전략과 실제 구현의 일치도: "일치", "개선하여 구현", "불일치" 중 하나만 작성. 다른 단어 금지)
-
-### CONSISTENCY_FEEDBACK
-(일관성에 대한 구체적 설명 3-4문장. 초기 전략과 최종 코드를 비교하여 어떻게 구현했는지 설명)
+{
+  "problem_understanding": "우수|양호|부족",
+  "understanding_feedback": "문제 이해도 설명",
+  "approach_validity": "우수|양호|부족",
+  "consistency_status": "일치|개선하여 구현|불일치",
+  "consistency_feedback": "일관성 설명"
+}
 """
 
     try:
@@ -129,6 +119,19 @@ def _generate_problem_solving_evaluation(
         model = get_llm("report")
         response = model.invoke(messages)
         content = response.content
+        parsed = _parse_problem_eval_json(content)
+        if parsed:
+            return parsed
+
+        # Retry once with stronger instruction
+        retry_messages = [
+            SystemMessage(content="JSON만 출력하세요. 다른 텍스트, 설명, 코드블록 금지."),
+            HumanMessage(content=user_prompt),
+        ]
+        response_retry = model.invoke(retry_messages)
+        parsed_retry = _parse_problem_eval_json(response_retry.content)
+        if parsed_retry:
+            return parsed_retry
         
         # 응답 파싱
         result = {
@@ -199,6 +202,33 @@ def _generate_problem_solving_evaluation(
             "consistency_status": "분석 실패",
             "consistency_feedback": "평가를 완료하지 못했습니다.",
         }
+
+
+def _parse_problem_eval_json(content: str) -> Optional[Dict[str, Any]]:
+    if not content:
+        return None
+    try:
+        data = json.loads(content)
+    except Exception:
+        return None
+    if not isinstance(data, dict):
+        return None
+    required = {
+        "problem_understanding",
+        "understanding_feedback",
+        "approach_validity",
+        "consistency_status",
+        "consistency_feedback",
+    }
+    if not required.issubset(set(data.keys())):
+        return None
+    return {
+        "problem_understanding": str(data.get("problem_understanding") or "").strip() or "평가 중",
+        "understanding_feedback": str(data.get("understanding_feedback") or "").strip(),
+        "approach_validity": str(data.get("approach_validity") or "").strip() or "평가 중",
+        "consistency_status": str(data.get("consistency_status") or "").strip() or "분석 중",
+        "consistency_feedback": str(data.get("consistency_feedback") or "").strip(),
+    }
 
 
 def _generate_detailed_feedback_with_llm(
@@ -346,6 +376,46 @@ def _generate_detailed_feedback_with_llm(
             "annotated_code": code,
             "cheating_warning": ""
         }
+
+
+def _generate_recommendation_query(
+    improvement: str,
+    consistency_feedback: str,
+    problem_feedback: str,
+    problem_algorithms: List[str],
+    strategy_algorithms: List[str],
+) -> str:
+    system_prompt = (
+        "너는 코딩 테스트 추천을 위한 요약 문장을 만든다. "
+        "입력된 정보에서 핵심 부족 스킬/개선점을 뽑아 1~2문장으로 요약해라. "
+        "알고리즘 키워드를 포함하고, 120자 이내로 작성한다. "
+        "불필요한 수식, 코드, 따옴표, 목록 표시는 금지."
+    )
+    algo_text = ", ".join([str(a) for a in (problem_algorithms or []) if a])
+    strategy_text = ", ".join([str(a) for a in (strategy_algorithms or []) if a])
+    user_prompt = f"""
+알고리즘(문제): {algo_text or "없음"}
+알고리즘(전략): {strategy_text or "없음"}
+개선점: {improvement[:500]}
+일치도 피드백: {consistency_feedback[:500]}
+문제 풀이 피드백: {problem_feedback[:500]}
+
+요약 문장 하나로 출력.
+"""
+    try:
+        messages = [
+            SystemMessage(content=system_prompt),
+            HumanMessage(content=user_prompt),
+        ]
+        model = get_llm("report")
+        response = model.invoke(messages)
+        content = (response.content or "").strip()
+        if not content:
+            return ""
+        return content.splitlines()[0].strip()[:120]
+    except Exception as e:
+        print(f"[recommendation_query 생성 실패] {e}", flush=True)
+        return ""
 
 
 def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -611,6 +681,13 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             qa_history=qa_history,
         )
         print("[create_report_node] 문제 해결 능력 평가 완료", flush=True)
+        recommendation_query = _generate_recommendation_query(
+            improvement=llm_feedback.get("improvement", ""),
+            consistency_feedback=ps_evaluation.get("consistency_feedback", ""),
+            problem_feedback=problem_feedback,
+            problem_algorithms=problem_algorithms or [],
+            strategy_algorithms=strategy_algorithms or [],
+        )
 
         collab_rule_20 = float(code_collab_evidence.get("collab_rule_20") or 0.0)
         collab_llm_score_10 = float(code_collab_evidence.get("collab_llm_score_10") or 0.0)
@@ -689,6 +766,7 @@ def create_report_node(state: Dict[str, Any]) -> Dict[str, Any]:
             "annotated_code": llm_feedback["annotated_code"],
             "cheating_warning": llm_feedback["cheating_warning"],
             "anti_cheat_summary": anti_cheat_summary,
+            "recommendation_query": recommendation_query,
 
             "problem_category": problem_category,
             "problem_difficulty": problem_difficulty,

@@ -124,5 +124,14 @@ urlpatterns = [
     path("livecoding/reports/", views.LiveCodingReportListView.as_view(), name="livecoding-report-list"),
     path("livecoding/reports/<str:session_id>/", views.LiveCodingReportDetailView.as_view(), name="livecoding-report-detail"),
     path("livecoding/session/strategy/", views.save_strategy_answer, name="save-strategy"),
+    path("user/profile/detail/", UserProfileDetailView.as_view(), name="user-profile-detail"),
+    path("user/profile/options/", UserProfileOptionsView.as_view(), name="user-profile-options"),
+    path("livecoding/final-eval/start/", LiveCodingFinalEvalStartView.as_view()),
+    path("livecoding/final-eval/status/", LiveCodingFinalEvalStatusView.as_view()),
+    path("livecoding/final-eval/report/", LiveCodingFinalEvalReportView.as_view()),
+    path("livecoding/anti-cheat/event/", LiveCodingAntiCheatEventView.as_view()),
+    path("livecoding/reports/", LiveCodingReportListView.as_view(), name="livecoding-report-list"),
+    path("livecoding/reports/<str:session_id>/", LiveCodingReportDetailView.as_view(), name="livecoding-report-detail"),
+    path("livecoding/session/strategy/", save_strategy_answer, name="save-strategy"),
     
 ]

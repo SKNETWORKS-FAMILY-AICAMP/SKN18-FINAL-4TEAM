@@ -1,10 +1,10 @@
 <template>
   <div class="landing">
     <header class="landing-header">
-      <div class="nav-dropdown">
+      <div class="nav-dropdown" ref="dropdownContainer">
         <button
           class="nav-pill"
-          @click="isMenuOpen = !isMenuOpen"
+          @click="toggleMenu"
           aria-haspopup="true"
           :aria-expanded="isMenuOpen"
         >
@@ -14,10 +14,10 @@
         
         <Transition name="dropdown">
           <div class="dropdown-menu" v-show="isMenuOpen">
-            <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+            <RouterLink to="/aboutus" class="dropdown-link dropdown-link--menu" @click="closeMenu">
               ABOUT US
             </RouterLink>
-            <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="isMenuOpen = false">
+            <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="closeMenu">
               LIVE CODING
             </RouterLink>
           </div>
@@ -26,10 +26,10 @@
 
       <h1 class="nav-logo">JOBTORY</h1>
 
-      <div class="nav-dropdown">
+      <div class="nav-dropdown" ref="userDropdownContainer">
         <button
           class="nav-pill"
-          @click="isDropdownOpen = !isDropdownOpen"
+          @click="toggleUserMenu"
           aria-haspopup="true"
           :aria-expanded="isDropdownOpen"
         >
@@ -40,7 +40,7 @@
         <Transition name="dropdown">
           <div class="dropdown-menu right-align" v-show="isDropdownOpen">
             <template v-if="isAuthenticated">
-              <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeDropdown">
+              <RouterLink :to="{ name: 'mypage' }" class="dropdown-link" @click="closeUserMenu">
                 MYPAGE
               </RouterLink>
               <button
@@ -55,11 +55,11 @@
               </button>
             </template>
             <template v-else>
-              <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeDropdown">
+              <RouterLink :to="{ name: 'login' }" class="dropdown-link" @click="closeUserMenu">
                 LOGIN
               </RouterLink>
-              <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeDropdown">
-                SIGN-IN
+              <RouterLink :to="{ name: 'signup-choice' }" class="dropdown-link" @click="closeUserMenu">
+                SIGNUP
               </RouterLink>
             </template>
           </div>
@@ -197,148 +197,147 @@
       @close="showForcedExit = false"
     />
 
-    <!-- 프로필 입력 모달 -->
-    <div v-if="showProfileModal" class="modal-overlay" @click.self="closeProfileModal">
+    <div v-if="showProfileModal" class="modal-overlay">
       <div class="modal-card profile-card">
         <div class="modal-header">
-          <h3>프로필 입력</h3>
-          <button type="button" class="modal-close" @click="closeProfileModal">✕</button>
+          <div class="header-content">
+            <h3>프로필 설정</h3>
+            <p class="step-desc">
+              {{ currentProfileStep === 1 ? '기본적인 학력 정보를 입력해주세요.' : '상세 직무 정보를 설정해주세요.' }}
+            </p>
+          </div>
+          <button type="button" class="modal-close" @click="closeProfileModal">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M18 6L6 18M6 6l12 12"></path>
+            </svg>
+          </button>
         </div>
+        
         <div class="modal-body profile-body">
           <template v-if="currentProfileStep === 1">
-            <label class="modal-field">
-              <span>최종 학력 *</span>
+            <div class="modal-field">
+              <label>최종 학력 <span class="required">*</span></label>
               <select v-model="profileForm.graduated_school">
-                <option value="">선택</option>
+                <option value="">선택하세요</option>
                 <option v-for="opt in graduatedOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
-            </label>
-            <label class="modal-field">
-              <span>학교명</span>
-              <input v-model="profileForm.university" type="text" placeholder="학교명" />
-            </label>
-            <label class="modal-field">
-              <span>전공 여부</span>
+            </div>
+            
+            <div class="modal-field">
+              <label>학교명</label>
+              <input v-model="profileForm.university" type="text" placeholder="예: 한국대학교" />
+            </div>
+            
+            <div class="modal-field">
+              <label>전공 여부</label>
               <select v-model="profileForm.major">
-                <option value="">선택</option>
+                <option value="">선택하세요</option>
                 <option v-for="opt in majorOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
-            </label>
-            <label class="modal-field">
-              <span>재학 상태</span>
+            </div>
+            
+            <div class="modal-field">
+              <label>재학 상태</label>
               <select v-model="profileForm.academic_status">
-                <option value="">선택</option>
+                <option value="">선택하세요</option>
                 <option v-for="opt in academicOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
-            </label>
-            <label class="modal-field">
-              <span>졸업(예정) 연도</span>
-              <input v-model="profileForm.graduation_year" type="number" min="1900" max="2100" />
-            </label>
+            </div>
+            
+            <div class="modal-field full-width">
+              <label>졸업(예정) 연도</label>
+              <input v-model="profileForm.graduation_year" type="number" min="1900" max="2100" placeholder="YYYY" />
+            </div>
           </template>
 
           <template v-else>
-            <label class="modal-field">
-              <span>경력 레벨 *</span>
+            <div class="modal-field">
+              <label>경력 레벨 <span class="required">*</span></label>
               <select v-model="profileForm.career_level">
-                <option value="">선택</option>
+                <option value="">선택하세요</option>
                 <option v-for="opt in careerOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
-            </label>
-            <label class="modal-field">
-              <span>현재 상태</span>
+            </div>
+            
+            <div class="modal-field">
+              <label>현재 상태</label>
               <select v-model="profileForm.current_status">
-                <option value="">선택</option>
+                <option value="">선택하세요</option>
                 <option v-for="opt in statusOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
-            </label>
-            <label class="modal-field">
-              <span>기술 스택</span>
-              <div class="checkbox-group">
-                <label
-                  v-for="opt in techStackOptions"
-                  :key="opt"
-                  class="checkbox-item"
-                >
-                <input
-                  type="checkbox"
-                  :value="opt"
-                  v-model="profileForm.tech_stack"
-                />
-                <span>{{ opt }}</span>
-              </label>
             </div>
-          </label>
-
-            <label class="modal-field">
-              <span>희망 직무</span>
+            
+            <div class="modal-field full-width">
+              <label>기술 스택</label>
               <div class="checkbox-group">
-                <label
-                  v-for="opt in desiredRoleOptions"
-                  :key="opt"
-                  class="checkbox-item"
-                >
-                  <input
-                    type="checkbox"
-                    :value="opt"
-                    v-model="profileForm.desired_role"
-                  />
+                <label v-for="opt in techStackOptions" :key="opt" class="checkbox-item">
+                  <input type="checkbox" :value="opt" v-model="profileForm.tech_stack" />
                   <span>{{ opt }}</span>
                 </label>
               </div>
-            </label>
+            </div>
 
-            <label class="modal-field">
-              <span>세부 희망 직무</span>
+            <div class="modal-field full-width">
+              <label>희망 직무</label>
               <div class="checkbox-group">
-                <label
-                  v-for="opt in detailedRoleOptions"
-                  :key="opt"
-                  class="checkbox-item"
-                >
-                  <input
-                    type="checkbox"
-                    :value="opt"
-                    v-model="profileForm.detailed_role"
-                  />
+                <label v-for="opt in desiredRoleOptions" :key="opt" class="checkbox-item">
+                  <input type="checkbox" :value="opt" v-model="profileForm.desired_role" />
                   <span>{{ opt }}</span>
                 </label>
               </div>
-            </label>
+            </div>
 
-            <label class="modal-field">
-              <span>희망 근무지</span>
+            <div class="modal-field full-width">
+              <label>세부 희망 직무</label>
+              <div class="checkbox-group">
+                <label v-for="opt in detailedRoleOptions" :key="opt" class="checkbox-item">
+                  <input type="checkbox" :value="opt" v-model="profileForm.detailed_role" />
+                  <span>{{ opt }}</span>
+                </label>
+              </div>
+            </div>
+
+            <div class="modal-field full-width">
+              <label>희망 근무지</label>
               <select v-model="profileForm.region">
-                <option value="">선택</option>
+                <option value="">선택하세요</option>
                 <option v-for="opt in regionOptions" :key="opt" :value="opt">{{ opt }}</option>
               </select>
-            </label>
+            </div>
           </template>
         </div>
+        
         <div class="modal-footer">
-          <div class="modal-steps">
-            <span :class="{ active: currentProfileStep === 1 }">1</span>
-            <span :class="{ active: currentProfileStep === 2 }">2</span>
+          <div class="step-indicator">
+            <div class="step-dot" :class="{ active: currentProfileStep >= 1 }"></div>
+            <div class="step-line"></div>
+            <div class="step-dot" :class="{ active: currentProfileStep >= 2 }"></div>
           </div>
+          
           <div class="modal-actions">
-            <button v-if="currentProfileStep === 2" type="button" class="pill-button ghost" @click="currentProfileStep = 1">
+            <button 
+              v-if="currentProfileStep === 2" 
+              type="button" 
+              class="btn-secondary" 
+              @click="currentProfileStep = 1"
+            >
               이전
             </button>
-            <button
-              v-if="currentProfileStep === 1"
-              type="button"
-              class="pill-button"
+            <button 
+              v-if="currentProfileStep === 1" 
+              type="button" 
+              class="btn-primary" 
               @click="currentProfileStep = 2"
             >
-              다음
+              다음 단계
             </button>
-            <button
-              v-else
-              class="pill-button"
-              :disabled="savingProfile"
+            <button 
+              v-else 
+              class="btn-primary" 
+              :disabled="savingProfile" 
               @click="saveProfile"
             >
-              {{ savingProfile ? "저장 중..." : "저장" }}
+              {{ savingProfile ? "저장 중..." : "설정 완료" }}
             </button>
           </div>
         </div>
@@ -361,7 +360,13 @@ const router = useRouter();
 const { isAuthenticated, user, fetchProfile, logout, token } = useAuth();
 const { options: optionData, loading: optionsLoading, error: optionsError, fetchProfileOptions } = useProfileOptions();
 const isMenuOpen = ref(false);
-const isDropdownOpen = ref(false);
+const isDropdownOpen = ref(false); 
+const dropdownContainer = ref(null); 
+const userDropdownContainer = ref(null); 
+const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value; };
+const closeMenu = () => { isMenuOpen.value = false; };
+const toggleUserMenu = () => { isDropdownOpen.value = !isDropdownOpen.value; };
+const closeUserMenu = () => { isDropdownOpen.value = false; };
 const isLoggingOut = ref(false);
 const showForcedExit = ref(false);
 const showProfileModal = ref(false);
@@ -401,6 +406,15 @@ const toggleMultiSelect = (field, value) => {
 
 const userName = computed(() => user.value?.name || "회원");
 
+const handleClickOutside = (event) => {
+  if (dropdownContainer.value && !dropdownContainer.value.contains(event.target)) {
+    closeMenu();
+  }
+  if (userDropdownContainer.value && !userDropdownContainer.value.contains(event.target)) {
+    closeUserMenu();
+  }
+};
+
 const handleMouseMove = (e) => {
   const card = e.currentTarget;
   const rect = card.getBoundingClientRect();
@@ -437,7 +451,6 @@ const syncProfile = () => {
 };
 
 const needProfileModal = (profile) => {
-  // 간단한 기준: 학력/경력 레벨이 비어 있으면 추가 입력 안내
   return !profile?.graduated_school || !profile?.career_level;
 };
 
@@ -467,7 +480,6 @@ const loadProfile = async () => {
       showProfileModal.value = true;
     }
   } catch (err) {
-    // 조회 실패 시 새 입력을 안내
     showProfileModal.value = true;
   }
 };
@@ -519,6 +531,12 @@ const checkForcedAlert = () => {
 };
 
 onMounted(() => {
+  document.addEventListener("click", handleClickOutside);
+  window.addEventListener("storage", syncProfile);
+  syncProfile();
+  void fetchProfileOptions().catch(() => {});
+  void loadProfile();
+  checkForcedAlert();
   window.addEventListener("storage", syncProfile);
   syncProfile();
   void fetchProfileOptions().catch(() => {});
@@ -527,6 +545,8 @@ onMounted(() => {
 });
 
 onUnmounted(() => {
+  document.removeEventListener("click", handleClickOutside);
+  window.removeEventListener("storage", syncProfile);
   window.removeEventListener("storage", syncProfile);
 });
 
@@ -538,7 +558,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 
 <style scoped>
 @import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap");
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=SF+Pro&display=swap");
 
 .landing {
@@ -559,6 +579,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   position: relative;
   z-index: 100;
 }
+
 .nav-logo {
   position: absolute;
   width: 471px;
@@ -573,6 +594,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   line-height: 116px;
   color: #000000;
 }
+
 .nav-pill {
   display: inline-flex;
   align-items: center;
@@ -586,11 +608,19 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   font-size: 16px;
   font-weight: 600;
 }
-.nav-pill .chevron { font-size: 12px; }
-.chevron.rotate { transform: rotate(180deg); }
-.nav-dropdown { position: relative; }
 
-/* ▼▼▼ [변경된 드롭다운 스타일: 검정 배경 + 흰색 텍스트] ▼▼▼ */
+.nav-pill .chevron {
+  font-size: 12px;
+}
+
+.chevron.rotate {
+  transform: rotate(180deg);
+}
+
+.nav-dropdown {
+  position: relative;
+}
+
 .dropdown-menu {
   position: absolute;
   top: 100%;
@@ -600,9 +630,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   flex-direction: column;
   min-width: 160px;
   padding: 8px 0;
-  
-  /* 검정 배경 및 테두리 수정 */
-  background: #111827; 
+  background: #111827;
   border: 1px solid #374151;
   border-radius: 12px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
@@ -610,22 +638,22 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 }
 
 .dropdown-menu.right-align {
-  left: auto; 
+  left: auto;
   right: 0;
 }
 
 .dropdown-link {
   padding: 10px 14px;
-  color: #f9fafb; /* 흰색 텍스트 */
+  color: #f9fafb;
   font-size: 16px;
-  font-weight: 700; /* 좀 더 굵게 */
+  font-weight: 700;
   text-decoration: none;
   border-radius: 8px;
   transition: background 0.2s;
 }
 
 .dropdown-link:hover {
-  background: #374151; /* 호버 시 진한 회색 */
+  background: #374151;
 }
 
 .dropdown-button {
@@ -640,21 +668,22 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   display: inline-flex;
   align-items: center;
   gap: 8px;
-  color: #f9fafb; /* 버튼 텍스트도 흰색 */
+  color: #f9fafb;
 }
 
-/* 스피너 색상도 흰색으로 변경 */
 .dropdown-button--loading .spinner {
   width: 14px;
   height: 14px;
   border-radius: 50%;
-  border: 2px solid #ffffff; /* 흰색 테두리 */
+  border: 2px solid #ffffff;
   border-top-color: transparent;
   animation: spin 0.8s linear infinite;
 }
-/* ▲▲▲ [변경 완료] ▲▲▲ */
 
-.dropdown-button:disabled { opacity: 0.7; cursor: not-allowed; }
+.dropdown-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
 
 /* Dropdown Animation */
 .dropdown-enter-active,
@@ -662,11 +691,13 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   transform-origin: top center;
 }
+
 .dropdown-enter-from,
 .dropdown-leave-to {
   opacity: 0;
   transform: translateY(-10px) scaleY(0.95);
 }
+
 .dropdown-enter-to,
 .dropdown-leave-from {
   opacity: 1;
@@ -683,7 +714,10 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 /* Grid Background */
 .hero-bg-grid {
   position: absolute;
-  top: 0; left: 0; width: 100%; height: 100%;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
   z-index: 0;
   background-size: 40px 40px;
   background-image:
@@ -703,11 +737,13 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   position: relative;
   z-index: 1;
 }
+
 .hero-text {
   text-align: left;
   position: relative;
   z-index: 1;
 }
+
 .hero-title {
   max-width: 640px;
   font-family: "Inter", sans-serif;
@@ -716,18 +752,21 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   line-height: 1.30;
   color: #000000;
 }
+
 .hero-description {
   max-width: 540px;
   margin: 0 0 32px;
   font-size: 17px;
   color: #4b5563;
 }
+
 .hero-actions {
   display: inline-flex;
   justify-content: flex-start;
   gap: 12px;
   flex-wrap: wrap;
 }
+
 .secondary {
   border-radius: 999px;
   padding: 10px 20px;
@@ -740,6 +779,7 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   color: #111827;
   transition: all 0.3s ease;
 }
+
 .primary {
   border-radius: 999px;
   padding: 10px 20px;
@@ -751,22 +791,26 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   cursor: pointer;
   transition: all 0.3s ease;
 }
+
 .primary:hover {
   transform: translateY(-1px);
   box-shadow: 0 8px 18px rgba(0, 0, 0, 0.22);
 }
+
 .hover-scale:hover {
   transform: scale(1.05);
   background: #111827;
   color: #ffffff;
   border-color: #111827;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
+
 .hero-image-wrap {
   width: 100%;
   display: flex;
   justify-content: center;
 }
+
 .hero-image {
   width: 100%;
   max-width: 620px;
@@ -774,9 +818,11 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   box-shadow: 0 22px 40px rgba(15, 23, 42, 0.4);
   object-fit: cover;
 }
+
 .floating-anim {
   animation: float 6s ease-in-out infinite;
 }
+
 @keyframes float {
   0% { transform: translateY(0px); }
   50% { transform: translateY(-15px); }
@@ -899,13 +945,18 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   --mouse-x: -500px;
   --mouse-y: -500px;
 }
+
 .spotlight-card:hover {
   transform: translateY(-8px);
   box-shadow: 0 30px 60px rgba(0, 0, 0, 0.3);
 }
+
 .spotlight-overlay {
   position: absolute;
-  top: 0; left: 0; right: 0; bottom: 0;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   pointer-events: none;
   z-index: 1;
   background: radial-gradient(
@@ -916,14 +967,19 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   opacity: 0;
   transition: opacity 0.3s;
 }
-.spotlight-card:hover .spotlight-overlay { opacity: 1; }
-.spotlight-card:hover .card-image-content { transform: scale(1.05); }
+
+.spotlight-card:hover .spotlight-overlay {
+  opacity: 1;
+}
+
+.spotlight-card:hover .card-image-content {
+  transform: scale(1.05);
+}
 
 /* Card Colors */
 .card-one { background: #f9c5d5; }
 .card-two { background: #f7d56f; }
 .card-three { background: #bfacf9; }
-
 
 /* Footer Marquee Section */
 .footer-marquee {
@@ -982,295 +1038,286 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   background: #111827;
 }
 
-/* Profile modal */
+/* =========================================
+   프로필 모달 디자인 (Clean & Standard Modern)
+   ========================================= */
+
+/* 모달 배경 (Backdrop) */
 .modal-overlay {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 2000;
+  padding: 16px;
 }
 
+/* 모달 카드 본체 */
 .modal-card.profile-card {
-  width: min(900px, 92vw);
+  width: min(800px, 100%);
   max-height: 85vh;
   background: #ffffff;
-  border-radius: 16px;
+  border-radius: 12px;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
   overflow: hidden;
   display: flex;
   flex-direction: column;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.25);
 }
 
+/* 헤더 */
 .modal-header {
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  padding: 16px 20px;
-  border-bottom: 1px solid #e5e7eb;
+  align-items: flex-start;
+  padding: 24px 32px 16px;
+  background: #fff;
+  border-bottom: 1px solid #f3f4f6;
+}
+
+.header-content h3 {
+  margin: 0 0 4px;
+  font-size: 20px;
   font-weight: 800;
-  font-size: 18px;
+  color: #111827;
+}
+
+.step-desc {
+  margin: 0;
+  font-size: 13px;
+  color: #6b7280;
 }
 
 .modal-close {
-  background: none;
+  background: transparent;
   border: none;
-  font-size: 18px;
+  color: #9ca3af;
   cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: all 0.2s;
 }
 
+.modal-close:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+/* 바디 (Body) */
 .modal-body.profile-body {
-  padding: 20px;
+  padding: 32px;
   overflow-y: auto;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 14px 16px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 20px;
+  background: #fff;
 }
 
+/* 입력 필드 (Input Fields) */
 .modal-field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 14px;
 }
 
+.modal-field.full-width {
+  grid-column: 1 / -1;
+}
+
+.modal-field label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #374151;
+}
+
+.modal-field .required {
+  color: #ef4444;
+  margin-left: 2px;
+}
+
+/* Input & Select: Filled Style */
 .modal-field input,
 .modal-field select {
-  border: 1px solid #d1d5db;
-  border-radius: 10px;
-  padding: 8px 10px;
-  font-size: 13px;
-}
-
-.modal-field select[multiple] {
-  min-height: 120px;
-}
-.modal-field select[multiple] {
   width: 100%;
-}
-
-.modal-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 20px 16px;
-  border-top: 1px solid #e5e7eb;
-}
-.modal-actions {
-  display: flex;
-  gap: 8px;
-}
-.modal-steps {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-}
-.modal-steps span {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  border: 1px solid #d1d5db;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-  color: #6b7280;
-}
-.modal-steps span.active {
-  background: #111827;
-  color: #f9fafb;
-  border-color: #111827;
-}
-.pill-button.ghost {
-  border: 1px solid #d1d5db;
-  background: #fff;
+  height: 46px;
+  padding: 0 16px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: #f3f4f6;
   color: #111827;
-}
-.tag-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-  gap: 8px;
-}
-.tag-option {
-  border: 1px solid #d1d5db;
-  background: #fff;
-  padding: 6px 10px;
-  border-radius: 12px;
-  font-size: 13px;
-  cursor: pointer;
+  font-size: 14px;
+  font-family: inherit;
   transition: all 0.2s ease;
-  text-align: left;
-}
-.tag-option.active {
-  background: #111827;
-  color: #f9fafb;
-  border-color: #111827;
-}
-.tag-option:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.12);
+  outline: none;
+  box-sizing: border-box;
 }
 
-/* Mobile Styles */
-@media (max-width: 768px) {
-  .landing-header { padding: 16px 20px; }
-  .nav-logo { font-size: 24px; position: static; transform: none; width: auto; height: auto; }
-  .hero { padding: 56px 20px 100px; }
-  .hero-title { font-size: 32px; margin-bottom: 16px; }
-  
-  .insights-header { 
-    gap: 16px; 
-    margin-bottom: 40px;
-  }
-  .insights-title {
-    font-size: 48px;
-  }
-  .insights-cards { grid-template-columns: 1fr; }
-  .insight-card {
-    max-width: 100%;
-    padding: 40px 24px;
-  }
-  .marquee-content span { font-size: 48px; }
-}
-
-/* ===== Profile Modal polish ===== */
-.modal-card.profile-card {
-  border: 1px solid rgba(0,0,0,0.08);
-}
-
-.modal-header {
-  background: rgba(248, 244, 235, 0.75);
-  backdrop-filter: blur(8px);
-}
-
-.modal-header h3 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: -0.02em;
-}
-
-.modal-close {
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  transition: background 0.2s ease;
-}
-.modal-close:hover {
-  background: rgba(17, 24, 39, 0.08);
-}
-
-/* form grid inside modal */
-.modal-body.profile-body {
-  background: #ffffff;
-}
-
-/* field label */
-.modal-field > span {
-  font-weight: 800;
-  color: #111827;
-}
-
-/* inputs */
-.modal-field input,
-.modal-field select {
-  background: #ffffff;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
+/* Focus State */
 .modal-field input:focus,
 .modal-field select:focus {
-  outline: none;
+  background: #ffffff;
   border-color: #111827;
-  box-shadow: 0 0 0 4px rgba(17, 24, 39, 0.12);
+  box-shadow: 0 0 0 1px #111827;
 }
 
-/* checkbox group -> chip style */
+/* Select 화살표 커스텀 */
+.modal-field select {
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%234b5563' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+}
+
+.modal-field input::placeholder {
+  color: #9ca3af;
+}
+
+/* 체크박스 그룹 (Chips) */
 .checkbox-group {
   display: flex;
   flex-wrap: wrap;
-  gap: 10px;
-  padding: 10px;
-  border: 1px solid #e5e7eb;
-  border-radius: 14px;
-  background: #f9fafb;
+  gap: 8px;
 }
 
 .checkbox-item {
   position: relative;
-  display: inline-flex;
-  align-items: center;
   cursor: pointer;
-  user-select: none;
 }
 
-/* hide native checkbox */
-.checkbox-item input[type="checkbox"] {
+.checkbox-item input {
   position: absolute;
   opacity: 0;
-  pointer-events: none;
+  width: 0;
+  height: 0;
 }
 
-/* chip */
+/* Chip Style */
 .checkbox-item span {
   display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 8px 12px;
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 6px;
   background: #ffffff;
+  border: 1px solid #d1d5db;
+  color: #4b5563;
   font-size: 13px;
-  font-weight: 700;
-  color: #111827;
-  transition: transform 0.12s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+  font-weight: 500;
+  transition: all 0.15s ease;
 }
 
 .checkbox-item:hover span {
-  transform: translateY(-1px);
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.10);
+  border-color: #9ca3af;
+  color: #111827;
 }
 
-/* checked style */
-.checkbox-item input[type="checkbox"]:checked + span {
+/* Chip Selected */
+.checkbox-item input:checked + span {
   background: #111827;
-  color: #f9fafb;
   border-color: #111827;
-  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.18);
+  color: #ffffff;
+  font-weight: 600;
 }
 
-/* footer polish */
+/* 푸터 (Footer) */
 .modal-footer {
-  background: rgba(248, 244, 235, 0.65);
-  backdrop-filter: blur(8px);
+  padding: 20px 32px;
+  background: #ffffff;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.pill-button {
-  padding: 10px 16px;
-  border-radius: 999px;
-  border: none;
-  background: #111827;
-  color: #f9fafb;
-  font-weight: 800;
-  cursor: pointer;
+/* 단계 표시기 */
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
-.pill-button:disabled {
+
+.step-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #e5e7eb;
+  transition: all 0.3s;
+}
+
+.step-dot.active {
+  background: #111827;
+  transform: scale(1.2);
+}
+
+.step-line {
+  width: 40px;
+  height: 2px;
+  background: #e5e7eb;
+  border-radius: 99px;
+}
+
+/* 버튼 그룹 */
+.modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.btn-primary,
+.btn-secondary {
+  height: 44px;
+  padding: 0 20px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary {
+  background: #111827;
+  color: #ffffff;
+  border: 1px solid #111827;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #000000;
+  transform: translateY(-1px);
+}
+
+.btn-primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
 }
 
-.pill-button.ghost {
+.btn-secondary {
   background: #ffffff;
+  color: #374151;
   border: 1px solid #d1d5db;
-  color: #111827;
-}
-.pill-button.ghost:hover {
-  box-shadow: 0 10px 22px rgba(15, 23, 42, 0.10);
 }
 
+.btn-secondary:hover {
+  background: #f9fafb;
+  border-color: #9ca3af;
+  color: #111827;
+}
+
+/* Mobile Footer */
+@media (max-width: 640px) {
+  .modal-footer {
+    flex-direction: column-reverse;
+    gap: 16px;
+  }
+
+  .modal-actions {
+    width: 100%;
+    justify-content: stretch;
+  }
+
+  .btn-primary,
+  .btn-secondary {
+    flex: 1;
+  }
+}
 </style>

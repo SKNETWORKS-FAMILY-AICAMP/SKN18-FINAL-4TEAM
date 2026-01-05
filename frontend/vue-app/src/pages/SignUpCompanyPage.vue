@@ -328,22 +328,51 @@ const handleSendEmailCode = async () => {
     return;
   }
   emailSending.value = true;
-  setTimeout(() => {
-    emailSending.value = false;
+  emailVerified.value = false;
+  try {
+    const resp = await fetch(`${API_BASE}/api/auth/email/send/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.detail || "발송 실패");
+    }
     emailInlineMessage.value = "인증번호가 발송되었습니다.";
     emailInlineType.value = "success";
-  }, 1000);
+  } catch (err) {
+    emailInlineMessage.value = err?.message || "발송 실패";
+    emailInlineType.value = "error";
+  } finally {
+    emailSending.value = false;
+  }
 };
 
 const handleVerifyEmailCode = async () => {
-  if (!emailCode.value) return;
+  const email = buildEmail();
+  if (!email || !emailCode.value) return;
   emailVerifying.value = true;
-  setTimeout(() => {
-    emailVerifying.value = false;
+  try {
+    const resp = await fetch(`${API_BASE}/api/auth/email/verify/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code: emailCode.value })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.detail || "인증 실패");
+    }
     emailVerified.value = true;
-    emailInlineMessage.value = "인증되었습니다.";
+    emailInlineMessage.value = data?.message || "인증되었습니다.";
     emailInlineType.value = "success";
-  }, 1000);
+  } catch (err) {
+    emailVerified.value = false;
+    emailInlineMessage.value = err?.message || "인증 실패";
+    emailInlineType.value = "error";
+  } finally {
+    emailVerifying.value = false;
+  }
 };
 
 const handleEnter = () => {

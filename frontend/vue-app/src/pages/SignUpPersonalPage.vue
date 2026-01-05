@@ -435,14 +435,21 @@ const handleSendEmailCode = async () => {
     return;
   }
   emailSending.value = true;
+  emailVerified.value = false;
   try {
-    // API 호출 시뮬레이션
-    await new Promise(r => setTimeout(r, 800));
-    // 실제: await fetch(...)
+    const resp = await fetch(`${API_BASE}/api/auth/email/send/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.detail || "발송 실패");
+    }
     emailInlineMessage.value = "인증번호가 발송되었습니다.";
     emailInlineType.value = "success";
-  } catch(e) {
-    emailInlineMessage.value = "발송 실패";
+  } catch (e) {
+    emailInlineMessage.value = e?.message || "발송 실패";
     emailInlineType.value = "error";
   } finally {
     emailSending.value = false;
@@ -450,17 +457,25 @@ const handleSendEmailCode = async () => {
 };
 
 const handleVerifyEmailCode = async () => {
-  if(!emailCode.value) return;
+  const email = buildEmail();
+  if (!email || !emailCode.value) return;
   emailVerifying.value = true;
   try {
-    // API 호출 시뮬레이션
-    await new Promise(r => setTimeout(r, 800));
-    // 실제: await fetch(...)
+    const resp = await fetch(`${API_BASE}/api/auth/email/verify/`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, code: emailCode.value })
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      throw new Error(data?.detail || "인증 실패");
+    }
     emailVerified.value = true;
-    emailInlineMessage.value = "이메일 인증 완료!";
+    emailInlineMessage.value = data?.message || "이메일 인증 완료!";
     emailInlineType.value = "success";
-  } catch(e) {
-    emailInlineMessage.value = "인증 실패";
+  } catch (e) {
+    emailVerified.value = false;
+    emailInlineMessage.value = e?.message || "인증 실패";
     emailInlineType.value = "error";
   } finally {
     emailVerifying.value = false;
@@ -485,28 +500,42 @@ const handleSubmit = async () => {
   pending.value = true;
   try {
     // 실제 회원가입 API 호출
-    const birth = `${birthYear.value}-${String(birthMonth.value).padStart(2,'0')}-${String(birthDay.value).padStart(2,'0')}`;
-    const phone = `${phone1.value}-${phone2.value}-${phone3.value}`;
-    
+    const hasBirth =
+      birthYear.value && birthMonth.value && birthDay.value;
+    const birth = hasBirth
+      ? `${birthYear.value}-${String(birthMonth.value).padStart(2,'0')}-${String(birthDay.value).padStart(2,'0')}`
+      : null;
+    const hasPhone = phone1.value && phone2.value && phone3.value;
+    const phone = hasPhone ? `${phone1.value}-${phone2.value}-${phone3.value}` : null;
+
+    const payload = {
+      user_id: username.value,
+      password: password.value,
+      name: name.value,
+      email: buildEmail()
+    };
+    if (phone) payload.phone_number = phone;
+    if (birth) payload.birthdate = birth;
+
     const res = await fetch(`${API_BASE}/api/auth/signup/`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        user_id: username.value,
-        password: password.value,
-        name: name.value,
-        email: buildEmail(),
-        phone_number: phone,
-        birthdate: birth
-      })
+      body: JSON.stringify(payload)
     });
     
-    if(!res.ok) throw new Error("가입 실패");
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const detail = data?.detail;
+      const fieldError = !detail && data && typeof data === "object"
+        ? Object.values(data).flat().join(" ")
+        : "";
+      throw new Error(detail || fieldError || "가입 실패");
+    }
     
     alert("가입이 완료되었습니다!");
     router.push("/login");
   } catch (e) {
-    alert("가입 중 오류가 발생했습니다.");
+    alert(e?.message || "가입 중 오류가 발생했습니다.");
   } finally {
     pending.value = false;
   }

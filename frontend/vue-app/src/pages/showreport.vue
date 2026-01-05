@@ -87,11 +87,11 @@
             </div>
             <div v-if="antiCheatSummary" class="alert-grid">
               <div class="alert-item">
-                <span class="label">Camera Events</span>
+                <span class="label">행동기반 경고 횟수</span>
                 <span class="val">{{ antiCheatSummary.camera?.count || 0 }}</span>
               </div>
               <div class="alert-item">
-                <span class="label">Input Events</span>
+                <span class="label">타이핑기반 경고 횟수</span>
                 <span class="val">{{ antiCheatSummary.typing?.count || 0 }}</span>
               </div>
             </div>

@@ -103,7 +103,7 @@ class LivecodingReport(models.Model):
     final_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     final_grade = models.CharField(max_length=8, null=True, blank=True)
     graph_output = models.JSONField(default=dict)
-    problem_text = models.TextField(null=True, blank=True)
+    problem = models.JSONField(null=True, blank=True, default=dict)
     code_feedback = models.TextField(null=True, blank=True)
     problem_solving_evaluation = models.JSONField(null=True, blank=True)
     initial_strategy = models.TextField(null=True, blank=True)

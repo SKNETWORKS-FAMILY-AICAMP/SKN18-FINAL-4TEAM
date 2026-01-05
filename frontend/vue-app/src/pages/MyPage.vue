@@ -149,6 +149,13 @@
             <h2 class="insight-title">나의 라이브코딩 성장 리포트</h2>
             <p class="insight-desc">라이브코딩 결과를 바탕으로 강점과 개선 포인트를 한눈에 정리해드립니다.</p>
           </div>
+          <div v-if="hasTrend && sparkPath" class="trend-box">
+            <div class="trend-chart">
+              <svg :viewBox="'0 0 180 50'" preserveAspectRatio="none">
+                <path :d="sparkPath" fill="none" stroke="#111827" stroke-width="2" />
+              </svg>
+            </div>
+          </div>
         </div> 
         <div class="agent-row">
           <div class="agent-status" :class="{ error: !!aggregateError }">
@@ -287,11 +294,51 @@ const latestGrowthVersion = ref(null);
 const latestGrowthIds = ref([]);
 const AGG_TS_KEY = "jobtory_last_aggregate_ts";
 
+// final_score 추세용
+const trendLoading = ref(false);
+const trendError = ref("");
+const trendPoints = ref([]); // [{t, score}]
+const latestScore = computed(() => {
+  if (!trendPoints.value.length) return null;
+  return trendPoints.value[trendPoints.value.length - 1].score;
+});
+const scoreDelta = computed(() => {
+  if (trendPoints.value.length < 2) return null;
+  const prev = trendPoints.value[trendPoints.value.length - 2].score;
+  const curr = trendPoints.value[trendPoints.value.length - 1].score;
+  if (prev === null || curr === null) return null;
+  return curr - prev;
+});
+
+const sparkPath = computed(() => {
+  const pts = trendPoints.value;
+  if (pts.length < 3) return "";
+  const scores = pts.map((p) => (p.score == null ? 0 : p.score));
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const width = 180;
+  const height = 50;
+  const span = Math.max(pts.length - 1, 1);
+  const norm = (v) => {
+    if (max === min) return height / 2;
+    return height - ((v - min) / (max - min)) * height;
+  };
+  const coords = pts.map((p, idx) => {
+    const x = (idx / span) * width;
+    const y = norm(p.score ?? min);
+    return `${x},${y}`;
+  });
+  return `M ${coords.join(" L ")}`;
+});
+
+const hasTrend = computed(() => trendPoints.value.length >= 3);
+
 onMounted(() => {
   if (!user.value) void fetchProfile();
   void fetchReports();
   void fetchPayloadAndMaybeAggregate();
   void fetchUserProfile();
+  void fetchTrend();
 });
 
 const fetchReports = async () => {
@@ -318,6 +365,37 @@ const fetchReports = async () => {
     listError.value = "리포트 목록을 불러오지 못했습니다.";
   } finally {
     listLoading.value = false;
+  }
+};
+
+const fetchTrend = async () => {
+  trendLoading.value = true;
+  trendError.value = "";
+  trendPoints.value = [];
+  try {
+    const ok = await ensureValidSession();
+    if (!ok) {
+      trendError.value = "로그인이 필요합니다.";
+      return;
+    }
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/trend/`, {
+      headers: { Authorization: `Bearer ${token.value}` },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      trendError.value = data?.detail || "점수 추세를 불러오지 못했습니다.";
+      return;
+    }
+    const results = Array.isArray(data.results) ? data.results : [];
+    trendPoints.value = results.map((r) => ({
+      t: r.created_at,
+      score: typeof r.final_score === "number" ? r.final_score : null,
+    }));
+  } catch (e) {
+    console.error(e);
+    trendError.value = "점수 추세를 불러오지 못했습니다.";
+  } finally {
+    trendLoading.value = false;
   }
 };
 
@@ -1088,6 +1166,39 @@ const formatList = (arr) => {
   font-size: 14px;
   letter-spacing: -0.01em;
   line-height: 1.6;
+}
+
+.insight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trend-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.trend-chart {
+  width: 180px;
+  height: 50px;
+}
+.trend-chart svg {
+  width: 100%;
+  height: 100%;
+}
+.trend-placeholder {
+  width: 180px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px dashed #e5e7eb;
 }
 
 

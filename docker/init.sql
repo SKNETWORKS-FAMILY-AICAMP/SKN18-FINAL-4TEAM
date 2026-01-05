@@ -63,6 +63,15 @@ CREATE TABLE user_profile(
   updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE recommended_videos (
+  id            SERIAL       PRIMARY KEY,
+  code_lang     TEXT[]       NULL,
+  video_url     VARCHAR(200) NOT NULL,
+  summary       TEXT         NOT NULL,
+  category      TEXT[]       NOT NULL,
+  domain        VARCHAR(50)  NOT NULL,
+  created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+);
 
 CREATE TABLE auth_identities (
   id SERIAL PRIMARY KEY,
@@ -86,7 +95,7 @@ CREATE TABLE IF NOT EXISTS livecoding_reports (
     final_score       NUMERIC(6,2),
     final_grade       VARCHAR(8),
     graph_output      JSONB        DEFAULT '{}'::jsonb,
-    problem_text            TEXT,
+    problem           JSONB,
     code_feedback           TEXT,
     problem_solving_evaluation JSONB,
     initial_strategy        TEXT,

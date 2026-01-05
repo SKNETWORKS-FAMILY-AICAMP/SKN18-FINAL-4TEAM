@@ -14,7 +14,7 @@
             <p class="eyebrow">WELCOME BACK</p>
             <h1 class="login-title">Login to<br>JobTory</h1>
             <p class="login-desc">
-              한 번의 로그인으로 면접 준비부터<br>라이브 코딩 테스트까지 경험해 보세요.
+              로그인을 통해 면접 준비부터<br>AI 라이브 코딩 테스트까지 경험해 보세요.
             </p>
           </div>
 
@@ -422,7 +422,7 @@ const handleSubmit = async () => {
 
 /* 입력 필드 스타일 */
 .form-input {
-  width: 100%;
+  width: 90%;
   height: 48px;
   padding: 0 16px;
   border-radius: 8px;
@@ -442,10 +442,6 @@ const handleSubmit = async () => {
 
 .password-wrapper {
   position: relative;
-}
-
-.password-wrapper .form-input {
-  padding-right: 48px;
 }
 
 .password-toggle {

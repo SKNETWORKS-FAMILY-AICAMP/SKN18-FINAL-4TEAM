@@ -1140,7 +1140,7 @@ const formatList = (arr) => {
   padding-left: 18px;
   color: #1f2937;
 }
-</style>
+
 @media (max-width: 768px) {
   .nav-header {
     padding: 20px;

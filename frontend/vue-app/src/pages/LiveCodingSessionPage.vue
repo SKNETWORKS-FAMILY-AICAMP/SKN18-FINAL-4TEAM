@@ -2104,8 +2104,6 @@ let mediaStream = null;
 let antiCheatTimer = null;
 let webcamMonitor = null;
 let mediapipeInterval = null;
-let keyTimestamps = [];
-let lastAbnormalAlert = 0;
 let lastCopyAlert = 0;
 let lastCameraStatus = "ok";
 const offscreenCount = ref(0);
@@ -2113,9 +2111,6 @@ const isForceEnding = ref(false);
 let lastOffscreenAlert = 0;
 const isAntiCheatReady = computed(() => !isIntroPreparing.value);
 
-const KEY_WINDOW_MS = 2000;
-const KEY_THRESHOLD = 12;
-const ABNORMAL_COOLDOWN_MS = 8000;
 const COPY_COOLDOWN_MS = 4000;
 const OFFSCREEN_LIMIT = 3000;
 const OFFSCREEN_COOLDOWN_MS = 1500;
@@ -2283,7 +2278,6 @@ const sendFrameForMediapipe = async () => {
 };
 
 const handleEditorKeydown = (event) => {
-  const now = Date.now();
   if ((event.ctrlKey || event.metaKey) && event.key?.toLowerCase() === "c") {
     event.preventDefault();
     handleCopy();
@@ -2293,20 +2287,6 @@ const handleEditorKeydown = (event) => {
     event.preventDefault();
     handlePaste();
     return;
-  }
-
-  keyTimestamps.push(now);
-  keyTimestamps = keyTimestamps.filter((ts) => now - ts <= KEY_WINDOW_MS);
-
-  if (
-    keyTimestamps.length >= KEY_THRESHOLD &&
-    now - lastAbnormalAlert >= ABNORMAL_COOLDOWN_MS
-  ) {
-    lastAbnormalAlert = now;
-    showAntiCheat(
-      "abnormalInput",
-      `최근 ${KEY_WINDOW_MS / 1000}초간 ${keyTimestamps.length}회의 빠른 키 입력이 감지되었습니다.`
-    );
   }
 };
 

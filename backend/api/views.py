@@ -62,6 +62,8 @@ def _to_kst_iso(dt):
     return aware.isoformat()
 
 
+
+
 def health(request):
     return JsonResponse({"status": "ok"})
 
@@ -1814,6 +1816,15 @@ class LiveCodingFinalEvalReportView(APIView):
             # 캐시가 정리된 경우 DB에 저장된 리포트로 fallback
             report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
             if report:
+                graph_output = report.graph_output or {}
+                try:
+                    from graph_sync.graph_queue import enqueue_report_sync, enqueue_recommendations
+
+                    enqueue_report_sync(report.id)
+                    if not (graph_output.get("recommended_problems") or []):
+                        enqueue_recommendations(report.id, str(user.user_id), "python")
+                except Exception as e:
+                    print(f"[report_api] graph queue failed: {e}", flush=True)
                 return Response(
                     {
                         "status": "done",
@@ -1834,7 +1845,7 @@ class LiveCodingFinalEvalReportView(APIView):
                         "improvement": report.improvement,
                         "comprehensive_evaluation": report.comprehensive_evaluation,
                         "anti_cheat_summary": report.anti_cheat_summary,
-                        "graph_output": report.graph_output or {},
+                        "graph_output": graph_output,
                         "problem_eval_score": report.problem_eval_score,
                         "problem_eval_feedback": report.problem_eval_feedback,
                         "code_collab_score": report.code_collab_score,
@@ -1992,6 +2003,18 @@ class LiveCodingFinalEvalReportView(APIView):
         except Exception as e:
             # 저장 실패는 조회 응답을 막지 않음
             print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
+            report_obj = None
+
+        if report_obj:
+            try:
+                from graph_sync.graph_queue import enqueue_report_sync, enqueue_recommendations
+
+                enqueue_report_sync(report_obj.id)
+                if not (graph_output.get("recommended_problems") or []):
+                    language = (meta.get("language") or "python").lower()
+                    enqueue_recommendations(report_obj.id, str(user.user_id), language)
+            except Exception as e:
+                print(f"[report_api] graph queue failed: {e}", flush=True)
 
         # 리포트가 정상적으로 생성/저장된 이후에는
         # 해당 세션과 관련된 Redis 캐시/체크포인트를 모두 정리해

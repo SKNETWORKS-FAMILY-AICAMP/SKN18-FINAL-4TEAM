@@ -1,11 +1,10 @@
 <template>
   <div class="mypage">
-    <header class="mypage-header">
+    <nav class="nav-header">
       <RouterLink to="/" class="brand">JOBTORY</RouterLink>
-    </header>
+    </nav>
 
     <main class="mypage-body">
-      <!-- ✅ 계정 + 프로필 통합 카드 -->
       <div class="card account-profile-card">
         <div class="top-header">
           <div>
@@ -14,7 +13,6 @@
           </div>
 
           <div class="top-actions" v-if="user">
-            <!-- ✅ 버튼 하나로 고정 (name 기준) -->
             <RouterLink class="edit-button" :to="{ name: 'profile-edit' }">
               회원정보 수정
             </RouterLink>
@@ -25,7 +23,6 @@
           </div>
         </div>
 
-        <!-- 계정 정보 -->
         <div v-if="user" class="section">
           <h2 class="section-title">계정</h2>
 
@@ -54,7 +51,6 @@
         </div>
         <p class="hint" v-else>로그인을 불러오는 중입니다...</p>
 
-        <!-- 프로필 -->
         <div class="section">
           <h2 class="section-title">프로필</h2>
           <p class="profile-subtitle">
@@ -115,7 +111,6 @@
         </div>
       </div>
 
-      <!-- 리포트 카드 (그대로 유지) -->
       <div class="card reports-card">
         <div class="reports-header">
           <div>
@@ -697,37 +692,73 @@ const formatList = (arr) => {
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap");
 
+/* 1. 전체 페이지 레이아웃 (화면 고정) */
 .mypage {
-  min-height: 100vh;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
   background: #f8f4eb;
   font-family: "Inter", sans-serif;
   color: #111827;
+  overflow: hidden; /* 바깥쪽 스크롤 차단 */
 }
 
-.mypage-header {
+/* 2. 네비게이션 (고정) */
+.nav-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 24px 40px;
+  z-index: 50;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 24px 32px;
 }
 
 .brand {
-  font-weight: 800;
-  letter-spacing: 0.14em;
-  color: #0f172a;
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
   text-decoration: none;
-  font-size: 22px;
+  letter-spacing: -0.02em;
+  cursor: pointer;
 }
 
+/* 3. 메인 바디 (스크롤 영역 수정) */
 .mypage-body {
+  /* 화면 전체를 채우되, 패딩을 포함하여 계산 */
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box; /* 중요: 패딩이 높이에 포함되도록 설정 */
+  
+  overflow-y: auto; /* 내부 스크롤 허용 */
+  
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 24px;
-  padding: 60px 16px;
+  
+  /* 상단은 헤더만큼, 하단은 넉넉하게 공간 확보 */
+  padding-top: 100px;
+  padding-bottom: 120px; /* 끝까지 스크롤 되도록 여유값 추가 */
+  padding-left: 16px;
+  padding-right: 16px;
+
+  /* Firefox: 스크롤바 숨김 */
+  scrollbar-width: none;
+  /* IE, Edge: 스크롤바 숨김 */
+  -ms-overflow-style: none;
 }
+
+/* Chrome, Safari, Opera: 스크롤바 숨김 */
+.mypage-body::-webkit-scrollbar {
+  display: none;
+}
+
+/* --- 이하 스타일 동일 --- */
 
 .card {
   width: min(960px, 100%);
@@ -737,6 +768,8 @@ const formatList = (arr) => {
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.12);
   border: 1px solid #e5e7eb;
   text-align: left;
+  /* 카드 높이가 늘어나도 잘리지 않도록 설정 */
+  flex-shrink: 0; 
 }
 
 .title {
@@ -877,6 +910,8 @@ const formatList = (arr) => {
 
 .reports-card {
   width: min(960px, 100%);
+  /* 카드 높이 확보 */
+  flex-shrink: 0; 
 }
 
 .reports-header {
@@ -968,6 +1003,7 @@ const formatList = (arr) => {
   color: #dc2626;
 }
 
+/* 모달 스타일 */
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1103,5 +1139,12 @@ const formatList = (arr) => {
   margin: 0;
   padding-left: 18px;
   color: #1f2937;
+}
+</style>
+@media (max-width: 768px) {
+  .nav-header {
+    padding: 20px;
+    justify-content: center;
+  }
 }
 </style>

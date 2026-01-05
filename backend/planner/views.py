@@ -5,23 +5,19 @@ from rest_framework.response import Response
 from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
-#from .deep_recommandation.graph import agent_app
+from .deep_recommend.graph import create_recommend_graph
 from .models import StudyPlan, DailyTask
-from api.models import UserGrowthInsight
+from api.models import UserGrowthInsight, UserProfile
 
 class GeneratePlanView(APIView):
     permission_classes = [IsAuthenticated]
+    agent_app = create_recommend_graph()
 
     def post(self, request):
         try:
             user = request.user
             if not user or not user.is_authenticated:
                 return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
-
-            try:
-                duration = int(request.data.get("duration", 7))
-            except (TypeError, ValueError):
-                return Response({"error": "duration은 숫자여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
 
             user_id = getattr(user, "user_id", None) or getattr(user, "id", None) or str(user)
             latest_growth = (
@@ -41,16 +37,24 @@ class GeneratePlanView(APIView):
 
             growth_content = latest_growth.report_content or ""
 
+            profile = UserProfile.objects.filter(user_id=user_id).first()
+            user_profile = {
+                "tech_stack": profile.tech_stack if profile else [],
+                "desired_role": profile.desired_role if profile else [],
+                "detailed_role": profile.detailed_role if profile else [],
+            }
+
             # 1. planner langgraph 실행
             inputs = {
-                "growth_report_content": growth_content,
-                "duration": duration,
+                "user_id": user_id,
+                "growth_report": growth_content,
+                "user_profile": user_profile,
             }
-            result = agent_app.invoke(inputs)
-            
-            # 최종 결과 가져오기 (비어있는 날짜는 curriculum 정보로 메꿈)
-            final_schedule = result.get("final_schedule", [])
-            curriculum = result.get("curriculum", [])
+            result = self.agent_app.invoke(inputs)
+
+            # 최종 결과 가져오기
+            final_schedule = result.get("final_plan", [])
+            duration = 7
 
             # 2. DB 저장 및 응답 데이터 생성
             start_date = date.today()
@@ -65,18 +69,12 @@ class GeneratePlanView(APIView):
                 for i in range(duration):
                     day_num = i + 1
 
-                    # 결과가 있으면 쓰고, 없으면(최종 실패) Fallback 링크 생성
                     item = final_schedule[i] if i < len(final_schedule) and final_schedule[i] else None
 
-                    if item:
-                        topic = item["topic"]
-                        url = item["video_url"]
-                        title = item["video_title"]
-                    else:
-                        # Fallback Logic
-                        topic = curriculum[i]["topic"]
-                        title = f"'{topic}' 검색 결과 보기 (영상 못 찾음)"
-                        url = f"https://www.youtube.com/results?search_query={topic}"
+                    topic = (item or {}).get("day_plan_topic")
+                    title = (item or {}).get("video_title") 
+                    url = (item or {}).get("video_url") 
+                    why_selected = (item or {}).get("why_selected") or ""
 
                     actual_date = start_date + timedelta(days=i)
 
@@ -87,6 +85,7 @@ class GeneratePlanView(APIView):
                         topic=topic,
                         video_title=title,
                         video_url=url,
+                        why_selected=why_selected,
                         is_completed=False
                     )
                     task.save() # DB 저장 및 ID 생성
@@ -100,7 +99,7 @@ class GeneratePlanView(APIView):
                                 "day_number": day_num,
                                 "task_id": task.id, # [중요] 프론트엔드 체크박스 기능용 ID
                                 "is_completed": False,
-                                "reflection_difficulty": None,
+                                "why_selected": why_selected,
                                 "lecture_note": ""
                             },
                             "backgroundColor": '#e7f5ff',
@@ -148,7 +147,6 @@ class LatestStudyPlanView(APIView):
                         "day_number": task.day,
                         "task_id": task.id,
                         "is_completed": task.is_completed,
-                        "reflection_difficulty": task.reflection_difficulty,
                         "lecture_note": task.lecture_note,
                     },
                 }

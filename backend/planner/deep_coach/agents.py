@@ -310,10 +310,21 @@ def create_feedback_agent():
             - ambiguous_slots → [[확인]]
             - format/style lint는 annotated_draft에 절대 반영하지 않는다.
             - video_summary와 draft에 없는 새로운 정보는 절대 추가하지 마라.
-
+          
             ━━━━━━━━━━━━━━━━━━━━━━
             [subagent 활용]
             ━━━━━━━━━━━━━━━━━━━━━━
             - clarify-agent:
-        """,
-)
+              [[확인]]에 사용할 “교체 문장(replacement)”만 생성한다.
+            - fix-agent:
+              [[추가]] / [[수정]]에 사용할 “행동 지시 힌트”만 생성한다.
+            - inline-annotator:
+              판단 없이 clarify_results와 fix_results를
+              기계적으로 적용해 최종 annotated_draft를 만든다.
+
+            반환 형식:
+            {
+              "annotated_draft": "..."
+            }
+            """,
+            )

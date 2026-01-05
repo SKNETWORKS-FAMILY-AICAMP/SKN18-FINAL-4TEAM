@@ -3,56 +3,77 @@
 환경: OPENAI_API_KEY 필요, deepagents/LLM 의존.
 """
 
-import time
-from agents import create_weekly_study_planner_agent
+from nodes import report_analyzer,slot_planner,video_selector
+from tools import video_search_tool
 
 
 def main():
-    agent = create_weekly_study_planner_agent()
-    growth_reports = """
-    [핵심 강점]  
-    문제 제약에 맞는 시간·공간 복잡도를 의식하며, 불필요한 연산·자료구조 없이 설계하는 능력이 안정적으로 드러난다. 
-    문제를 수학적·함수적 모델로 추상화하고, 전략 단계에서 세운 핵심 알고리즘을 코드 구조에 일관되게 녹여내는 힘이 강하다.
-
-    [개선 필요 영역]  
-    그래프/BFS·이분 탐색과 같은 알고리즘의 큰 전략은 잘 잡지만, 이를 끝까지 실행 가능한 코드로 완성하는 구현 마무리 단계에서 자주 멈춘다. 
-    기본적인 실행 가능성, 특히 파이썬 들여쓰기·포매팅 검증이 미흡하고, 면접 상황에서 사고 과정과 전략을 말로 공유하는 커뮤니케이션이 거의 드러나지 않는다.
-
-    [개선 액션 플랜]  
-    그래프/BFS·이분 탐색 문제에서는 코딩 전 A4 절반에 자료구조 목록, 메인 루프 조건, 보조 함수 시그니처, 
-    종료/리턴 조건 4줄을 먼저 적고 이를 그대로 코드에 옮겨 실행 가능한 최소 골격부터 완성한다. 
-    코드 제출 전에는 `print('CHECK')`로 파싱 여부 확인, 블록 시작 다음 줄 들여쓰기를 전부 스페이스 4개로 통일, 
-    가장 단순한 테스트 입력을 하드코딩해 실제 출력까지 확인하는 3단계 로컬 검증 루틴을 반복한다. 
-    면접에서는 3분 안에 “이 문제를 ___ 문제로 보고 ___ 알고리즘을 쓰겠다”, 
-    “주요 변수/자료구조와 역할”, “코드를 3단계로 나누는 계획”을 구두로 설명한 뒤, 
-    각 단계 구현이 끝날 때마다 현재 진행 상황과 다음 작업을 한 문장 이상으로 업데이트한다.
-
-    [다음 단계에서의 기대]  
-    위 루틴이 습관화되면, 전략 수립 능력에 비해 뒤처져 있던 구현 완성도와 실행 안정성이 빠르게 따라붙고, 
-    면접관 입장에서도 “생각-설계-구현”의 전 과정을 신뢰할 수 있게 된다.
-    """
-    user_profile = {
-        "tech_stack": ["python"],
-        "desired_role": "AI/ML 엔지니어",
-        "detailed_role": "딥러닝 모델링"
-    }
+    
     inputs = {
-        "user_id": "sonju",
-        "growth_reports": growth_reports,
-        "user_profile": user_profile,
+        'needs_profile': {
+            'goal': '그래프/BFS 및 이분 탐색 문제의 큰 전략은 잘 잡지만, 이를 실행 가능한 코드로 완성하는 구현 마무리 단계에서 자주 멈춘다.', 
+            'focus_topics': ['그래프', 'BFS', '이분 탐색'], 
+            'preferences': ['Python 중심', 'AI/ML 직무 지향', '딥러닝 모델링 관심'], 
+            'language': 'Python'
+        },
+        'slots':[
+            {
+                'day': 1, 
+                'day_plan_topic': '그래프 및 BFS 기초 구현', 
+                'domain': 'algorithm', 
+                'category': 'BFS', 
+                'reason': '그래프 및 BFS 기초 구현 체득'
+            }, 
+            {
+                'day': 2, 
+                'day_plan_topic': '그래프 탐색의 차이: BFS vs DFS 실전 비교', 
+                'domain': 'algorithm', 
+                'category': 'DFS', 
+                'reason': 'BFS와의 차이 이해를 위한 실전 비교'
+            }, 
+            {
+                'day': 3, 
+                'day_plan_topic': '이분 탐색의 원리와 Python 구현', 
+                'domain': 'algorithm', 
+                'category': 'Binary Search', 
+                'reason': '이분 탐색 기본 구현 강화'
+            },
+            {
+                'day': 4, 
+                'day_plan_topic': '정렬된 배열에서의 이분 탐색 응용문제 풀이', 
+                'domain': 'algorithm', 
+                'category': 'Binary Search',
+                'reason': '응용 문제 해결력 강화'   
+            },
+            {
+                'day': 5, 
+                'day_plan_topic': '그래프에서 BFS를 이용한 최단경로 문제 예제', 
+                'domain': 'algorithm', 
+                'category': 'BFS', 
+                'reason': '실전 최단경로 문제를 BFS로 해결 전략 익히기'
+            }, 
+            {
+                'day': 6, 
+                'day_plan_topic': '그래프 구현에서 큐와 방문처리 최적화', 
+                'domain': 'algorithm', 
+                'category': 'BFS', 
+                'reason': '실전 최단경로 문제를 BFS로 해결 전략 익히기'
+                }, 
+            {
+                'day': 7, 
+                'day_plan_topic': '실전 BFS 코드 구현 및 시연', 
+                'domain': 'live_coding', 
+                'category': 'CODE_VERIFICATION', 
+                'reason': '실전 코드 검증 시연'
+            }]
     }
-    last_err = None
-    for attempt in range(3):
-        try:
-            print(agent.invoke(inputs))
-            last_err = None
-            break
-        except Exception as exc:  # noqa: BLE001
-            last_err = exc
-            time.sleep(1.0)  # rate limit 완화용 딜레이
-    if last_err:
-        raise last_err
+    agent = video_selector(inputs)
+    print(agent)
 
 
 if __name__ == "__main__":
+    import os, sys, pathlib, django
+    sys.path.append(str(pathlib.Path(__file__).resolve().parents[2])) # backend 디렉터리 추가
+    os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+    django.setup()
     main()

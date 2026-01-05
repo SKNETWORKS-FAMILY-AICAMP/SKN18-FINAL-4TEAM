@@ -1,6 +1,7 @@
 # backend/interview_engine/nodes/create_report_node.py
 from __future__ import annotations
 
+import json
 from typing import Any, Dict, List, Optional
 from interview_engine.llm import get_llm
 from interview_engine.utils.checkpoint_reader import load_chapter_channel_values
@@ -207,8 +208,15 @@ def _generate_problem_solving_evaluation(
 def _parse_problem_eval_json(content: str) -> Optional[Dict[str, Any]]:
     if not content:
         return None
+    text = content.strip()
+    if text.startswith("```"):
+        text = text.strip("`")
+        if text.lower().startswith("json"):
+            text = text[4:].strip()
+    if "{" in text and "}" in text:
+        text = text[text.find("{"): text.rfind("}") + 1]
     try:
-        data = json.loads(content)
+        data = json.loads(text)
     except Exception:
         return None
     if not isinstance(data, dict):

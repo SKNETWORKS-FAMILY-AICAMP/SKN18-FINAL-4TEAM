@@ -102,6 +102,35 @@
             </div>
           </div>
 
+          <!-- 추천 문제 섹션 -->
+          <div class="recommendations">
+            <h2 class="section-title">추천 문제</h2>
+            <p class="section-subtitle">이번 리포트 기준으로 바로 이어서 풀어볼 수 있는 문제입니다.</p>
+
+            <div v-if="!recommendedProblems.length" class="recommendations-empty">
+              아직 추천 문제가 없습니다.
+            </div>
+            <div v-else class="recommendations-grid">
+              <article v-for="item in recommendedProblems" :key="item.problem_id" class="recommendation-card">
+                <div class="rec-header">
+                  <div class="rec-title">#{{ item.problem_id }} {{ item.problem }}</div>
+                  <div class="rec-meta">
+                    <span class="rec-chip">{{ item.category || "미분류" }}</span>
+                    <span class="rec-chip" :class="difficultyChipClass(item.difficulty)">
+                      {{ item.difficulty || "미정" }}
+                    </span>
+                  </div>
+                </div>
+                <div v-if="item.algorithm && item.algorithm.length" class="rec-algos">
+                  {{ formatAlgoList(item.algorithm) }}
+                </div>
+                <div class="rec-actions">
+                  <button class="btn primary" @click="startWithProblem(item)">이 문제로 코딩 테스트 시작</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
           <!-- 종합 평가 섹션 -->
           <div class="comprehensive-evaluation">
             <h2 class="section-title">종합 평가</h2>
@@ -268,6 +297,7 @@ const finalScore = ref(null);
 const finalGrade = ref(null);
 const problemText = ref("");
 const latestCode = ref("");
+const recommendedProblems = ref([]);
 
 // ✅ 세부 점수들
 const codeQualityScore = ref(null);
@@ -421,6 +451,36 @@ const prettyGraphOutput = computed(() => {
   }
 });
 
+const difficultyChipClass = (value) => {
+  const diff = String(value || "").toLowerCase();
+  if (diff.includes("easy") || diff.includes("쉬움")) return "chip-easy";
+  if (diff.includes("medium") || diff.includes("중간") || diff.includes("normal")) return "chip-medium";
+  if (diff.includes("hard") || diff.includes("어려움")) return "chip-hard";
+  return "chip-default";
+};
+
+const formatAlgoList = (algos) => {
+  if (!algos) return "";
+  if (Array.isArray(algos)) return algos.filter(Boolean).join(", ");
+  return String(algos);
+};
+
+const startWithProblem = (item) => {
+  const token = localStorage.getItem("jobtory_access_token");
+  if (!token) {
+    router.replace({ name: "login" });
+    return;
+  }
+  const required = ["problem_id", "problem", "difficulty", "category", "language", "function_name", "starter_code", "test_cases"];
+  const missing = required.filter((k) => item[k] == null);
+  if (missing.length) {
+    window.alert("문제 데이터를 불러오는 중입니다. 잠시 후 다시 시도해 주세요.");
+    return;
+  }
+  sessionStorage.setItem("jobtory_livecoding_problem_data", JSON.stringify(item));
+  router.push({ name: "coding-settings", query: { from: "report", session_id: sessionId } });
+};
+
 const fetchReport = async () => {
   if (!sessionId) {
     error.value = "session_id가 없습니다.";
@@ -470,6 +530,11 @@ const fetchReport = async () => {
 
     // ✅ 최종 output에서 세부 정보 추출
     graphOutput.value = output;
+    if (Array.isArray(output.recommended_problems)) {
+      recommendedProblems.value = output.recommended_problems.slice(0, 3);
+    } else {
+      recommendedProblems.value = [];
+    }
     
     // ✅ 점수 추출 (수정됨)
     codeQualityScore.value = output.code_quality_score ?? null;  // 100점 환산
@@ -677,6 +742,93 @@ const extractProblemDescription = (fullText) => {
   font-weight: 700;
   margin: 0 0 20px 0;
   color: #e9e9ea;
+}
+
+.section-subtitle {
+  margin: -10px 0 16px;
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.recommendations {
+  padding: 24px;
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+
+.recommendations-empty {
+  font-size: 13px;
+  opacity: 0.7;
+  padding: 10px 0;
+}
+
+.recommendations-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.recommendation-card {
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 14px;
+  padding: 14px;
+  background: rgba(255,255,255,0.02);
+}
+
+.rec-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.rec-title {
+  font-size: 14px;
+  font-weight: 600;
+  line-height: 1.4;
+}
+
+.rec-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.rec-chip {
+  font-size: 11px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  letter-spacing: 0.2px;
+}
+
+.rec-chip.chip-easy {
+  border-color: rgba(74, 222, 128, 0.4);
+  color: #4ade80;
+}
+
+.rec-chip.chip-medium {
+  border-color: rgba(251, 191, 36, 0.4);
+  color: #fbbf24;
+}
+
+.rec-chip.chip-hard {
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.rec-chip.chip-default {
+  color: #cbd5f5;
+}
+
+.rec-algos {
+  margin-top: 10px;
+  font-size: 12px;
+  opacity: 0.8;
+}
+
+.rec-actions {
+  margin-top: 14px;
+  display: flex;
+  justify-content: flex-end;
 }
 
 .grade-section {

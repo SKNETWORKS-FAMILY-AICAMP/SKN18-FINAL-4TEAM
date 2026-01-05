@@ -506,7 +506,11 @@ const handleSubmit = async () => {
       ? `${birthYear.value}-${String(birthMonth.value).padStart(2,'0')}-${String(birthDay.value).padStart(2,'0')}`
       : null;
     const hasPhone = phone1.value && phone2.value && phone3.value;
-    const phone = hasPhone ? `${phone1.value}-${phone2.value}-${phone3.value}` : null;
+    if (!hasPhone) {
+      alert("전화번호를 모두 입력해주세요.");
+      return;
+    }
+    const phone = `${phone1.value}-${phone2.value}-${phone3.value}`;
 
     const payload = {
       user_id: username.value,
@@ -514,7 +518,7 @@ const handleSubmit = async () => {
       name: name.value,
       email: buildEmail()
     };
-    if (phone) payload.phone_number = phone;
+    payload.phone_number = phone;
     if (birth) payload.birthdate = birth;
 
     const res = await fetch(`${API_BASE}/api/auth/signup/`, {

@@ -603,6 +603,7 @@ const startTest = async () => {
       return;
     }
     localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
+    sessionStorage.removeItem("jobtory_livecoding_problem_data");
 
  
     router.replace({
@@ -628,6 +629,19 @@ const problemData = ref(null);
 const hasInitRun = ref(false);
 const isWarmed = ref(false);
 const isPreloading = ref(false);
+const loadSelectedProblem = () => {
+  if (problemData.value) return;
+  const raw = sessionStorage.getItem("jobtory_livecoding_problem_data");
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.problem_id && parsed.problem && parsed.test_cases) {
+      problemData.value = parsed;
+    }
+  } catch {
+    return;
+  }
+};
 const warmupLanggraph = async () => {
   if (isWarmed.value) return true;
   try {
@@ -696,6 +710,7 @@ const preloadProblem = async () => {
 const runInitialSetup = async () => {
   if (hasInitRun.value) return true;
   try {
+    loadSelectedProblem();
     const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
     if (!warmOk || !preloaded) return false;
 

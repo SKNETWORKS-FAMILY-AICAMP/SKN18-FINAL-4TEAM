@@ -67,7 +67,7 @@ with open(CSV_DIR / "coding_problems_testcases.csv", "r", encoding="utf-8-sig", 
 
 # 3. coding_problem_language
 print("coding_problem_language 처리 시작...")
-with open(CSV_DIR / "coding_problem_language_all.csv", "r", encoding="utf-8-sig", newline="") as f:
+with open(CSV_DIR / "coding_problem_language.csv", "r", encoding="utf-8-sig", newline="") as f:
     reader = csv.DictReader(f)
     count = 0
     for row in reader:

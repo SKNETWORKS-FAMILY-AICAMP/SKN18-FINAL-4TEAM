@@ -20,18 +20,6 @@ SCHEMA_STATEMENTS = [
 ]
 
 
-ALGO_SIMILARITY = [
-    ("BFS", "DFS", 0.7, "graph_traversal"),
-    ("DFS", "Backtracking", 0.6, "search_strategy"),
-    ("DP", "Knapsack", 0.7, "dynamic_programming"),
-    ("Greedy", "Priority Queue", 0.55, "greedy_with_heap"),
-    ("Dijkstra", "Priority Queue", 0.8, "shortest_path"),
-    ("Graph", "Tree", 0.5, "graph_structure"),
-    ("Two Pointers", "Sliding Window", 0.6, "pointer_window"),
-    ("Binary Search", "Parametric Search", 0.7, "search_variant"),
-]
-
-
 def ensure_schema():
     cache_key = "graph_sync:neo4j_schema_ready"
     if cache.get(cache_key):
@@ -66,10 +54,11 @@ def _count_nodes(label: str) -> int:
 def ensure_problem_graph():
     cache_key = "graph_sync:neo4j_problem_graph_ready"
     if cache.get(cache_key):
-        return
+        if _count_nodes("Problem") > 0:
+            return
+        cache.delete(cache_key)
     if _count_nodes("Problem") > 0:
         cache.set(cache_key, True, timeout=None)
-        ensure_algo_similarity()
         return
 
     from api.models import CodingProblem  # local import to avoid app loading issues
@@ -99,7 +88,6 @@ def ensure_problem_graph():
     if batch:
         _upsert_problem_batch(batch)
 
-    ensure_algo_similarity()
     cache.set(cache_key, True, timeout=None)
 
 
@@ -117,26 +105,6 @@ def _upsert_problem_batch(rows: list):
     )
     post_cypher(query, {"rows": rows})
 
-
-def ensure_algo_similarity():
-    cache_key = "graph_sync:neo4j_algo_similarity_ready"
-    if cache.get(cache_key):
-        return
-    rows = [
-        {"a": a, "b": b, "score": score, "reason": reason}
-        for a, b, score, reason in ALGO_SIMILARITY
-    ]
-    query = (
-        "UNWIND $rows AS row "
-        "MERGE (a:AlgoSkill {name: row.a}) "
-        "MERGE (b:AlgoSkill {name: row.b}) "
-        "MERGE (a)-[r:RELATED]->(b) "
-        "SET r.score = row.score, r.reason = row.reason "
-        "MERGE (b)-[r2:RELATED]->(a) "
-        "SET r2.score = row.score, r2.reason = row.reason"
-    )
-    post_cypher(query, {"rows": rows})
-    cache.set(cache_key, True, timeout=None)
 
 
 def sync_report(

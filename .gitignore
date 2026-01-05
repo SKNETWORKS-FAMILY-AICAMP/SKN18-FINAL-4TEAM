@@ -13,5 +13,11 @@ docker/redis-data/**
 backend\__pycache__
 backend/**/__pycache__/
 
-docker/database/
-docker/database/**
+docker/database/neo4j/data/
+docker/database/neo4j/logs/
+docker/database/neo4j/plugins/
+docker/database/elasticsearch/
+docker/postgres-data/
+docker/redis-data/
+docker/elasticsearch-data/
+docker/database/neo4j/import/*.csv

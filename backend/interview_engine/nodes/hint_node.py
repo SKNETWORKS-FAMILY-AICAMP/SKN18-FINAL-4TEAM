@@ -26,6 +26,8 @@ def hint_agent(state: CodingState) -> CodingState:
     current_user_code = state.get("current_user_code", "")
     problem_description = state.get("problem_description", "")
     real_algorithm_category = state.get("real_algorithm_category", "")
+    if isinstance(real_algorithm_category, list):
+        real_algorithm_category = ", ".join(str(x) for x in real_algorithm_category if x)
     hint_count = state.get("hint_count", 0)
     conversation_log = state.get("conversation_log", [])
     hint_request_text = (state.get("stt_text") or "").strip()

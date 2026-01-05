@@ -99,13 +99,13 @@ def _generate_problem_solving_evaluation(
 
 다음 JSON 형식으로만 출력하세요. 다른 텍스트는 절대 포함하지 마세요.
 
-{
+{{
   "problem_understanding": "우수|양호|부족",
   "understanding_feedback": "문제 이해도 설명",
   "approach_validity": "우수|양호|부족",
   "consistency_status": "일치|개선하여 구현|불일치",
   "consistency_feedback": "일관성 설명"
-}
+}}
 """
 
     try:

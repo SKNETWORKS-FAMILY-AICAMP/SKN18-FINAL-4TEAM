@@ -739,13 +739,14 @@ onMounted(() => {
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
 
 .setting-root {
-  min-height: 100vh;
+  width: 100vw;
+  height: 100vh; /* 화면 꽉 채움 */
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 40px;
   background: #262728;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  overflow: hidden; /* 💡 바깥쪽 스크롤 원천 차단 */
 }
 
 .setting-card {

@@ -1,22 +1,28 @@
 <template>
   <div class="session-page">
-    <AntiCheatAlert
-      :visible="antiCheatAlert.visible"
-      :state="antiCheatAlert.state"
-      :title="antiCheatAlert.title"
-      :description="antiCheatAlert.description"
-      :level="antiCheatAlert.level"
-      :timestamp="antiCheatAlert.timestamp"
-      @dismiss="resetAntiCheatState"
-    />
+    <div class="anticheat-wrapper">
+      <AntiCheatAlert
+        :visible="antiCheatAlert.visible"
+        :state="antiCheatAlert.state"
+        :title="antiCheatAlert.title"
+        :description="antiCheatAlert.description"
+        :level="antiCheatAlert.level"
+        :timestamp="antiCheatAlert.timestamp"
+        @dismiss="resetAntiCheatState"
+      />
+    </div> 
+
     <header class="session-header">
-      <div class="session-title-block">
-        <h1>JobTory Live Coding</h1>
-        <p class="session-subtitle">실전 환경에서 문제를 풀어보세요.</p>
+      <div class="header-left">
+        <div class="brand-badge">JOBTORY LIVE</div>
+        <h1 class="session-title">Live Coding Test</h1>
       </div>
-      <div class="timer-chip">
-        남은 시간
-        <span class="timer-value">{{ formattedRemainingTime }}</span>
+      
+      <div class="header-right">
+        <div class="timer-display" :class="{ 'warning': remainingSeconds < 300 }">
+          <span class="timer-icon">⏳</span>
+          <span class="timer-value">{{ formattedRemainingTime }}</span>
+        </div>
       </div>
     </header>
 
@@ -32,20 +38,23 @@
         </div>
       </div>
 
-      <div class="left-column">
-        <section class="camera-pane">
-          <header class="pane-header">
-            <span class="pane-title">캠 미리보기</span>
-          </header>
-          <div class="camera-body">
-            <div class="camera-placeholder">
-              <video ref="videoRef" autoplay playsinline muted></video>
+        <div class="left-column">
+          <section class="pane camera-pane">
+            <div class="pane-header">
+              <span class="pane-label">Camera Feed</span>
+              <div class="live-indicator">
+                <span class="dot"></span> LIVE
+              </div>
             </div>
-            <p class="camera-message">
-              {{ cameraError || "현재 웹캠으로 녹화 중입니다." }}
-            </p>
-          </div>
-        </section>
+            <div class="camera-body">
+              <div class="camera-frame">
+                <video ref="videoRef" autoplay playsinline muted></video>
+                <div class="camera-overlay">
+                  <span class="status-text">{{ cameraError || "Monitoring Active" }}</span>
+                </div>
+              </div>
+            </div>
+          </section>
 
         <section class="problem-pane">
           <header class="pane-header">
@@ -102,34 +111,32 @@
           />
         </div>
         <footer class="editor-footer">
-          <div class="footer-left">
+          <div class="footer-group">
             <button
               type="button"
-              class="hint-button"
+              class="footer-btn hint-btn"
               @click="onHintButtonClick"
               :disabled="isSttRunning || isTtsPlaying || isHintDisabled"
             >
-              {{
-                isHintRecording
-                  ? "힌트 설명 중... 다시 눌러 전송"
-                  : (isHintLoading ? "힌트 생성 중..." : "힌트 요청")
-              }}
+              {{ isHintRecording ? "설명 종료 (전송)" : (isHintLoading ? "생성 중..." : "AI 힌트 요청") }}
             </button>
-            <span class="hint-counter">사용한 횟수 {{ hintCount }}/{{ HINT_LIMIT }}</span>
+            <span class="hint-count">남은 힌트: {{ HINT_LIMIT - hintCount }}</span>
           </div>
-          <div class="footer-right">
+          
+          <div class="footer-group">
             <button
               type="button"
-              class="run-button"
+              class="footer-btn submit-btn"
               @click="onSubmitClick"
               :disabled="isSubmitting || isSttRunning || isTtsPlaying || isRecording || isHintRecording || isHintLoading"
             >
-              {{ isSubmitting ? "제출 중..." : "제출하기" }}
+              {{ isSubmitting ? "제출 중..." : "코드 제출" }}
             </button>
           </div>
         </footer>
       </section>
     </main>
+
 
     <!-- 자동 녹음(전략 답변 등) 중: 중앙 제출 버튼 -->
     <div v-if="showAutoRecordingSubmitOverlay" class="recording-submit-overlay">
@@ -2462,7 +2469,11 @@ onMounted(async () => {
   }
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: { width: 640, height: 360 },
+      video: { 
+        width: 640,  
+        height: 360,
+        frameRate: { ideal: 30 }
+      },
       audio: false,
     });
     if (videoRef.value) {
@@ -2568,85 +2579,156 @@ onBeforeRouteUpdate(() => {
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css");
 
 .session-page {
-  min-height: 100vh;
+  height: 100vh; 
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  background: #111827;
+  background: #0B1120;
   color: #e5e7eb;
   font-family: "Pretendard", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.session-header {
-  padding: 14px 28px;
-  border-bottom: 1px solid #1f2937;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-.session-title-block {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.session-header h1 {
-  margin: 0;
-  font-size: 18px;
-  font-weight: 700;
-}
-
-.session-subtitle {
-  margin: 0;
-  font-size: 13px;
-  color: #9ca3af;
-}
-
-.timer-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  border-radius: 999px;
-  background: #0f172a;
-  color: #e5e7eb;
-  font-size: 13px;
-  border: 1px solid #1f2937;
-  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.25);
-}
-
-.timer-value {
-  font-weight: 800;
-  font-variant-numeric: tabular-nums;
-  color: #38bdf8;
-}
-
-.session-main {
-  flex: 1;
-  display: grid;
-  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1.6fr);
-  gap: 1px;
-  background: #030712;
   position: relative;
 }
 
+.anticheat-wrapper {
+  position: fixed;
+  top: 20px; 
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 2000; 
+  pointer-events: auto;
+}
+
+/* 1. 헤더 스타일 */
+.session-header {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 24px;
+  background: rgba(15, 23, 42, 0.8);
+  backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  z-index: 10;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.brand-badge {
+  background: rgba(99, 102, 241, 0.15);
+  color: #818cf8;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-family: "JetBrains Mono", monospace;
+  letter-spacing: 0.05em;
+}
+
+.session-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.timer-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  padding: 6px 16px;
+  border-radius: 99px;
+  transition: all 0.3s ease;
+}
+
+.timer-display.warning {
+  border-color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  animation: pulse-border 1.5s infinite;
+}
+
+.timer-value {
+  font-family: "JetBrains Mono", monospace;
+  font-size: 16px;
+  font-weight: 700;
+  color: #38bdf8;
+  font-variant-numeric: tabular-nums;
+}
+.timer-display.warning .timer-value { color: #ef4444; }
+
+/* 2. 메인 컨텐츠 그리드 */
+.session-main {
+  flex: 1;
+  display: grid;
+  grid-template-columns: 600px 1fr; /* 왼쪽 고정, 오른쪽 가변 */
+  gap: 16px;
+  padding: 16px;
+  overflow: hidden;
+  z-index: 1;
+}
+
+
+/* 왼쪽 컬럼 (캠 + 문제) */
 .left-column {
   display: flex;
   flex-direction: column;
+  gap: 16px;
+  overflow: hidden;
 }
 
-.camera-pane,
-.problem-pane,
-.editor-pane {
+
+.camera-pane {
+  flex: 0 0 auto; 
+}
+
+.live-indicator {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ef4444;
+}
+.live-indicator .dot {
+  width: 6px; height: 6px; background: #ef4444; border-radius: 50%;
+  animation: blink 1.5s infinite;
+}
+
+
+.problem-pane {
   display: flex;
   flex-direction: column;
   background: #020617;
+  flex: 1;              /* 남은 공간 모두 차지 */
+  min-height: 0;        /* flex 자식의 내부 스크롤을 위해 필수 */
+  overflow: hidden;     /* 넘치는 내용은 body에서 스크롤 처리 */
+}
+
+.editor-pane {
+  display: flex; flex-direction: column;
+}
+
+/* 공통 패널 스타일 (Glassmorphism) */
+.pane {
+  background: rgba(30, 41, 59, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
 }
 
 .pane-header {
   padding: 10px 18px;
   border-bottom: 1px solid #1e293b;
+  background: #0B1120;
   font-size: 13px;
   color: #9ca3af;
   display: flex;
@@ -2659,8 +2741,9 @@ onBeforeRouteUpdate(() => {
 }
 
 .problem-body {
-  padding: 16px 20px 20px;
+  padding: 20px;
   overflow-y: auto;
+  background: #0B1120;
 }
 
 .retry-button {
@@ -2702,13 +2785,34 @@ onBeforeRouteUpdate(() => {
 }
 
 .camera-body {
-  flex: 0 0 auto;
-  padding: 12px 18px 8px;
-  display: flex;
+  display: flex; 
   justify-content: center;
-  flex-direction: column;
-  align-items: center;
+  padding: 0; 
+  background: #000;
+  overflow: hidden;
+  border-radius: 0 0 12px 12px; 
 }
+
+.camera-frame {
+  position: relative;
+  width: 100%;
+  height: 200px;
+  border: none;
+  background: #000;
+}
+
+.camera-frame video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover; 
+  transform: scaleX(-1);
+}
+
+.camera-overlay {
+  position: absolute; bottom: 8px; left: 8px;
+  background: rgba(0,0,0,0.6); padding: 2px 8px; border-radius: 4px;
+}
+.status-text { font-size: 10px; color: #fff; }
 
 .camera-placeholder {
   width: auto;
@@ -2723,22 +2827,9 @@ onBeforeRouteUpdate(() => {
   background: radial-gradient(circle at 0 0, #020617, #020617 40%, #020617);
 }
 
-.camera-placeholder video {
-  width: 260px;
-  aspect-ratio: 16 / 9;
-  border-radius: 14px;
-  object-fit: cover;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.7);
-}
 
-.camera-placeholder .camera-message {
-  font-size: 5px;
-  color: #e5e7eb;
-  background: rgba(15, 23, 42, 0.6);
-  padding: 4px 5px;
-  border-radius: 999px;
-  margin-top: 6px;
-}
+
+
 
 .problem-title {
   margin: 0 0 12px;
@@ -2841,18 +2932,25 @@ onBeforeRouteUpdate(() => {
 }
 
 .editor-body {
-  flex: 1;
-  padding: 12px 16px 0;
-  background: #020617;
+  flex: 1; min-height: 0; position: relative;
+  background: #1e1e1e; /* Editor bg */
 }
 
+
 .editor-footer {
-  padding: 8px 18px 12px;
-  border-top: 1px solid #1f2937;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  height: 60px;
+  background: #0B1120;
+  border-top: 1px solid #333;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 20px;
+}
+
+.footer-group { display: flex; align-items: center; gap: 16px; }
+
+.footer-btn {
+  display: flex; align-items: center; gap: 8px;
+  padding: 8px 16px; border-radius: 6px; border: none;
+  font-weight: 600; font-size: 13px; cursor: pointer; transition: all 0.2s;
 }
 
 .footer-left,
@@ -2862,8 +2960,21 @@ onBeforeRouteUpdate(() => {
   gap: 12px;
 }
 
+.hint-btn {
+  background: rgba(255,255,255,0.1); color: #e2e8f0;
+}
+.hint-btn:hover:not(:disabled) { background: rgba(255,255,255,0.2); }
+
+.hint-count { font-size: 12px; color: #64748b; }
+
+.submit-btn {
+  background: #2563eb; color: #fff;
+}
+.submit-btn:hover:not(:disabled) { background: #1d4ed8; transform: translateY(-1px); }
+.submit-btn:disabled { background: #334155; color: #94a3b8; cursor: not-allowed; }
+
+
 .mic-button,
-.hint-button,
 .run-button {
   padding: 6px 14px;
   border-radius: 999px;
@@ -2875,14 +2986,12 @@ onBeforeRouteUpdate(() => {
   cursor: pointer;
 }
 
-.mic-button:disabled,
-.hint-button:disabled {
+.mic-button:disabled {
   cursor: not-allowed;
   opacity: 0.65;
 }
 
-.mic-button:hover:not(:disabled),
-.hint-button:hover:not(:disabled) {
+.mic-button:hover:not(:disabled){
   background: #1fb154;
   transform: translateY(-1px);
 }
@@ -2890,11 +2999,6 @@ onBeforeRouteUpdate(() => {
 .mic-button.is-active {
   background: linear-gradient(135deg, #16a34a, #22c55e);
   color: #0b1a13;
-}
-
-.hint-counter {
-  font-size: 12px;
-  color: #9ca3af;
 }
 
 .mic-label {
@@ -3208,6 +3312,12 @@ onBeforeRouteUpdate(() => {
   animation: none;
 }
 
+@media (max-width: 900px) {
+  .session-main { grid-template-columns: 1fr; overflow-y: auto; }
+  .left-column { flex-direction: row; height: 300px; }
+  .camera-pane { width: 40%; }
+}
+
 @keyframes recording-mic-breathe {
   0% {
     box-shadow: 0 22px 46px rgba(0, 0, 0, 0.55), 0 0 0 0 rgba(167, 139, 250, 0.22);
@@ -3254,5 +3364,31 @@ onBeforeRouteUpdate(() => {
   .code-editor {
     height: 260px;
   }
+}
+</style>
+
+<style>
+/*커스텀 스크롤바 디자인 (전역 적용)*/
+::-webkit-scrollbar {
+  width: 10px;  /* 세로 스크롤바 너비 */
+  height: 10px; /* 가로 스크롤바 높이 */
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background-color: #374151; /* 진한 회색 */
+  border-radius: 5px;
+  border: 2px solid #020617; /* 배경색과 맞춰서 여백 효과 */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background-color: #4b5563;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
 }
 </style>

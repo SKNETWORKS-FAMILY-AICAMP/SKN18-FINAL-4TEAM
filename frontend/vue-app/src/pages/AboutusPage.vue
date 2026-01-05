@@ -1,111 +1,105 @@
 <template>
   <div class="aboutus">
     <nav class="nav-header">
-      <button type="button" class="back-button" @click="goBack" aria-label="뒤로 가기">
-        <svg class="back-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-      </button>
+      <RouterLink to="/" class="brand">JOBTORY</RouterLink>
     </nav>
 
-    <header class="hero">
-      <div class="marquee-container">
-        <div class="marquee-track">
-          <span>PROCESS & LOGIC • COMMUNICATION • GROWTH • JOBTORY • </span>
-          <span>PROCESS & LOGIC • COMMUNICATION • GROWTH • JOBTORY • </span>
+    <div class="scroll-container">
+      <header class="hero">
+        <div class="marquee-container">
+          <div class="marquee-track">
+            <span>PROCESS & LOGIC • COMMUNICATION • GROWTH • JOBTORY • </span>
+            <span>PROCESS & LOGIC • COMMUNICATION • GROWTH • JOBTORY • </span>
+          </div>
+          <div class="marquee-track reverse">
+            <span>TEAMWORK • VALUE • INSIGHT • DEVELOPER • STORY • </span>
+            <span>TEAMWORK • VALUE • INSIGHT • DEVELOPER • STORY • </span>
+          </div>
         </div>
-        <div class="marquee-track reverse">
-          <span>TEAMWORK • VALUE • INSIGHT • DEVELOPER • STORY • </span>
-          <span>TEAMWORK • VALUE • INSIGHT • DEVELOPER • STORY • </span>
-        </div>
-      </div>
 
-      <div class="hero-content fade-in-up">
-        <div class="glass-panel">
-          <h1 class="hero-title">About Us</h1>
-          <div class="hero-line"></div>
-          <p class="hero-desc">The story of how we build together.</p>
-        </div>
-      </div>
-      
-      <div class="scroll-indicator fade-in-up delay-2">
-        <div class="arrow-down"></div>
-      </div>
-    </header>
-
-    <section class="manifesto fade-in-up delay-1">
-      <div class="manifesto-inner">
-        <h2 class="manifesto-title">
-          우리는 당신의 '결과'보다<br />
-          <span class="highlight">'과정'에 담긴 가치</span>를 믿습니다.
-        </h2>
-        <div class="manifesto-text">
-          <p>
-            단순히 정답을 맞히는 코딩 테스트는 <br class="mobile-break"/>
-            한 사람의 진면목을 보여주기에 부족합니다.
-          </p>
-          <p>
-            JOBTORY는 코드가 작성되는 찰나의 고민, <br />
-            문제를 해결해 나가는 <strong>논리적인 흐름</strong>, <br />
-            그리고 동료와 나누는 <strong>유연한 소통</strong>에 집중합니다.
-          </p>
-          <p>
-            누구나 설득 가능한 채용 근거를 만들 수 있어야 합니다.<br />
-            실시간 라이브 코딩과 협업형 인터뷰 환경을 통해 <br />
-            당신의 진짜 실력을 증명하세요.
-          </p>
-        </div>
-      </div>
-    </section>
-
-    <section class="team fade-in-up delay-2">
-      <div class="team-inner">
-        <div class="section-header">
-          <span class="sub-label">THE CREW</span>
-          <h2>Meet the Builders</h2>
+        <div class="hero-content fade-in-up">
+          <div class="glass-panel">
+            <h1 class="hero-title">About us</h1>
+            <div class="hero-line"></div>
+            <p class="hero-desc">The story of how we build together.</p>
+          </div>
         </div>
         
-        <div class="team-grid">
-          <article v-for="(member, index) in members" :key="index" class="id-card">
-            <div class="card-hole"></div>
-            
-            <div class="image-area">
-              <img :src="member.img" :alt="member.name" loading="lazy" />
-              <div class="id-badge">JOBTORY</div>
-            </div>
-            
-            <div class="info-area">
-              <h3>{{ member.name }}</h3>
-              <p class="role">{{ member.role }}</p>
+        <div class="scroll-indicator fade-in-up delay-2">
+          <div class="arrow-down"></div>
+        </div>
+      </header>
+
+      <section class="manifesto fade-in-up delay-1">
+        <div class="manifesto-inner">
+          <h2 class="manifesto-title">
+            우리는 당신의 '결과'보다<br />
+            <span class="highlight">'과정'에 담긴 가치</span>를 믿습니다.
+          </h2>
+          <div class="manifesto-text">
+            <p>
+              단순히 정답을 맞히는 코딩 테스트는 <br class="mobile-break"/>
+              한 사람의 진면목을 보여주기에 부족합니다.
+            </p>
+            <p>
+              JOBTORY는 코드가 작성되는 찰나의 고민, <br />
+              문제를 해결해 나가는 <strong>논리적인 흐름</strong>, <br />
+              그리고 동료와 나누는 <strong>유연한 소통</strong>에 집중합니다.
+            </p>
+            <p>
+              누구나 설득 가능한 채용 근거를 만들 수 있어야 합니다.<br />
+              실시간 라이브 코딩과 협업형 인터뷰 환경을 통해 <br />
+              당신의 진짜 실력을 증명하세요.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section class="team fade-in-up delay-2">
+        <div class="team-inner">
+          <div class="section-header">
+            <span class="sub-label">THE CREW</span>
+            <h2>Meet the Builders</h2>
+          </div>
+          
+          <div class="team-grid">
+            <article v-for="(member, index) in members" :key="index" class="id-card">
+              <div class="card-hole"></div>
               
-              <div class="qr-section">
-                <div class="qr-divider"></div>
-                <div class="qr-wrapper">
-                  <img 
-                    :src="`https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=111827&data=${member.github}`" 
-                    alt="GitHub QR" 
-                    class="qr-code"
-                  />
-                  <span class="qr-label">GITHUB SCAN</span>
-                </div>
+              <div class="image-area">
+                <img :src="member.img" :alt="member.name" loading="lazy" />
+                <div class="id-badge">JOBTORY</div>
               </div>
               
-            </div>
-          </article>
+              <div class="info-area">
+                <h3>{{ member.name }}</h3>
+                <p class="role">{{ member.role }}</p>
+                
+                <div class="qr-section">
+                  <div class="qr-divider"></div>
+                  <div class="qr-wrapper">
+                    <img 
+                      :src="`https://api.qrserver.com/v1/create-qr-code/?size=150x150&color=111827&data=${member.github}`" 
+                      alt="GitHub QR" 
+                      class="qr-code"
+                    />
+                    <span class="qr-label">GITHUB SCAN</span>
+                  </div>
+                </div>
+                
+              </div>
+            </article>
+          </div>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </div>
 </template>
 
 <script setup>
-import { useRouter } from "vue-router";
+import { useRouter, RouterLink } from "vue-router";
 
 const router = useRouter();
-const goBack = () => {
-  router.back();
-};
 
 const members = [
   { name: "김규리", role: "Project Manager", img: new URL("../assets/김규리.png", import.meta.url).href, github: "https://github.com/GyuriKimm" },
@@ -121,6 +115,7 @@ const members = [
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css");
 @import url("https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=Anton&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap");
 
 :root {
   --bg-color: #f3f4f6;
@@ -128,41 +123,63 @@ const members = [
   --accent-color: #caa3b1;
 }
 
+/* 1. 전체 레이아웃 (화면 고정) */
 .aboutus {
-  min-height: 100vh;
+  position: relative;
+  width: 100vw;
+  height: 100vh;
   background-color: var(--bg-color);
-  font-family: "Pretendard", sans-serif;
+  font-family: "Inter", sans-serif;
   color: var(--text-primary);
-  overflow-x: hidden;
+  overflow: hidden; /* 바깥쪽 스크롤 차단 */
 }
 
-/* Nav */
+/* 2. 네비게이션 (고정) */
 .nav-header {
   position: absolute;
-  top: 0; left: 0; width: 100%;
-  padding: 32px;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 32px 40px;
   z-index: 100;
+  display: flex;
+  align-items: center;
 }
-.back-button {
-  background: rgba(255, 255, 255, 0.5);
-  backdrop-filter: blur(8px);
-  border: 1px solid rgba(0,0,0,0.1);
-  width: 48px; height: 48px;
-  border-radius: 50%;
+
+.brand {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
   color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
   cursor: pointer;
-  display: flex; align-items: center; justify-content: center;
-  transition: all 0.3s;
 }
-.back-button:hover { background: #111827; color: #fff; }
-.back-icon { width: 24px; height: 24px; }
+
+/* 3. 내부 스크롤 컨테이너 (스크롤바 숨김) */
+.scroll-container {
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  
+  /* Firefox */
+  scrollbar-width: none;
+  /* IE, Edge */
+  -ms-overflow-style: none;
+}
+
+/* Chrome, Safari */
+.scroll-container::-webkit-scrollbar {
+  display: none;
+}
 
 /* Hero Section */
 .hero {
   position: relative;
-  height: 70vh;
+  height: 100vh; /* 화면 꽉 채우기 */
   min-height: 550px;
-  background: #eaddd5;
+  background: #f8f4eb;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -220,7 +237,7 @@ const members = [
 }
 
 .hero-title {
-  font-family: "Playfair Display", serif;
+  font-family: "SF Pro", sans-serif, Inter;
   font-size: clamp(50px, 6vw, 90px);
   margin: 0;
   line-height: 1;
@@ -274,7 +291,7 @@ const members = [
   text-align: center;
 }
 .manifesto-title {
-  font-family: "Playfair Display", serif;
+  font-family: "Inter", sans-serif;
   font-size: 36px;
   line-height: 1.5;
   margin-bottom: 50px;
@@ -304,7 +321,7 @@ const members = [
   color: #9ca3af; margin-bottom: 12px; display: block;
 }
 .section-header h2 {
-  font-family: "Playfair Display", serif;
+  font-family: "Inter", sans-serif;
   font-size: 48px; color: #111827; margin: 0;
 }
 
@@ -328,8 +345,6 @@ const members = [
 
 .id-card:hover {
   transform: translateY(-10px);
-  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
-  border-color: #caa3b1;
 }
 
 .card-hole {
@@ -366,7 +381,7 @@ const members = [
 }
 
 .info-area h3 {
-  font-family: "Playfair Display", serif;
+  font-family: "Inter", sans-serif;
   font-size: 20px;
   margin: 0 0 6px;
   color: #111827;
@@ -381,7 +396,7 @@ const members = [
   letter-spacing: 0.05em;
 }
 
-/* [NEW] QR Code Styles */
+/* QR Code Styles */
 .qr-section {
   margin-top: 16px;
   display: flex;
@@ -394,7 +409,7 @@ const members = [
   height: 1px;
   background: #e5e7eb;
   margin-bottom: 16px;
-  border-bottom: 1px dashed #d1d5db; /* 절취선 느낌 */
+  border-bottom: 1px dashed #d1d5db; 
 }
 
 .qr-wrapper {
@@ -407,13 +422,13 @@ const members = [
 .qr-code {
   width: 70px;
   height: 70px;
-  mix-blend-mode: multiply; /* 배경과 자연스럽게 섞이도록 */
+  mix-blend-mode: multiply; 
   opacity: 0.9;
   transition: transform 0.3s;
 }
 
 .id-card:hover .qr-code {
-  transform: scale(1.1); /* 호버 시 QR 살짝 확대 */
+  transform: scale(1.1);
 }
 
 .qr-label {
@@ -437,8 +452,11 @@ const members = [
   .marquee-track { font-size: 60px; }
   .glass-panel { padding: 40px 20px; width: 90%; }
 }
+@media (max-width: 768px) {
+  .nav-header { padding: 20px; justify-content: center; }
+}
 @media (max-width: 600px) {
   .team-grid { grid-template-columns: 1fr; }
-  .hero { height: 60vh; }
+  .hero { height: 100vh; }
 }
 </style>

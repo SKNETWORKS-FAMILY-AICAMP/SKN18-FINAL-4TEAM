@@ -1,39 +1,6 @@
-import json
 from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
-from utils import judge_calc_tool
-
-# judge 노드 출력 스키마: completion_level + missing_slots + lint + confidence
-'''
-{
-    "type": "object",
-    "properties": {
-        "completion_level": {"type": "string", "enum": ["COMPLETE", "NEEDS_WORK", "POLISH"]},
-        "missing_slots": {"type": "array", "items": {"type": "string"}},
-        "ambiguous_slots": {"type": "array", "items": {"type": "string"}},
-        "lint": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {"tag": {"type": "string"}, "message": {"type": "string"}},
-                "required": ["tag", "message"],
-            },
-        },
-    },
-    "required": ["completion_level", "missing_slots", "ambiguous_slots", "lint"],
-}
-'''
-
-'''
-{
-    "type": "object",
-    "properties": {
-        "annotated_draft": {"type": "string"},
-    },
-    "required": ["annotated_draft"],
-}
-'''
-
+from .utils import judge_calc_tool
 
 
 # coach 서브에이전트용 프롬프트
@@ -188,7 +155,7 @@ def create_judge_agent():
 
     메인 에이전트는 slot-matcher와 lint-checker를 task로 호출해 결과를 합산한다.
     """
-    base_model = ChatOpenAI(model="gpt-4o-mini", temperature=0, top_p=1)
+    base_model = ChatOpenAI(model="gpt-5-nano", temperature=0, top_p=1)
 
     return create_deep_agent(
         model=base_model,
@@ -310,10 +277,21 @@ def create_feedback_agent():
             - ambiguous_slots → [[확인]]
             - format/style lint는 annotated_draft에 절대 반영하지 않는다.
             - video_summary와 draft에 없는 새로운 정보는 절대 추가하지 마라.
-
+          
             ━━━━━━━━━━━━━━━━━━━━━━
             [subagent 활용]
             ━━━━━━━━━━━━━━━━━━━━━━
             - clarify-agent:
-        """,
-)
+              [[확인]]에 사용할 “교체 문장(replacement)”만 생성한다.
+            - fix-agent:
+              [[추가]] / [[수정]]에 사용할 “행동 지시 힌트”만 생성한다.
+            - inline-annotator:
+              판단 없이 clarify_results와 fix_results를
+              기계적으로 적용해 최종 annotated_draft를 만든다.
+
+            반환 형식:
+            {
+              "annotated_draft": "..."
+            }
+            """,
+            )

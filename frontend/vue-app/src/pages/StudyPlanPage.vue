@@ -26,12 +26,6 @@ const calendarOptions = reactive({
     center: 'title',
     right: 'dayGridMonth'
   },
-  eventClassNames: (arg) => {
-    if (arg.event?.extendedProps?.is_completed) {
-      return [ 'is-completed' ];
-    }
-    return [ 'is-pending' ];
-  },
   events: [], // 여기에 API 데이터가 들어갑니다
   eventClick: handleEventClick,
   height: 'auto'
@@ -39,12 +33,28 @@ const calendarOptions = reactive({
 
 const isVideoOpen = ref(false);
 const activeVideo = ref(null);
-const reflectionDifficulty = ref(3);
 const lectureNote = ref('');
 const reflectionSaving = ref(false);
-
-const isActiveCompleted = computed(() => {
-  return Boolean(activeVideo.value?.extendedProps?.is_completed);
+const statusLabel = computed(() => {
+  const raw = (activeVideo.value?.extendedProps?.is_completed || '').toString().toUpperCase();
+  if (raw === 'COMPLETE') return '완료';
+  if (raw === 'NEEDS_WORK' || raw === 'NEEDS_WORK') return '미흡';
+  if (raw === 'POLISH') return '수정 필요';
+  return '미진행';
+});
+const statusClass = computed(() => {
+  const label = statusLabel.value;
+  if (label === '완료') return 'status-badge--done';
+  if (label === '수정 필요') return 'status-badge--doing';
+  if (label === '미흡') return 'status-badge--todo';
+  return 'status-badge--todo';
+});
+const statusStyle = computed(() => {
+  const label = statusLabel.value;
+  if (label === '완료') return { background: '#e7f5ff', color: '#1f6f54', border: '1px solid #86efac' };
+  if (label === '수정 필요') return { background: '#eef2ff', color: '#312e81', border: '1px solid #c7d2fe' };
+  if (label === '미흡') return { background: '#fff0e5', color: '#9a3412', border: '1px solid #fdba74' };
+  return { background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' };
 });
 
 function getYouTubeEmbedUrl(url) {
@@ -65,7 +75,6 @@ function getYouTubeEmbedUrl(url) {
 
 function openVideoModal(event) {
   activeVideo.value = event;
-  reflectionDifficulty.value = event?.extendedProps?.reflection_difficulty ?? 3;
   lectureNote.value = event?.extendedProps?.lecture_note ?? '';
   isVideoOpen.value = true;
 }
@@ -77,6 +86,12 @@ function closeVideoModal() {
 
 async function saveReflection() {
   if (!activeVideo.value) {
+    return;
+  }
+
+  const trimmedNote = (lectureNote.value || "").trim();
+  if (trimmedNote.length < 30) {
+    alert("회고는 30자 이상 작성해주세요.");
     return;
   }
 
@@ -98,8 +113,7 @@ async function saveReflection() {
       `${BACKEND_BASE}/api/tasks/reflection/`,
       {
         task_id: taskId,
-        difficulty: reflectionDifficulty.value,
-        lecture_note: lectureNote.value
+        lecture_note: trimmedNote
       },
       {
         headers: {
@@ -108,24 +122,28 @@ async function saveReflection() {
       }
     );
 
-    const updatedDifficulty = response.data?.difficulty ?? reflectionDifficulty.value;
-    const updatedComment = response.data?.lecture_note ?? lectureNote.value;
-    const updatedCompleted = response.data?.is_completed ?? true;
+    const updatedComment = response.data?.lecture_note ?? trimmedNote;
+    const updatedCompleted = response.data?.is_completed ?? statusLabel.value;
+    const coachOutput = response.data?.coach_output ?? '';
     if (typeof activeVideo.value.setExtendedProp === 'function') {
-      activeVideo.value.setExtendedProp('reflection_difficulty', updatedDifficulty);
       activeVideo.value.setExtendedProp('lecture_note', updatedComment);
       activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
+      if (coachOutput) activeVideo.value.setExtendedProp('coach_output', coachOutput);
     } else {
       activeVideo.value.extendedProps = {
         ...(activeVideo.value.extendedProps || {}),
-        reflection_difficulty: updatedDifficulty,
         lecture_note: updatedComment,
-        is_completed: updatedCompleted
+        is_completed: updatedCompleted,
+        ...(coachOutput ? { coach_output: coachOutput } : {}),
       };
     }
   } catch (error) {
     console.error(error);
-    alert("회고 저장에 실패했습니다.");
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.detail ||
+      "회고 저장에 실패했습니다.";
+    alert(message);
   } finally {
     reflectionSaving.value = false;
   }
@@ -257,8 +275,8 @@ onMounted(() => {
           <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
         </div>
         <div class="video-status">
-          <span :class="['video-badge', isActiveCompleted ? 'video-badge--done' : 'video-badge--todo']">
-            {{ isActiveCompleted ? '학습 완료' : '학습 진행 중' }}
+          <span :class="['status-badge', statusClass]" :style="statusStyle">
+            {{ statusLabel }}
           </span>
         </div>
         <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
@@ -276,27 +294,11 @@ onMounted(() => {
         <div class="reflection-block">
           <div class="reflection-fields">
             <label class="reflection-label">
-              난이도
-              <div class="reflection-slider">
-                <input
-                  v-model.number="reflectionDifficulty"
-                  type="range"
-                  min="1"
-                  max="5"
-                  step="1"
-                  class="reflection-range"
-                  aria-label="난이도 선택"
-                />
-                <div class="reflection-range-value">{{ reflectionDifficulty }}</div>
-              </div>
-            </label>
-            <label class="reflection-label">
               공부한 내용
               <textarea
                 v-model="lectureNote"
                 class="reflection-input"
                 rows="3"
-                maxlength="200"
                 placeholder="오늘 배운 내용을 적어주세요. 추후 AI코치가 피드백을 제공해드립니다."
               ></textarea>
             </label>
@@ -455,33 +457,6 @@ onMounted(() => {
   font-weight: 700;
 }
 
-:global(.video-status) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
-:global(.video-badge) {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.9rem;
-  font-weight: 700;
-}
-
-:global(.video-badge--todo) {
-  background: #fff4e5;
-  color: #9a6a35;
-}
-
-:global(.video-badge--done) {
-  background: #e7f5ff;
-  color: #2c3e50;
-}
-
-
 :global(.video-frame) {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -521,26 +496,6 @@ onMounted(() => {
   font-size: 0.95rem;
   font-weight: 700;
   color: #2f2a1f;
-}
-
-:global(.reflection-slider) {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-:global(.reflection-range) {
-  width: 140px;
-  accent-color: #1f6f54;
-  height: 6px;
-}
-
-:global(.reflection-range-value) {
-  min-width: 28px;
-  text-align: center;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #2c3e50;
 }
 
 :global(.reflection-input) {
@@ -616,3 +571,34 @@ onMounted(() => {
   background-color: #fff9db !important;
 }
 </style>
+:global(.video-status) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.status-badge--todo {
+  background: #fff0e5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+.status-badge--doing {
+  background: #eef2ff;
+  color: #312e81;
+  border: 1px solid #c7d2fe;
+}
+.status-badge--done {
+  background: #e6f7ec;
+  color: #14532d;
+  border: 1px solid #86efac;
+}

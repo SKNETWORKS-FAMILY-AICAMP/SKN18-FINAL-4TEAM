@@ -128,24 +128,50 @@ ALGO_TEXT_SYSTEM_PROMPT = """
 ALGO_TEXT_WITH_TAGS_PROMPT = """
 너는 “알고리즘/풀이 STT → 간결한 줄글 요약 + 알고리즘 태그 추출기”다.
 
+⚠️ 최상위 판단 규칙 (가장 중요):
+- 알고리즘/자료구조에 대한 “표준적 정의·성질·동작 방식”이
+  transcript의 설명과 충돌하는 경우,
+  반드시 표준 정의를 우선하고 transcript의 설명은
+  ‘예시·발화·잘못된 설명 가능성’으로 낮춰서 서술하라.
+- transcript에 기반한 설명이라도,
+  알고리즘의 일반적 성질과 명확히 다른 주장은
+  일반 법칙처럼 요약하지 말고
+  “영상 설명은 표준 정의와 다를 수 있다”는 맥락으로 처리하거나
+  요약에서 제외하라.
+
+❗ 절대 금지:
+- 표준 알고리즘 지식과 모순되는 내용을
+  단정적인 설명으로 요약하는 것
+  (예: DFS가 알파벳 순서로 노드를 방문한다)
+
+보조 규칙 (transcript 사용 원칙):
+- transcript는 “어떤 식으로 설명했는지”를 파악하는 참고 자료일 뿐,
+  알고리즘의 정식 정의를 대체하지 않는다.
+- transcript에서 특정 현상이 관찰되었더라도,
+  그것이 알고리즘의 필수 성질인지 확실하지 않다면
+  “예시에서는 ~하게 보였다” 수준으로만 언급한다.
+- transcript에 오류·혼동 가능성이 있으면
+  그 내용을 일반화하지 말고 요약에서 제거해도 된다.
+
 요약 목표:
 - 한국어로 2~3문단 이내.
-- 핵심 아이디어/알고리즘 흐름/사용 조건·주의점/복잡도(있다면)를 자연어로 서술.
+- 알고리즘의 핵심 개념과 표준적인 동작 원리를 중심으로 서술한다.
+- transcript에서 설명한 흐름은
+  표준 정의와 일치하는 범위에서만 반영한다.
 - 필요하면 3~5개 불릿으로 핵심 체크포인트를 덧붙인다.
+- 길이: 전체 900자 이내.
+- 불필요한 인사말/메타 발언 금지.
 
 추가 태그:
-- 이 영상에서 다루는 핵심 알고리즘/기법/자료구조를 1~5개 선정해 리스트로 뽑아라.
-- 예시: ["BFS", "DFS", "Dijkstra", "Union-Find", "Binary Search", "Greedy", "DP"]
-- 원문에 근거가 없으면 빈 리스트 [].
+- 표준적으로 인정되는 알고리즘/기법/자료구조를 기준으로
+  이 영상이 다룬 핵심 항목을 1~5개 선정한다.
+- transcript에서 이름만 언급되고
+  실제 알고리즘 설명으로 보기 어려운 경우 태그에 넣지 마라.
+- 근거 없으면 빈 리스트 [].
 
 언어 감지:
-- 사용된 프로그래밍 언어를 1개 추정해라 (예: Python, Java, C++, JavaScript, Go, etc).
+- 사용된 프로그래밍 언어를 1개 추정해라.
 - 근거 없으면 "unknown".
-
-금지/제한:
-- 원문에 없는 내용 추정 금지.
-- 불필요한 인사말/메타 발언 금지.
-- 길이: 전체 900자 이내.
 
 출력 형식:
 ```
@@ -659,7 +685,7 @@ def summarize_csv(
 if __name__ == "__main__":
     base_dir = os.path.dirname(__file__)
     input_csv = os.path.join(base_dir, "data", "youtube_transcripts_cleaned.csv")
-    output_csv = os.path.join(base_dir, "data", "youtube_summaries_texts.csv")
+    output_csv = os.path.join(base_dir, "data", "youtube_summaries_texts_v2.csv")
 
     output_format = os.environ.get("SUMMARY_OUTPUT_FORMAT", "text").lower()
     if output_format not in ("json", "text"):

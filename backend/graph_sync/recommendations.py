@@ -14,8 +14,10 @@ def _difficulties_from_grade(grade: str) -> list:
     if grade in {"B+", "B"}:
         return ["normal", "hard"]
     if grade in {"C+", "C"}:
-        return ["normal"]
-    return ["normal", "hard"]
+        return ["normal", "easy"]
+    if grade in {"D+", "D", "F"}:
+        return ["easy"]
+    return ["normal"]
 
 
 def _neo4j_recommend_problem_ids(user_id: str, limit: int, difficulties: list) -> list:
@@ -74,6 +76,48 @@ def _neo4j_recommend_problem_ids(user_id: str, limit: int, difficulties: list) -
             continue
         problem_ids.append(row[0])
     return problem_ids
+
+
+def _fallback_problem_ids_by_algos(algorithms: list, difficulties: list, limit: int) -> list:
+    if not algorithms:
+        return []
+    query = (
+        "UNWIND $algorithms AS algo "
+        "MATCH (s:AlgoSkill {name: algo})<-[:USES_ALGO]-(p:Problem)-[:HAS_DIFFICULTY]->(d:Difficulty) "
+        "WHERE d.level IN $difficulties "
+        "RETURN DISTINCT p.problem_id AS problem_id "
+        "LIMIT $limit"
+    )
+    data = post_cypher(
+        query,
+        {"algorithms": algorithms, "limit": limit, "difficulties": difficulties},
+    )
+    errors = data.get("errors") or []
+    if errors:
+        return []
+    rows = data.get("results", [{}])[0].get("data", [])
+    return [r.get("row")[0] for r in rows if r.get("row")]
+
+
+def _fallback_problem_ids_by_category(categories: list, difficulties: list, limit: int) -> list:
+    if not categories:
+        return []
+    query = (
+        "UNWIND $categories AS category "
+        "MATCH (p:Problem {category: category})-[:HAS_DIFFICULTY]->(d:Difficulty) "
+        "WHERE d.level IN $difficulties "
+        "RETURN DISTINCT p.problem_id AS problem_id "
+        "LIMIT $limit"
+    )
+    data = post_cypher(
+        query,
+        {"categories": categories, "limit": limit, "difficulties": difficulties},
+    )
+    errors = data.get("errors") or []
+    if errors:
+        return []
+    rows = data.get("results", [{}])[0].get("data", [])
+    return [r.get("row")[0] for r in rows if r.get("row")]
 
 
 def _es_hybrid_rerank(
@@ -191,6 +235,24 @@ def build_recommended_problems(
         return existing
     difficulties = _difficulties_from_grade(graph_output.get("final_grade") or "")
     neo4j_ids = _neo4j_recommend_problem_ids(user_id, max(limit * 10, 50), difficulties)
+    if not neo4j_ids:
+        fallback_algos = graph_output.get("strategy_algorithms") or []
+        if isinstance(fallback_algos, str):
+            fallback_algos = [a.strip() for a in fallback_algos.split(",") if a.strip()]
+        neo4j_ids = _fallback_problem_ids_by_algos(
+            [str(a) for a in fallback_algos if a],
+            difficulties,
+            max(limit * 10, 50),
+        )
+    if not neo4j_ids:
+        categories = graph_output.get("problem_category") or []
+        if isinstance(categories, str):
+            categories = [categories]
+        neo4j_ids = _fallback_problem_ids_by_category(
+            [str(c) for c in categories if c],
+            difficulties,
+            max(limit * 10, 50),
+        )
     query_text = (graph_output.get("recommendation_query") or "").strip()
     reranked = _es_hybrid_rerank(query_text, neo4j_ids, difficulties, limit)
     problem_ids = reranked or neo4j_ids[:limit]

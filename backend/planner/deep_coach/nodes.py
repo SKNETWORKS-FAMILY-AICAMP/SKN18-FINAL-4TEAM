@@ -1,9 +1,9 @@
 import json
 from typing import Any, Dict
-from utils import _normalize_for_judge, _calc_tool_level,_choose_lenient
-from state import EvidenceCoachState
-from agents import create_judge_agent, create_feedback_agent
-from utils import safe_json_parse
+from .utils import _normalize_for_judge, _calc_tool_level,_choose_lenient, safe_json_parse
+from .state import EvidenceCoachState
+from .agents import create_judge_agent, create_feedback_agent
+
 # ---------- node ----------
 def evidence_ingest_node(state: EvidenceCoachState) -> EvidenceCoachState:
     ''' 
@@ -13,6 +13,7 @@ def evidence_ingest_node(state: EvidenceCoachState) -> EvidenceCoachState:
     # 1) normalize draft
     draft = _normalize_for_judge(state.get("draft", ""))
     state["normalized_draft"] = draft
+    print(f"[deep_coach] ingest draft_len={len(draft)}", flush=True)
     return state
 
 def judge_progress_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
@@ -32,9 +33,10 @@ def judge_progress_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
     try:
         res = agent.invoke({"messages": [{"role": "user", "content": user_prompt}]})
         raw = res["messages"][-1].content
+        print(f"[deep_coach] judge raw={raw}", flush=True)
         parsed = safe_json_parse(raw)
     except Exception as e:
-        print(f"agent 호출 오류: {e}")
+        print(f"[deep_coach] judge error: {e}", flush=True)
 
     missing = parsed.get("missing_slots", [])
     lint = parsed.get("lint", [])
@@ -47,6 +49,7 @@ def judge_progress_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
     # coach 단계에서 부분 반영/모호 슬롯 활용
     state["ambiguous_slots"] = parsed.get("ambiguous_slots", parsed.get("ambiguous", []))
     state["lint"] = lint
+    print(f"[deep_coach] judge completion={state['completion_level']} missing={len(missing)} ambiguous={len(state['ambiguous_slots'])} lint={len(lint)}", flush=True)
     return state
 
 def final_feedback_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
@@ -83,9 +86,10 @@ def final_feedback_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
             }
         )
         raw = res["messages"][-1].content
+        print(f"[deep_coach] feedback raw={raw}", flush=True)
         parsed = safe_json_parse(raw)   
     except Exception as e:
-        print(f"agent 호출 오류: {e}")
+        print(f"[deep_coach] feedback error: {e}", flush=True)
 
     state["coach_output"] = parsed.get("annotated_draft")
     return state

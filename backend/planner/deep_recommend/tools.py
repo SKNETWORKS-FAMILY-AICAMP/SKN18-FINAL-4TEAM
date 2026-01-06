@@ -1,9 +1,13 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Union
 from langchain_core.tools import tool
 from dotenv import load_dotenv
+from deepagents import create_deep_agent as build_deep_agent
+from langchain_openai import ChatOpenAI
+import json
+import re
 load_dotenv()
 
-
+DEFAULT_MODEL_NAME = "gpt-5-nano"
 def _ensure_django_ready():
     """apps.ready가 False면 django.setup()을 시도한다."""
     try:
@@ -20,17 +24,27 @@ def _ensure_django_ready():
         return False
 
 
+def _create_agent(*, model_name: str = DEFAULT_MODEL_NAME, tools: Optional[list] = None, system_prompt: Optional[str] = None):
+    """deep_agent 인스턴스를 생성하는 래퍼."""
+    base_model = ChatOpenAI(model=model_name, temperature=0)
+    return build_deep_agent(
+        model=base_model,
+        tools=tools or [],
+        system_prompt=system_prompt,
+)
+
 @tool
-def video_search_tool(query: str) -> Dict[str, Any]:
+def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 5) -> Dict[str, Any]:
     """
-    RecommendedVideo 모델(recommended_videos 테이블)을 조회해 요약/카테고리/도메인 기반 후보를 찾는다.
-    - summary에 대한 icontains 검색
-    - ArrayField(category)에도 부분 일치 검색 시도
+    RecommendedVideo 검색 (ArrayField 대응).
+    - dict 입력 권장: domain(필수) + category(필수) + code_lang(옵션) AND 필터
+    - str 입력: 보조(사용 금지 권장)
+    - limit: 반환 개수(기본 5, 최대 20)
     """
     try:
         from django.apps import apps
         from django.db.models import Q
-    except Exception as exc:  # pragma: no cover - Django 미초기화 시
+    except Exception as exc:  # pragma: no cover
         return {"query": query, "results": [], "note": f"Django import 실패: {exc}"}
 
     if not _ensure_django_ready():
@@ -40,91 +54,79 @@ def video_search_tool(query: str) -> Dict[str, Any]:
         model = apps.get_model(app_label="planner", model_name="RecommendedVideo")
     except Exception as exc:
         return {"query": query, "results": [], "note": f"RecommendedVideo 모델 조회 실패: {exc}"}
+
     if not model:
         return {"query": query, "results": [], "note": "planner.RecommendedVideo 모델을 찾을 수 없습니다"}
 
-    try:
-        qs = model.objects.all()
-        if query:
-            qs = qs.filter(Q(summary__icontains=query) | Q(category__icontains=query) | Q(domain__icontains=query))
-        qs = qs.order_by("-created_at")[:5]  # 후보 수 축소
+    def _as_list(x: Any) -> List[str]:
+        if not x:
+            return []
+        if isinstance(x, list):
+            return [str(v).strip() for v in x if str(v).strip()]
+        return [str(x).strip()] if str(x).strip() else []
 
+    debug = {}
+    limit = max(1, min(int(limit or 5), 20))
+    filters = Q()
+
+    # ✅ dict 입력: domain/category/code_lang 중심
+    if isinstance(query, dict):
+        domain = (query.get("domain") or "").strip()
+        category_vals = _as_list(query.get("category"))
+        code_lang_vals = [s.lower() for s in _as_list(query.get("code_lang"))]
+
+        # domain은 반드시 둘 중 하나라고 했으니 equality로 강하게
+        if domain in ("algorithm", "live_coding"):
+            filters &= Q(domain=domain)
+        else:
+            # 잘못 들어오면 결과 0이 나오게 하는 대신, note로 알려줌
+            return {
+                "query": query,
+                "results": [],
+                "note": f"invalid domain: {domain} (expected 'algorithm'|'live_coding')",
+            }
+
+        # category는 ArrayField -> overlap
+        if category_vals:
+            filters &= Q(category__overlap=category_vals)
+        else:
+            return {"query": query, "results": [], "note": "missing category (list)"}
+
+        # code_lang도 ArrayField -> overlap (옵션)
+        if code_lang_vals:
+            filters &= Q(code_lang__overlap=code_lang_vals)
+
+        debug = {
+            "mode": "dict",
+            "domain": domain,
+            "category": category_vals,
+            "code_lang": code_lang_vals,
+        }
+
+    else:
+        # str 입력은 보조: 쓰지 않는 걸 권장
+        qstr = (query or "").strip()
+        if not qstr:
+            return {"query": query, "results": [], "note": "empty query"}
+        filters = Q(summary__icontains=qstr) | Q(domain__icontains=qstr)
+        debug = {"mode": "str", "raw": qstr}
+
+    try:
+        qs = (
+            model.objects.all()
+            .only("id", "video_url", "summary")
+            .filter(filters)
+            .order_by("?")[:limit]
+        )
         results = [
             {
                 "id": obj.id,
                 "video_url": getattr(obj, "video_url", None),
-                "summary": (getattr(obj, "summary", None) or "")[:300],  # 요약 길이 제한
-                "category": getattr(obj, "category", None),
-                "code_lang": getattr(obj, "code_lang", None),
-                "domain": getattr(obj, "domain", None),
-                "created_at": getattr(obj, "created_at", None).isoformat() if getattr(obj, "created_at", None) else None,
+                "summary": getattr(obj, "summary", None),
             }
             for obj in qs
         ]
-    except Exception as exc:  # pragma: no cover - DB 접근 실패 시
-        return {"query": query, "results": [], "note": f"DB 조회 실패: {exc}"}
+    except Exception as exc:  # pragma: no cover
+        return {"query": query, "results": [], "note": f"DB 조회 실패: {exc}", "debug": debug}
 
-    return {"query": query, "results": results, "note": "RecommendedVideo 조회 결과"}
-
-
-@tool
-def validate_plan_tool(plan: List[Dict[str, Any]]) -> Dict[str, Any]:
-    """7일 플랜 품질을 검증한다."""
-    issues: List[str] = []
-    plan = plan or []
-
-    if len(plan) != 7:
-        issues.append("slots_count: 7일 플랜이 아닙니다")
-
-    topics = [item.get("topic") for item in plan if isinstance(item, dict)]
-    urls = [item.get("video_url") for item in plan if isinstance(item, dict)]
-
-    def _find_dupes(values: List[Any]) -> List[str]:
-        seen = set()
-        dupes = set()
-        for val in values:
-            if not val:
-                continue
-            if val in seen:
-                dupes.add(val)
-            else:
-                seen.add(val)
-        return sorted(list(dupes))
-
-    dup_topics = _find_dupes(topics)
-    dup_urls = _find_dupes(urls)
-    if dup_topics:
-        issues.append(f"topic_duplication: {dup_topics}")
-    if dup_urls:
-        issues.append(f"video_url_duplication: {dup_urls}")
-
-    for idx, item in enumerate(plan):
-        if not isinstance(item, dict):
-            issues.append(f"slot_{idx+1}: invalid item")
-            continue
-
-        diff = item.get("difficulty")
-        if diff is None:
-            issues.append(f"slot_{idx+1}: difficulty 누락")
-        else:
-            try:
-                diff_val = int(diff)
-                if diff_val < 1 or diff_val > 5:
-                    issues.append(f"slot_{idx+1}: difficulty 범위(1~5) 위반")
-            except Exception:
-                issues.append(f"slot_{idx+1}: difficulty 숫자 아님")
-
-        if not item.get("topic"):
-            issues.append(f"slot_{idx+1}: topic 누락")
-        if not item.get("video_title"):
-            issues.append(f"slot_{idx+1}: video_title 누락")
-        if not item.get("video_url"):
-            issues.append(f"slot_{idx+1}: video_url 누락")
-
-        criteria = item.get("success_criteria") or []
-        if not criteria or not isinstance(criteria, list):
-            issues.append(f"slot_{idx+1}: success_criteria 누락")
-
-
-
-    return {"ok": len(issues) == 0, "issues": issues}
+    return {"query": query, "results": results, "note": ("ok" if results else "no results"), "debug": debug}

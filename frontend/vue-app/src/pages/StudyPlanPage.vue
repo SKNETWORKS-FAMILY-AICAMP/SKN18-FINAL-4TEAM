@@ -8,10 +8,11 @@ import { useRouter } from 'vue-router';
 import { useAuth } from '../hooks/useAuth';
 
 // --- 상태 관리 (State) ---
-const duration = ref(7); // 기본 7일
+const duration = ref(7); // 1주(7일)로 고정
 const loading = ref(false);
 const { token, ensureValidSession, BACKEND_BASE } = useAuth();
 const router = useRouter();
+
 const redirectToLogin = () => {
   const redirect = router.currentRoute?.value?.fullPath || "/login";
   router.push({ name: "login", query: { redirect } });
@@ -26,7 +27,7 @@ const calendarOptions = reactive({
     center: 'title',
     right: 'dayGridMonth'
   },
-  events: [], // 여기에 API 데이터가 들어갑니다
+  events: [], 
   eventClick: handleEventClick,
   height: 'auto'
 });
@@ -35,13 +36,15 @@ const isVideoOpen = ref(false);
 const activeVideo = ref(null);
 const lectureNote = ref('');
 const reflectionSaving = ref(false);
+
 const statusLabel = computed(() => {
   const raw = (activeVideo.value?.extendedProps?.is_completed || '').toString().toUpperCase();
   if (raw === 'COMPLETE') return '완료';
-  if (raw === 'NEEDS_WORK' || raw === 'NEEDS_WORK') return '미흡';
+  if (raw === 'NEEDS_WORK') return '미흡';
   if (raw === 'POLISH') return '수정 필요';
   return '미진행';
 });
+
 const statusClass = computed(() => {
   const label = statusLabel.value;
   if (label === '완료') return 'status-badge--done';
@@ -49,6 +52,7 @@ const statusClass = computed(() => {
   if (label === '미흡') return 'status-badge--todo';
   return 'status-badge--todo';
 });
+
 const statusStyle = computed(() => {
   const label = statusLabel.value;
   if (label === '완료') return { background: '#e7f5ff', color: '#1f6f54', border: '1px solid #86efac' };
@@ -69,7 +73,7 @@ function getYouTubeEmbedUrl(url) {
       const id = parsed.searchParams.get('v');
       return id ? `https://www.youtube.com/embed/${id}` : '';
     }
-  } catch (err) { /* ignore malformed urls */ }
+  } catch (err) { /* ignore */ }
   return '';
 }
 
@@ -85,9 +89,7 @@ function closeVideoModal() {
 }
 
 async function saveReflection() {
-  if (!activeVideo.value) {
-    return;
-  }
+  if (!activeVideo.value) return;
 
   const trimmedNote = (lectureNote.value || "").trim();
   if (trimmedNote.length < 30) {
@@ -116,15 +118,14 @@ async function saveReflection() {
         lecture_note: trimmedNote
       },
       {
-        headers: {
-          Authorization: `Bearer ${token.value}`
-        }
+        headers: { Authorization: `Bearer ${token.value}` }
       }
     );
 
     const updatedComment = response.data?.lecture_note ?? trimmedNote;
     const updatedCompleted = response.data?.is_completed ?? statusLabel.value;
     const coachOutput = response.data?.coach_output ?? '';
+
     if (typeof activeVideo.value.setExtendedProp === 'function') {
       activeVideo.value.setExtendedProp('lecture_note', updatedComment);
       activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
@@ -139,25 +140,18 @@ async function saveReflection() {
     }
   } catch (error) {
     console.error(error);
-    const message =
-      error?.response?.data?.error ||
-      error?.response?.data?.detail ||
-      "회고 저장에 실패했습니다.";
+    const message = error?.response?.data?.error || error?.response?.data?.detail || "회고 저장에 실패했습니다.";
     alert(message);
   } finally {
     reflectionSaving.value = false;
   }
 }
 
-// --- 함수 구현 ---
-
-// 1. 이벤트 클릭 핸들러 (영상 링크 이동)
 function handleEventClick(info) {
   info.jsEvent.preventDefault();
   openVideoModal(info.event);
 }
 
-// 2. 계획 생성 요청 (API 호출)
 async function loadLatestPlan() {
   const ok = await ensureValidSession();
   if (!ok) {
@@ -168,9 +162,7 @@ async function loadLatestPlan() {
 
   try {
     const response = await axios.get(`${BACKEND_BASE}/api/plans/latest/`, {
-      headers: {
-        Authorization: `Bearer ${token.value}`
-      }
+      headers: { Authorization: `Bearer ${token.value}` }
     });
     if (response.data?.events) {
       calendarOptions.events = response.data.events;
@@ -184,7 +176,6 @@ async function loadLatestPlan() {
 
 async function generatePlan() {
   loading.value = true;
-  
   try {
     const ok = await ensureValidSession();
     if (!ok) {
@@ -193,22 +184,14 @@ async function generatePlan() {
       return;
     }
 
-    // Django API 호출 (CORS 설정 필수)
+    // duration은 7로 고정되어 전송됨
     const response = await axios.post(
       `${BACKEND_BASE}/api/generate-plan/`,
-      {
-        duration: duration.value
-      },
-      {
-        headers: {
-          Authorization: `Bearer ${token.value}`
-        }
-      }
+      { duration: duration.value },
+      { headers: { Authorization: `Bearer ${token.value}` } }
     );
 
-    // 받은 데이터를 캘린더 옵션에 주입 (반응형으로 즉시 업데이트됨)
     calendarOptions.events = response.data.events;
-    
     alert("커리큘럼 생성이 완료되었습니다!");
 
   } catch (error) {
@@ -225,7 +208,6 @@ async function generatePlan() {
       redirectToLogin();
       return;
     }
-
     const fallback = detail || error?.response?.data?.error;
     alert(fallback || "에러가 발생했습니다. 백엔드 서버가 켜져있는지 확인해주세요.");
   } finally {
@@ -241,16 +223,14 @@ onMounted(() => {
 <template>
   <div class="app-container">
     <header class="header">
-      <h1> AI 학습 코치</h1>
+      <h1>AI 학습 코치</h1>
       <p>약점 보완을 위해 AI코치가 맞춤형 커리큘럼을 짜드립니다.</p>
     </header>
 
     <div class="input-section">
       <div class="input-label">라이브코딩 성장 리포트 기반 커리큘럼을 생성합니다.</div>
-      <select v-model="duration" class="input-select">
-        <option :value="7">1주 완성</option>
-        <option :value="30">4주 완성</option>
-      </select>
+      
+      <div class="fixed-duration-badge">1주 완성</div>
 
       <button 
         @click="generatePlan" 
@@ -264,55 +244,59 @@ onMounted(() => {
     <div class="calendar-wrapper">
       <FullCalendar :options="calendarOptions" />
     </div>
+
     <Teleport to="body">
       <div v-if="isVideoOpen" class="video-modal" role="dialog" aria-modal="true">
-        <div class="video-backdrop"></div>
+        <div class="video-backdrop" @click="closeVideoModal"></div>
+        
         <div class="video-sheet">
-        <div class="video-header">
-          <div class="video-title">
-            세부 계획<span v-if="activeVideo?.extendedProps?.day_number"> · {{ activeVideo.extendedProps.day_number }}일차</span>
+          <div class="video-header">
+            <div class="video-title">
+              세부 계획<span v-if="activeVideo?.extendedProps?.day_number"> · {{ activeVideo.extendedProps.day_number }}일차</span>
+            </div>
+            <button type="button" class="video-close" @click="closeVideoModal"></button>
           </div>
-          <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
-        </div>
-        <div class="video-status">
-          <span :class="['status-badge', statusClass]" :style="statusStyle">
-            {{ statusLabel }}
-          </span>
-        </div>
-        <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
-        <div class="video-frame">
-            <iframe
-              v-if="getYouTubeEmbedUrl(activeVideo?.url)"
-              :src="getYouTubeEmbedUrl(activeVideo?.url)"
-              title="YouTube video"
-              frameborder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowfullscreen
-            ></iframe>
-            <div v-else class="video-empty">유효한 유튜브 링크가 없습니다.</div>
+
+          <div class="video-body">
+            <div class="video-status">
+              <span :class="['status-badge', statusClass]" :style="statusStyle">
+                {{ statusLabel }}
+              </span>
+            </div>
+            <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
+            <div class="video-frame">
+              <iframe
+                v-if="getYouTubeEmbedUrl(activeVideo?.url)"
+                :src="getYouTubeEmbedUrl(activeVideo?.url)"
+                title="YouTube video"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+              ></iframe>
+              <div v-else class="video-empty">유효한 유튜브 링크가 없습니다.</div>
+            </div>
+            <div class="reflection-block">
+              <div class="reflection-fields">
+                <label class="reflection-label">
+                  공부한 내용 (회고)
+                  <textarea
+                    v-model="lectureNote"
+                    class="reflection-input"
+                    rows="3"
+                    placeholder="오늘 배운 내용을 적어주세요. 추후 AI코치가 피드백을 제공해드립니다."
+                  ></textarea>
+                </label>
+              </div>
+              <div class="reflection-actions">
+                <button type="button" class="reflection-save" :disabled="reflectionSaving" @click="saveReflection">
+                  {{ reflectionSaving ? "저장 중..." : "학습내용 저장" }}
+                </button>
+              </div>
+            </div>
           </div>
-        <div class="reflection-block">
-          <div class="reflection-fields">
-            <label class="reflection-label">
-              공부한 내용
-              <textarea
-                v-model="lectureNote"
-                class="reflection-input"
-                rows="3"
-                placeholder="오늘 배운 내용을 적어주세요. 추후 AI코치가 피드백을 제공해드립니다."
-              ></textarea>
-            </label>
-          </div>
-          <div class="reflection-actions">
-            <button type="button" class="reflection-save" :disabled="reflectionSaving" @click="saveReflection">
-              {{ reflectionSaving ? "저장 중..." : "학습내용 저장" }}
-            </button>
-          </div>
-        </div>
         </div>
       </div>
     </Teleport>
-
   </div>
 </template>
 
@@ -351,7 +335,8 @@ onMounted(() => {
 /* 입력 섹션 */
 .input-section {
   display: flex;
-  gap: 10px;
+  gap: 15px;
+  align-items: center;
   justify-content: center;
   margin-bottom: 40px;
   background: #f8f9fa;
@@ -360,31 +345,37 @@ onMounted(() => {
   box-shadow: 0 4px 6px rgba(0,0,0,0.05);
 }
 
-.input-text {
-  width: 400px;
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+.input-label {
   font-size: 1rem;
+  color: #555;
 }
 
-.input-select {
-  padding: 12px;
+/* 1주 완성 배지 */
+.fixed-duration-badge {
+  padding: 12px 20px;
+  background-color: #fff;
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
+  font-weight: 600;
+  color: #2c3e50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 100px;
 }
 
 .btn-generate {
-  padding: 1px 20px;
+  padding: 12px 24px;
   background-color: #1f2933; 
   color: white;
   border: none;
-  border-radius: 5px;
+  border-radius: 8px;
   font-size: 1rem;
   font-weight: bold;
   cursor: pointer;
   transition: background 0.2s;
+  height: 100%;
 }
 
 .btn-generate:hover {
@@ -392,7 +383,7 @@ onMounted(() => {
 }
 
 .btn-generate:disabled {
-  background-color: #8ab0caff;
+  background-color: #8ab0ca;
   cursor: not-allowed;
 }
 
@@ -403,66 +394,109 @@ onMounted(() => {
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
 }
+
+/* =========================================
+   [모달 디자인]
+   ========================================= */
+
 :global(.video-modal) {
   position: fixed;
   inset: 0;
+  z-index: 9999;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 30;
+  padding: 20px;
+  box-sizing: border-box;
 }
 
 :global(.video-backdrop) {
   position: absolute;
   inset: 0;
-  background: rgba(15, 23, 42, 0.55);
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+  animation: fadeIn 0.2s ease-out;
 }
 
 :global(.video-sheet) {
   position: relative;
-  width: min(720px, 92vw);
-  background: #fff;
-  border-radius: 16px;
-  padding: 20px;
-  box-shadow: 0 28px 60px rgba(15, 23, 42, 0.28);
+  z-index: 10;
+  width: min(680px, 100%);
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  font-family: "SF Pro", sans-serif;
+  max-height: calc(100vh - 60px); /* 화면 꽉 차지 않게 제한 */
+  overflow: hidden; /* 내부 스크롤을 위해 필수 */
+  animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+/* 모달 헤더 (고정) */
 :global(.video-header) {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  padding: 20px 24px;
+  border-bottom: 1px solid #f1f5f9;
+  background: #fff;
+  flex-shrink: 0; /* 크기 줄어들지 않음 */
 }
 
 :global(.video-title) {
-  font-size: 1.35rem;
-  font-weight: 800;
-  color: #1f2933;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1e293b;
 }
 
 :global(.video-close) {
-  background: none;
+  background: transparent;
   border: none;
-  color: #6b7280;
-  font-weight: 700;
+  font-size: 24px;
+  color: #94a3b8;
   cursor: pointer;
+  padding: 4px;
+  border-radius: 50%;
+  line-height: 1;
+  transition: all 0.2s;
+}
+:global(.video-close:hover) {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+:global(.video-close::before) { content: "×"; }
+
+/* 모달 본문 (스크롤) */
+:global(.video-body) {
+  padding: 24px;
+  overflow-y: auto; /* 내용 넘치면 스크롤 */
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
+/* 상태 배지 */
+:global(.video-status) {
+  display: flex;
+}
+
+/* 비디오 제목 */
 :global(.video-meta) {
-  color: #6b4f3f;
-  font-size: 2.5rem;
-  font-weight: 700;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.3;
 }
 
+/* 비디오 프레임 */
 :global(.video-frame) {
   width: 100%;
   aspect-ratio: 16 / 9;
-  background: #f1f5f9;
+  background: #000;
   border-radius: 12px;
   overflow: hidden;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  flex-shrink: 0;
 }
 
 :global(.video-frame iframe) {
@@ -471,40 +505,52 @@ onMounted(() => {
   border: none;
 }
 
+:global(.video-empty) {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+/* 회고 영역 */
 :global(.reflection-block) {
+  background: #f8fafc;
+  border-radius: 12px;
+  padding: 20px;
+  border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 12px;
 }
 
-:global(.reflection-title) {
-  font-size: 1.1rem;
-  font-weight: 800;
-  color: #2c3e50;
-}
-
-:global(.reflection-fields) {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
 :global(.reflection-label) {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: #475569;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #2f2a1f;
+  gap: 8px;
 }
 
 :global(.reflection-input) {
-  border: 1px solid #d2d6dc;
-  border-radius: 12px;
-  padding: 12px 14px;
-  font-size: 1rem;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 12px;
+  font-size: 0.95rem;
+  font-family: inherit;
   resize: vertical;
-  font-family: "SF Pro", sans-serif;
+  background: #fff;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+:global(.reflection-input:focus) {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
 :global(.reflection-actions) {
@@ -513,32 +559,47 @@ onMounted(() => {
 }
 
 :global(.reflection-save) {
+  background: #10b981;
+  color: white;
   border: none;
-  background: #1f6f54;
-  color: #fff;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 10px 16px;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background 0.2s;
 }
-
+:global(.reflection-save:hover) {
+  background: #059669;
+}
 :global(.reflection-save:disabled) {
   background: #94a3b8;
   cursor: not-allowed;
 }
 
-:global(.video-empty) {
-  width: 100%;
-  height: 100%;
-  display: flex;
+/* 애니메이션 */
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+/* 스크롤바 커스텀 */
+:global(.video-body::-webkit-scrollbar) { width: 6px; }
+:global(.video-body::-webkit-scrollbar-thumb) { background: #cbd5e1; border-radius: 3px; }
+:global(.video-body::-webkit-scrollbar-track) { background: transparent; }
+
+/* 상태 배지 스타일 */
+.status-badge {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  color: #8a6f56;
-  font-size: 0.95rem;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
 }
+.status-badge--todo { background: #fff0e5; color: #9a3412; border: 1px solid #fdba74; }
+.status-badge--doing { background: #eef2ff; color: #312e81; border: 1px solid #c7d2fe; }
+.status-badge--done { background: #e6f7ec; color: #14532d; border: 1px solid #86efac; }
 
-
-/* Vue Style Deep Selector (::v-deep) for Child Components */
+/* FullCalendar Custom */
 :deep(.fc-event) {
   cursor: pointer;
   border: none;
@@ -546,59 +607,9 @@ onMounted(() => {
   padding: 4px;
   font-weight: 600;
 }
-
-:deep(.fc-event.is-pending) {
-  background-color: #6abaffff;
-  color: #f8fafc;
-  border-left-color: #4291b8ff;
-}
-
-:deep(.fc-event.is-pending:hover) {
-  background-color: #9bc7e6ff;
-}
-
-:deep(.fc-event.is-completed) {
-  background-color: #cad4dcff;
-  color: #2c3e50;
-  border-left-color: #4291b8ff;
-}
-
-:deep(.fc-event.is-completed:hover) {
-  background-color: #cfe9ff;
-}
-
-:deep(.fc-day-today) {
-  background-color: #fff9db !important;
-}
+:deep(.fc-event.is-pending) { background-color: #6abaff; color: #fff; border-left-color: #4291b8; }
+:deep(.fc-event.is-pending:hover) { background-color: #9bc7e6; }
+:deep(.fc-event.is-completed) { background-color: #cad4dc; color: #2c3e50; border-left-color: #4291b8; }
+:deep(.fc-event.is-completed:hover) { background-color: #cfe9ff; }
+:deep(.fc-day-today) { background-color: #fff9db !important; }
 </style>
-:global(.video-status) {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.status-badge {
-  display: inline-flex;
-  align-items: center;
-  padding: 6px 12px;
-  border-radius: 999px;
-  font-size: 0.95rem;
-  font-weight: 800;
-  letter-spacing: -0.01em;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
-}
-.status-badge--todo {
-  background: #fff0e5;
-  color: #9a3412;
-  border: 1px solid #fdba74;
-}
-.status-badge--doing {
-  background: #eef2ff;
-  color: #312e81;
-  border: 1px solid #c7d2fe;
-}
-.status-badge--done {
-  background: #e6f7ec;
-  color: #14532d;
-  border: 1px solid #86efac;
-}

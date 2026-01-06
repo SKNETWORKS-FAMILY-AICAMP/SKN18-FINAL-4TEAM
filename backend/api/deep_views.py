@@ -8,6 +8,7 @@ from .models import UserGrowthInsight
 from django.db.utils import ProgrammingError
 from planner.growth_report.graph import run_growth_report
 from planner.growth_report.utils import append_growth_state
+from api.views import _to_kst_iso
 
 
 class UserReportsPayloadView(APIView):
@@ -47,6 +48,7 @@ class UserReportsPayloadView(APIView):
                 .first()
             )
             has_previous_growth = True if latest_growth else False
+            latest_growth_ts = _to_kst_iso(getattr(latest_growth, "created_at", None))
         except ProgrammingError as e:
             return Response(
                 {
@@ -91,6 +93,8 @@ class UserReportsPayloadView(APIView):
                 "user_id": user_id,
                 "reports": payload,
                 "report_ids": report_ids,
+                "latest_created_at": latest_growth_ts,
+                "latest_updated_at": latest_growth_ts,
             },
             status=status.HTTP_200_OK,
         )
@@ -106,7 +110,8 @@ class UserReportsPayloadView(APIView):
                     "report_ids":report_ids,
                     "run_mode": run_mode,
                     "prev_agent_result": prev_agent_result,
-
+                    "latest_created_at": latest_growth_ts,
+                    "latest_updated_at": latest_growth_ts,
                 },
                 status=status.HTTP_200_OK,)
                 
@@ -123,6 +128,8 @@ class UserReportsPayloadView(APIView):
                         "report_ids":report_ids,
                         "selected_report": selected_report,
                         "prev_agent_result": prev_agent_result,
+                        "latest_created_at": latest_growth_ts,
+                        "latest_updated_at": latest_growth_ts,
                     },
                     status=status.HTTP_200_OK,
                 )
@@ -144,6 +151,7 @@ class DeepAgentReportView(APIView):
         prev_agent_result = request.data.get("prev_agent_result") or ""
         reports = request.data.get("reports") or []
         result_text = ""
+        latest_created_at = None
         
         if run_mode == "blocked":
             return Response(
@@ -155,7 +163,7 @@ class DeepAgentReportView(APIView):
             try:
                 response = run_growth_report(reports)
                 result_text = response.get("final_report") if isinstance(response, dict) else str(response)
-                append_growth_state(
+                obj = append_growth_state(
                     user_id=user_id,
                     new_state={
                         "report_content": result_text,
@@ -163,6 +171,7 @@ class DeepAgentReportView(APIView):
                         "window_size": len(report_ids or reports) or 3,
                     },
                 )
+                latest_created_at = _to_kst_iso(getattr(obj, "created_at", None))
             except Exception as e:
                 print(f"[DeepAgentReportView] append_growth_state failed: {e}", flush=True)
                 return Response({"detail": "에이전트 실행에 실패했습니다.", "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -171,6 +180,12 @@ class DeepAgentReportView(APIView):
             try:
                 # 캐시 결과 그대로 반환
                 result_text = prev_agent_result or ""
+                latest = (
+                    UserGrowthInsight.objects.filter(user_id=user_id)
+                    .order_by("-version")
+                    .first()
+                )
+                latest_created_at = _to_kst_iso(getattr(latest, "created_at", None))
             except Exception as e:
                 print(f"[DeepAgentReportView] cached branch failed: {e}", flush=True)
                 return Response({"detail": "에이전트 실행에 실패했습니다.", "error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -179,7 +194,7 @@ class DeepAgentReportView(APIView):
             try:
                 response = run_growth_report(selected_reports, prev_agent_result)
                 result_text = response.get("final_report") if isinstance(response, dict) else str(response)
-                append_growth_state(
+                obj = append_growth_state(
                     user_id=user_id,
                     new_state={
                         "report_content": result_text,
@@ -187,7 +202,7 @@ class DeepAgentReportView(APIView):
                         "window_size": len(report_ids) or 3,
                     },
                 )
-
+                latest_created_at = _to_kst_iso(getattr(obj, "created_at", None))
 
             except Exception as e:
                 print(f"[DeepAgentReportView] append_growth_state failed: {e}", flush=True)
@@ -196,6 +211,8 @@ class DeepAgentReportView(APIView):
                 {
                     "agent_result": result_text,
                     "run_mode": run_mode,
+                    "latest_created_at": latest_created_at,
+                    "latest_updated_at": latest_created_at,
                 },
                 status=status.HTTP_200_OK,
-        )
+            )

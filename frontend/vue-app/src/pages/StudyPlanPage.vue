@@ -29,12 +29,12 @@ const calendarOptions = reactive({
   },
   events: [], 
   eventClick: handleEventClick,
-  height: 'auto'
+  height: 'auto', // 달력 높이는 내용에 맞게 자동 조절
+  dayMaxEvents: true
 });
 
-// [New] Todo List Data (Computed from Calendar Events)
+// Todo List Data (날짜순 정렬)
 const todoList = computed(() => {
-  // 날짜순 정렬
   return [...calendarOptions.events].sort((a, b) => new Date(a.start) - new Date(b.start));
 });
 
@@ -71,7 +71,7 @@ const statusStyle = computed(() => {
 function getTodoStatusClass(event) {
   const status = (event.extendedProps?.is_completed || '').toUpperCase();
   if (status === 'COMPLETE') return 'todo-done';
-  if (status === 'NEEDS_WORK') return 'todo-pending'; // Or todo-fail
+  if (status === 'NEEDS_WORK') return 'todo-pending'; 
   return 'todo-pending';
 }
 
@@ -105,23 +105,7 @@ function openVideoModal(event) {
   isVideoOpen.value = true;
 }
 
-// [New] Open modal from Todo List click (event is raw object here, not FullCalendar's info.event)
 function openVideoModalFromTodo(eventData) {
-  // Wrap raw data to mimic FullCalendar event object structure for compatibility
-  const mockEvent = {
-    title: eventData.title,
-    start: eventData.start,
-    extendedProps: eventData.extendedProps || {},
-    setExtendedProp: (key, val) => {
-        // Simple reactivity update for the local object
-        if(!eventData.extendedProps) eventData.extendedProps = {};
-        eventData.extendedProps[key] = val;
-    } 
-  };
-  // Or simply pass the raw object if your modal handles it. 
-  // Let's use a unified approach: assume activeVideo can be a plain object or FC Event.
-  // The existing template uses `activeVideo?.extendedProps...` which works for both.
-  
   activeVideo.value = eventData; 
   lectureNote.value = eventData.extendedProps?.lecture_note ?? '';
   isVideoOpen.value = true;
@@ -170,24 +154,18 @@ async function saveReflection() {
     const updatedCompleted = response.data?.is_completed ?? statusLabel.value;
     const coachOutput = response.data?.coach_output ?? '';
 
-    // Update the reactive data source so UI updates immediately
-    // 1. If it's a FullCalendar event object
     if (typeof activeVideo.value.setExtendedProp === 'function') {
       activeVideo.value.setExtendedProp('lecture_note', updatedComment);
       activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
       if (coachOutput) activeVideo.value.setExtendedProp('coach_output', coachOutput);
-    } 
-    // 2. If it's a plain object (from Todo List) or fallback
-    else {
+    } else {
       if(!activeVideo.value.extendedProps) activeVideo.value.extendedProps = {};
       activeVideo.value.extendedProps.lecture_note = updatedComment;
       activeVideo.value.extendedProps.is_completed = updatedCompleted;
       if (coachOutput) activeVideo.value.extendedProps.coach_output = coachOutput;
     }
     
-    // Also update the source array for the Todo List to reflect changes
-    const targetId = taskId;
-    const itemInList = calendarOptions.events.find(e => e.extendedProps?.task_id === targetId);
+    const itemInList = calendarOptions.events.find(e => e.extendedProps?.task_id === taskId);
     if(itemInList) {
         itemInList.extendedProps.lecture_note = updatedComment;
         itemInList.extendedProps.is_completed = updatedCompleted;
@@ -276,13 +254,19 @@ onMounted(() => {
 
 <template>
   <div class="app-container">
+    <div class="bg-grid"></div>
+
     <header class="header">
-      <h1>AI 학습 코치</h1>
-      <p>약점 보완을 위해 AI코치가 맞춤형 커리큘럼을 짜드립니다.</p>
+      <nav class="nav-header">
+        <RouterLink to="/" class="brand">JOBTORY</RouterLink>
+      </nav>
+      <div class="header-content">
+        <h1>AI 학습 코치</h1>
+      </div>
     </header>
 
     <div class="input-section">
-      <div class="input-label">라이브코딩 성장 리포트 기반 커리큘럼을 생성합니다.</div>
+      <div class="input-label">약점 보완을 위해 라이브코딩 성장리포트 기반 맞춤형 커리큘럼을 생성합니다.</div>
       <div class="fixed-duration-badge">1주 완성</div>
       <button 
         @click="generatePlan" 
@@ -389,14 +373,27 @@ onMounted(() => {
 /* 기본 배경색 */
 :global(body) {
   background: #f8f4eb;
+  margin: 0;
+  font-family: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  overflow-x: hidden
+}
+
+.bg-grid {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: -1;
+  pointer-events: none;
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
 /* 전체 레이아웃 */
 .app-container {
-  max-width: 1200px; /* Width increased to accommodate side-by-side layout */
+  max-width: 1200px;
   margin: 0 auto;
-  padding: 40px 20px;
-  font-family: "SF Pro", sans-serif;
+  padding: 8px 20px;
   color: #333;
 }
 
@@ -404,17 +401,34 @@ onMounted(() => {
 .header {
   text-align: center;
   margin-bottom: 40px;
+  padding-top: 40px;
 }
 
-.header h1 {
-  font-size: 2.5rem;
+.header-content h1 {
+  font-size: 3.0rem;
   color: #2c3e50;
   margin-bottom: 10px;
 }
 
-.header p {
-  color: #7f8c8d;
-  font-size: 1.1rem;
+.nav-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 32px 40px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  cursor: pointer;
 }
 
 /* 입력 섹션 */
@@ -424,21 +438,17 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin-bottom: 30px;
-  background: #f8f9fa;
+  background: #fff;
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border: 1px solid #eee;
 }
 
-.input-label {
-  font-size: 1rem;
-  color: #555;
-}
 
-/* 1주 완성 배지 */
 .fixed-duration-badge {
   padding: 12px 20px;
-  background-color: #fff;
+  background-color: #f8f9fa;
   border: 1px solid #ddd;
   border-radius: 8px;
   font-size: 1rem;
@@ -472,33 +482,37 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* [New] Content Row (Calendar + Todo) */
+/* --- [수정된 부분] 컨텐츠 레이아웃 --- */
 .content-row {
   display: flex;
   gap: 24px;
-  align-items: flex-start;
+  align-items: flex-start; /* 높이를 서로 맞추지 않고 본연의 높이 유지 */
 }
 
-/* Calendar Section */
+/* 달력 섹션 */
 .calendar-wrapper {
-  flex: 2; /* Takes more space */
+  flex: 2;
   background: white;
   padding: 20px;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  min-width: 0; /* Prevents overflow in flex items */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  min-width: 0;
+  border: 1px solid #f0f0f0;
+  /* height: auto; (기본값) -> 달력은 내용에 따라 늘어남 */
 }
 
-/* Todo List Section */
+/* --- [수정된 부분] 투두 리스트 섹션 --- */
 .todo-wrapper {
-  flex: 1; /* Takes less space */
+  flex: 1;
   background: white;
   border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  border: 1px solid #f0f0f0;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  height: auto;
+  
+  /* 고정 높이 설정 (스크롤을 위해 필수) */
+  height: 628px; 
   overflow: hidden;
 }
 
@@ -529,7 +543,7 @@ onMounted(() => {
 
 .todo-list {
   flex: 1;
-  overflow-y: auto;
+  overflow-y: auto; /* 내용이 많으면 스크롤 */
   padding: 16px;
   background: #f8fafc;
   display: flex;
@@ -584,7 +598,7 @@ onMounted(() => {
   flex-direction: column;
   justify-content: center;
   gap: 6px;
-  min-width: 0; /* Text truncation fix */
+  min-width: 0;
 }
 
 .todo-title {
@@ -617,7 +631,7 @@ onMounted(() => {
 .todo-done { color: #15803d; background: #dcfce7; }
 .todo-pending { color: #9a3412; background: #ffedd5; }
 
-/* Custom Scrollbar for Todo List & Modal */
+/* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar,
 :global(.video-body::-webkit-scrollbar) { width: 6px; }
 .custom-scrollbar::-webkit-scrollbar-thumb,
@@ -658,12 +672,11 @@ onMounted(() => {
   box-shadow: 0 20px 50px -12px rgba(0, 0, 0, 0.25);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 60px); /* 화면 꽉 차지 않게 제한 */
-  overflow: hidden; /* 내부 스크롤을 위해 필수 */
+  max-height: calc(100vh - 60px);
+  overflow: hidden;
   animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* 모달 헤더 (고정) */
 :global(.video-header) {
   display: flex;
   align-items: center;
@@ -697,21 +710,18 @@ onMounted(() => {
 }
 :global(.video-close::before) { content: "×"; }
 
-/* 모달 본문 (스크롤) */
 :global(.video-body) {
   padding: 24px;
-  overflow-y: auto; /* 내용 넘치면 스크롤 */
+  overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 20px;
 }
 
-/* 상태 배지 */
 :global(.video-status) {
   display: flex;
 }
 
-/* 비디오 제목 */
 :global(.video-meta) {
   font-size: 1.5rem;
   font-weight: 800;
@@ -719,7 +729,6 @@ onMounted(() => {
   line-height: 1.3;
 }
 
-/* 비디오 프레임 */
 :global(.video-frame) {
   width: 100%;
   aspect-ratio: 16 / 9;
@@ -746,7 +755,6 @@ onMounted(() => {
   font-size: 0.95rem;
 }
 
-/* 회고 영역 */
 :global(.reflection-block) {
   background: #f8fafc;
   border-radius: 12px;

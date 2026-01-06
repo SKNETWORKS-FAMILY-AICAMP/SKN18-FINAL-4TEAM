@@ -222,14 +222,15 @@ onMounted(() => {
 
 <template>
   <div class="app-container">
+    <nav class="nav-header">
+        <RouterLink to="/" class="brand">JOBTORY</RouterLink>
+      </nav>
     <header class="header">
       <h1>AI 학습 코치</h1>
-      <p>약점 보완을 위해 AI코치가 맞춤형 커리큘럼을 짜드립니다.</p>
+      <p>약점 보완을 위해 라이브코딩 성장리포트 기반으로 맞춤형 커리큘럼을 만들어드립니다.</p>
     </header>
 
-    <div class="input-section">
-      <div class="input-label">라이브코딩 성장 리포트 기반 커리큘럼을 생성합니다.</div>
-      
+    <div class="input-section">      
       <div class="fixed-duration-badge">1주 완성</div>
 
       <button 
@@ -257,7 +258,7 @@ onMounted(() => {
             <button type="button" class="video-close" @click="closeVideoModal"></button>
           </div>
 
-          <div class="video-body">
+          <div class="video-body custom-scrollbar">
             <div class="video-status">
               <span :class="['status-badge', statusClass]" :style="statusStyle">
                 {{ statusLabel }}
@@ -315,6 +316,28 @@ onMounted(() => {
   color: #333;
 }
 
+/* 2. 네비게이션 (고정) */
+.nav-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 32px 40px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+}
+
+.brand {
+  font-family: "Inter", sans-serif;
+  font-size: 24px;
+  font-weight: 900;
+  color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
+  cursor: pointer;
+}
+
 /* 헤더 */
 .header {
   text-align: center;
@@ -339,15 +362,7 @@ onMounted(() => {
   align-items: center;
   justify-content: center;
   margin-bottom: 40px;
-  background: #f8f9fa;
   padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
-}
-
-.input-label {
-  font-size: 1rem;
-  color: #555;
 }
 
 /* 1주 완성 배지 */
@@ -580,10 +595,10 @@ onMounted(() => {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* 스크롤바 커스텀 */
-:global(.video-body::-webkit-scrollbar) { width: 6px; }
-:global(.video-body::-webkit-scrollbar-thumb) { background: #cbd5e1; border-radius: 3px; }
-:global(.video-body::-webkit-scrollbar-track) { background: transparent; }
+/* 스크롤바 커스텀 (다른 페이지와 동일 톤) */
+:global(.custom-scrollbar::-webkit-scrollbar) { width: 6px; }
+:global(.custom-scrollbar::-webkit-scrollbar-thumb) { background: #374151; border-radius: 3px; }
+:global(.custom-scrollbar::-webkit-scrollbar-track) { background: transparent; }
 
 /* 상태 배지 스타일 */
 .status-badge {

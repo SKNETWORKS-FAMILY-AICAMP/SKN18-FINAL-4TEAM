@@ -66,9 +66,9 @@ def judge_calc_tool(missing: list, lint: list) -> dict:
     mild = max(0, len(lint or []) - severe)
 
     # 완화된 기준: 경미한 lint 2개까지는 COMPLETE 허용, missing/치명 오류 여유폭 확대
-    if missing_cnt == 0 or severe == 0 or mild <= 3:
+    if severe == 0 and missing_cnt <= 1 and mild <= 2:
         level = "COMPLETE"
-    elif missing_cnt >= 4 or severe >= 2:
+    elif severe >= 2 or missing_cnt >= 4:
         level = "NEEDS_WORK"
     else:
         level = "POLISH"

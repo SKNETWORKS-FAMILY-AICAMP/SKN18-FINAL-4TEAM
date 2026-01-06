@@ -243,7 +243,7 @@ import { useRouter, RouterLink } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 import { useProfileOptions } from "../hooks/useProfileOptions";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
 const router = useRouter();
 const auth = useAuth();
 const { options: optionData, fetchProfileOptions } = useProfileOptions();

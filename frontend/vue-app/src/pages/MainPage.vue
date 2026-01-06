@@ -356,7 +356,7 @@ import { useAuth } from "../hooks/useAuth";
 import ForcedExitAlert from "../components/ForcedExitAlert.vue";
 import { useProfileOptions } from "../hooks/useProfileOptions";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
 
 const route = useRoute();
 const router = useRouter();

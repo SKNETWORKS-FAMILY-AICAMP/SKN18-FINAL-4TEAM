@@ -352,7 +352,7 @@ onMounted(() => {
                     v-model="lectureNote"
                     class="reflection-input"
                     rows="3"
-                    placeholder="오늘 배운 내용을 적어주세요. 추후 AI코치가 피드백을 제공해드립니다."
+                    placeholder="오늘 배운 내용을 적어주세요. AI 코치가 피드백을 제공해드립니다."
                   ></textarea>
                 </label>
               </div>
@@ -474,7 +474,7 @@ onMounted(() => {
 }
 
 .btn-generate:hover {
-  background-color: #33a06f;
+  background-color: #64748b;
 }
 
 .btn-generate:disabled {
@@ -633,7 +633,7 @@ onMounted(() => {
 
 /* Custom Scrollbar */
 .custom-scrollbar::-webkit-scrollbar,
-:global(.video-body::-webkit-scrollbar) { width: 6px; }
+:global(.video-body::-webkit-scrollbar) { width: 1px; }
 .custom-scrollbar::-webkit-scrollbar-thumb,
 :global(.video-body::-webkit-scrollbar-thumb) { background: #cbd5e1; border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-track,
@@ -756,10 +756,8 @@ onMounted(() => {
 }
 
 :global(.reflection-block) {
-  background: #f8fafc;
   border-radius: 12px;
   padding: 20px;
-  border: 1px solid #e2e8f0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -788,8 +786,8 @@ onMounted(() => {
 }
 :global(.reflection-input:focus) {
   outline: none;
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+  border-color: #94a3b8;
+  
 }
 
 :global(.reflection-actions) {
@@ -798,7 +796,7 @@ onMounted(() => {
 }
 
 :global(.reflection-save) {
-  background: #10b981;
+  background: #1f2933;
   color: white;
   border: none;
   padding: 10px 20px;
@@ -808,7 +806,7 @@ onMounted(() => {
   transition: background 0.2s;
 }
 :global(.reflection-save:hover) {
-  background: #059669;
+  background: #94a3b8;
 }
 :global(.reflection-save:disabled) {
   background: #94a3b8;

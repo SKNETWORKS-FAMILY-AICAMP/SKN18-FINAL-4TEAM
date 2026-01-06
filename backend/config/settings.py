@@ -25,6 +25,7 @@ INSTALLED_APPS = [
     "api",
     "anti_cheat",
     "graph_sync.apps.GraphSyncConfig",
+    "planner",
 ]
 
 MIDDLEWARE = [

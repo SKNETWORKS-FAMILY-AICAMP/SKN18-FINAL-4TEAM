@@ -63,6 +63,20 @@ CREATE TABLE user_profile(
   updated_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE recommended_videos (
+  id            SERIAL       PRIMARY KEY,
+  code_lang     TEXT[]       NULL,
+  video_url     VARCHAR(200) NOT NULL,
+  summary       TEXT         NOT NULL,
+  category      TEXT[]       NOT NULL,
+  domain        VARCHAR(50)  NOT NULL,
+  created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
+);
+
+-- recommended_videos 인덱스 (검색 성능 향상)
+CREATE INDEX IF NOT EXISTS idx_rv_domain ON recommended_videos(domain);
+CREATE INDEX IF NOT EXISTS idx_rv_category_gin ON recommended_videos USING GIN(category);
+CREATE INDEX IF NOT EXISTS idx_rv_code_lang_gin ON recommended_videos USING GIN(code_lang);
 
 CREATE TABLE auth_identities (
   id SERIAL PRIMARY KEY,
@@ -86,7 +100,7 @@ CREATE TABLE IF NOT EXISTS livecoding_reports (
     final_score       NUMERIC(6,2),
     final_grade       VARCHAR(8),
     graph_output      JSONB        DEFAULT '{}'::jsonb,
-    problem_text            TEXT,
+    problem           JSONB,
     code_feedback           TEXT,
     problem_solving_evaluation JSONB,
     initial_strategy        TEXT,

@@ -20,6 +20,9 @@
             <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="closeMenu">
               LIVE CODING
             </RouterLink>
+            <RouterLink to="/studyplan" class="dropdown-link dropdown-link--menu" @click="closeMenu">
+              PLANNER
+            </RouterLink>
           </div>
         </Transition>
       </div>
@@ -432,12 +435,16 @@ const closeDropdown = () => {
 const handleLogout = async () => {
   if (isLoggingOut.value) return;
   isLoggingOut.value = true;
-  setTimeout(async () => {
+  try {
     await logout();
-    isLoggingOut.value = false;
     closeDropdown();
-    void router.push({ name: "home" });
-  }, 360);
+    isMenuOpen.value = false;
+    await router.push({ name: "login" });
+  } catch (err) {
+    console.error("[logout] failed", err);
+  } finally {
+    isLoggingOut.value = false;
+  }
 };
 
 const syncProfile = () => {

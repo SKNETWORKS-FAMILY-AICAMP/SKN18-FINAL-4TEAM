@@ -142,6 +142,81 @@
         </div>
       </div>
 
+      <!-- 성장 리포트 안내 카드 -->
+      <div class="card insight-card">
+        <div class="insight-header">
+          <div>
+            <h2 class="insight-title">나의 라이브코딩 성장 리포트</h2>
+            <p class="insight-desc">라이브코딩 결과를 바탕으로 강점과 개선 포인트를 한눈에 정리해드립니다.</p>
+          </div>
+          <div v-if="hasTrend && sparkPath" class="trend-box">
+            <div class="trend-chart">
+              <svg :viewBox="'0 0 180 50'" preserveAspectRatio="none">
+                <path :d="sparkPath" fill="none" stroke="#111827" stroke-width="2" />
+              </svg>
+            </div>
+          </div>
+        </div> 
+        <div class="agent-row">
+          <div class="agent-status" :class="{ error: !!aggregateError }">
+            <span v-if="aggregateLoading">성장 리포트 갱신 중입니다...</span>
+            <span
+              v-else-if="
+                aggregateError && !latestGrowthContent && !aggregateOutputText
+              "
+            >
+              {{ aggregateError }}
+            </span>
+            <span
+              v-else-if="
+                !payloadLatestAt && !latestGrowthContent && !aggregateOutputText
+              "
+            >
+              아직 성장 리포트가 없습니다. 리포트가 3개 이상 쌓이면 자동 생성됩니다.
+            </span>
+          </div>
+          <div v-if="payloadLatestAt" class="agent-updated">
+            최근 갱신 시점: {{ formatDate(payloadLatestAt) }}
+          </div>
+        </div>
+        <div v-if="parsedAggregate" class="agent-output rich">
+          <div v-if="parsedAggregate.strengths?.length" class="agg-section">
+            <div class="agg-title">💪 강점</div>
+            <ul class="agg-list">
+              <li v-for="(item, idx) in parsedAggregate.strengths" :key="`s-${idx}`">{{ item }}</li>
+            </ul>
+          </div>
+          <div v-if="parsedAggregate.weaknesses?.length" class="agg-section">
+            <div class="agg-title">⚠️ 약점</div>
+            <ul class="agg-list">
+              <li v-for="(item, idx) in parsedAggregate.weaknesses" :key="`w-${idx}`">{{ item }}</li>
+            </ul>
+          </div>
+          <div v-if="parsedAggregate.improvements?.length" class="agg-section">
+            <div class="agg-title">🔧 개선 포인트</div>
+            <ul class="agg-list">
+              <li v-for="(item, idx) in parsedAggregate.improvements" :key="`i-${idx}`">{{ item }}</li>
+            </ul>
+          </div>
+          <div v-if="parsedAggregate.changes?.length" class="agg-section">
+            <div class="agg-title">🔄 변화</div>
+            <ul class="agg-list">
+              <li v-for="(item, idx) in parsedAggregate.changes" :key="`c-${idx}`">{{ item }}</li>
+            </ul>
+          </div>
+        </div>
+        <div v-else-if="aggregateOutputText" class="agent-output rich">
+          {{ aggregateOutputText }}
+        </div>
+        <div
+          v-else-if="!aggregateLoading && !aggregateError"
+          class="agent-output"
+        >
+          성장 리포트가 아직 생성되지 않았습니다. 리포트가 3개 이상 쌓이면 자동으로 생성돼요.
+        </div>
+      </div>
+
+      <!-- 리포트 모달: showreport 라우트를 iframe으로 재사용 -->
       <div v-if="showModal" class="modal-backdrop" @click.self="closeModal">
         <div class="modal">
           <div class="modal-header">
@@ -168,20 +243,13 @@
 </template>
 
 <script setup>
-import { onMounted, reactive, ref } from "vue";
+import { computed, onMounted, ref, reactive } from "vue";
 import { RouterLink } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 
 const { user, fetchProfile, ensureValidSession, token, BACKEND_BASE } = useAuth();
 
-const reports = ref([]);
-const listLoading = ref(false);
-const listError = ref("");
-const showModal = ref(false);
-const selectedSessionId = ref("");
-const reportPageUrl = "/coding-test/report";
-const reportFrameRef = ref(null);
-
+// 프로필 폼/로딩 상태
 const profileForm = reactive({
   graduated_school: "",
   university: "",
@@ -194,16 +262,83 @@ const profileForm = reactive({
   desired_role: [],
   detailed_role: [],
   region: [],
-  region_single: ""
+  region_single: "",
 });
-
 const profileLoading = ref(false);
 const profileError = ref("");
+
+const reports = ref([]);
+const listLoading = ref(false);
+const listError = ref("");
+const showModal = ref(false);
+const selectedSessionId = ref("");
+const reportPageUrl = "/coding-test/report";
+const reportFrameRef = ref(null);
+
+// 누적 딥 에이전트 리포트 (DB에 저장된 최신 growth insight를 사용)
+const aggregateLoading = ref(false);
+const aggregateError = ref("");
+const aggregateOutput = ref("");
+const payloadUserId = ref("");
+const payloadLatestAt = ref("");
+const payloadReports = ref([]);
+const payloadReportIds = ref([]);
+const payloadGrowth = ref(null);
+const payloadSelectedReport = ref([]);
+const payloadPrevAgentResult = ref("");
+const payloadReadyToRun = ref(false);
+const payloadRunMode = ref("");
+const payloadCachedResult = ref(null);
+const latestGrowthContent = ref(""); // 서버에서 받은 growth_insight.report_content
+const latestGrowthVersion = ref(null);
+const latestGrowthIds = ref([]);
+const AGG_TS_KEY = "jobtory_last_aggregate_ts";
+
+// final_score 추세용
+const trendLoading = ref(false);
+const trendError = ref("");
+const trendPoints = ref([]); // [{t, score}]
+const latestScore = computed(() => {
+  if (!trendPoints.value.length) return null;
+  return trendPoints.value[trendPoints.value.length - 1].score;
+});
+const scoreDelta = computed(() => {
+  if (trendPoints.value.length < 2) return null;
+  const prev = trendPoints.value[trendPoints.value.length - 2].score;
+  const curr = trendPoints.value[trendPoints.value.length - 1].score;
+  if (prev === null || curr === null) return null;
+  return curr - prev;
+});
+
+const sparkPath = computed(() => {
+  const pts = trendPoints.value;
+  if (pts.length < 3) return "";
+  const scores = pts.map((p) => (p.score == null ? 0 : p.score));
+  const min = Math.min(...scores);
+  const max = Math.max(...scores);
+  const width = 180;
+  const height = 50;
+  const span = Math.max(pts.length - 1, 1);
+  const norm = (v) => {
+    if (max === min) return height / 2;
+    return height - ((v - min) / (max - min)) * height;
+  };
+  const coords = pts.map((p, idx) => {
+    const x = (idx / span) * width;
+    const y = norm(p.score ?? min);
+    return `${x},${y}`;
+  });
+  return `M ${coords.join(" L ")}`;
+});
+
+const hasTrend = computed(() => trendPoints.value.length >= 3);
 
 onMounted(() => {
   if (!user.value) void fetchProfile();
   void fetchReports();
+  void fetchPayloadAndMaybeAggregate();
   void fetchUserProfile();
+  void fetchTrend();
 });
 
 const fetchReports = async () => {
@@ -230,6 +365,37 @@ const fetchReports = async () => {
     listError.value = "리포트 목록을 불러오지 못했습니다.";
   } finally {
     listLoading.value = false;
+  }
+};
+
+const fetchTrend = async () => {
+  trendLoading.value = true;
+  trendError.value = "";
+  trendPoints.value = [];
+  try {
+    const ok = await ensureValidSession();
+    if (!ok) {
+      trendError.value = "로그인이 필요합니다.";
+      return;
+    }
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/trend/`, {
+      headers: { Authorization: `Bearer ${token.value}` },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      trendError.value = data?.detail || "점수 추세를 불러오지 못했습니다.";
+      return;
+    }
+    const results = Array.isArray(data.results) ? data.results : [];
+    trendPoints.value = results.map((r) => ({
+      t: r.created_at,
+      score: typeof r.final_score === "number" ? r.final_score : null,
+    }));
+  } catch (e) {
+    console.error(e);
+    trendError.value = "점수 추세를 불러오지 못했습니다.";
+  } finally {
+    trendLoading.value = false;
   }
 };
 
@@ -269,6 +435,296 @@ const formatDate = (iso) => {
   }
 };
 
+const aggregateOutputText = computed(() => {
+  // 로딩 중에는 기존 growth를 잠시 숨긴다
+  if (aggregateLoading.value) return "";
+  const val = latestGrowthContent.value || aggregateOutput.value;
+  if (!val) return "";
+  if (typeof val === "string") return val;
+  if (val.text) return val.text;
+  if (val.agent_result && val.agent_result.text) return val.agent_result.text;
+  try {
+    return JSON.stringify(val, null, 2);
+  } catch {
+    return String(val);
+  }
+});
+
+const parsedAggregate = computed(() => {
+  if (aggregateLoading.value) return null;
+  const val = latestGrowthContent.value || aggregateOutput.value;
+  let obj = null;
+  if (typeof val === "string") {
+    try {
+      obj = JSON.parse(val);
+    } catch {
+      obj = null;
+    }
+  } else if (val && typeof val === "object") {
+    obj = val.agent_result || val;
+    if (typeof obj === "string") {
+      try {
+        obj = JSON.parse(obj);
+      } catch {
+        obj = null;
+      }
+    }
+  }
+  if (obj && typeof obj === "object") {
+    return {
+      strengths: obj.strengths || [],
+      weaknesses: obj.weaknesses || [],
+      improvements: obj.improvements || [],
+      changes: obj.changes || [],
+    };
+  }
+  return null;
+});
+
+const runAggregateAgent = async () => {
+  aggregateLoading.value = true;
+  aggregateError.value = "";
+  try {
+    const ok = await ensureValidSession();
+    if (!ok) {
+      aggregateError.value = "로그인이 필요합니다.";
+      return;
+    }
+
+    // 프론트 강제 호출 시에도 run_mode별 가드 유지
+    if (payloadRunMode.value === "blocked") {
+      aggregateError.value = "최소 3개의 리포트가 필요합니다.";
+      return;
+    }
+
+    if (payloadRunMode.value === "cached") {
+      const cached =
+        payloadCachedResult.value ||
+        payloadPrevAgentResult.value ||
+        payloadGrowth.value?.report_content;
+      if (cached) {
+        latestGrowthContent.value = cached;
+        latestGrowthIds.value =
+          payloadGrowth.value?.report_ids || payloadReportIds.value || [];
+      }
+      return;
+    }
+
+    const reportCount =
+      payloadReportIds.value.length ||
+      payloadReports.value.length ||
+      payloadSelectedReport.value.length;
+    if (!reportCount) {
+      aggregateError.value = "리포트가 없습니다.";
+      return;
+    }
+    if (!payloadGrowth.value && reportCount < 3) {
+      aggregateError.value = "최소 3개의 리포트가 필요합니다.";
+      return;
+    }
+
+    const body = {
+      user_id: payloadUserId.value,
+      report_ids: payloadReportIds.value,
+      run_mode: payloadRunMode.value,
+    };
+    if (payloadRunMode.value === "initial") {
+      body.reports = payloadReports.value;
+    } else if (payloadRunMode.value === "incremental") {
+      body.selected_reports = payloadSelectedReport.value || [];
+      body.prev_agent_result = payloadPrevAgentResult.value || "";
+    } else {
+      body.reports = payloadReports.value;
+    }
+
+    const resp = await fetch(
+      `${BACKEND_BASE}/api/livecoding/reports/aggregate/`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token.value}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+      }
+    );
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok) {
+      aggregateError.value = data?.detail || `HTTP ${resp.status}`;
+      // 3개 미만 블록이면 기존 성장 리포트를 그대로 노출
+      if (
+        data?.block_reason === "need_min_reports" &&
+        payloadGrowth.value?.report_content
+      ) {
+        latestGrowthContent.value = payloadGrowth.value.report_content;
+        latestGrowthIds.value = payloadGrowth.value.report_ids || [];
+      }
+      return;
+    }
+    // agent_result_raw가 있으면 디버깅용으로 콘솔에 남김
+    if (data.agent_result_raw !== undefined) {
+      console.debug("[aggregate] raw response", data.agent_result_raw);
+    }
+    const agentResult =
+      data.agent_result !== undefined ? data.agent_result : data;
+    aggregateOutput.value = agentResult;
+    // 최신 growth insight 저장 (문자열이면 그대로, 객체면 report_content 우선)
+    if (typeof agentResult === "string") {
+      latestGrowthContent.value = agentResult;
+    } else if (agentResult && typeof agentResult === "object") {
+      latestGrowthContent.value =
+        agentResult.report_content ||
+        agentResult.text ||
+        JSON.stringify(agentResult);
+    }
+    const usedIds =
+      data.used_report_ids ||
+      agentResult?.report_ids ||
+      payloadReportIds.value ||
+      [];
+    latestGrowthIds.value = Array.isArray(usedIds) ? usedIds : [];
+    if (data.growth_version !== undefined) {
+      latestGrowthVersion.value = data.growth_version;
+    }
+    // 페이로드 최신 ts 로컬 저장
+    const ts =
+      data.latest_updated_at ||
+      payloadLatestAt.value ||
+      new Date().toISOString();
+    payloadLatestAt.value = ts;
+    try {
+      localStorage.setItem(AGG_TS_KEY, ts);
+    } catch {}
+  } catch (e) {
+    console.error(e);
+    aggregateError.value = "에이전트 실행 중 오류가 발생했습니다.";
+  } finally {
+    aggregateLoading.value = false;
+  }
+};
+
+const fetchPayload = async () => {
+  const ok = await ensureValidSession();
+  if (!ok) {
+    aggregateError.value = "로그인이 필요합니다.";
+    return false;
+  }
+  try {
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/reports/payload/`, {
+      headers: {
+        Authorization: `Bearer ${token.value}`,
+      },
+    });
+    const data = await resp.json().catch(() => ({}));
+    payloadUserId.value = data.user_id || "";
+    // 성장 리포트 최신 시점: deepagent가 만든 성장 리포트(created_at) 우선
+    const growthAt = data.user_growth_insight?.created_at || "";
+    payloadLatestAt.value =
+      growthAt || data.latest_created_at || data.latest_updated_at || "";
+    payloadReports.value = data.reports || [];
+    payloadReportIds.value = data.report_ids || [];
+    payloadGrowth.value = data.user_growth_insight || null;
+    payloadSelectedReport.value = data.selected_report || data.selected_reports || [];
+    payloadPrevAgentResult.value = data.prev_agent_result || "";
+    payloadReadyToRun.value = !!data.ready_to_run;
+    payloadRunMode.value = data.run_mode || "";
+    payloadCachedResult.value = data.cached_agent_result || null;
+    if (!resp.ok) {
+      aggregateError.value = data?.detail || `HTTP ${resp.status}`;
+      return false;
+    }
+    // 3개 미만 등으로 실행 차단된 경우 (성장 리포트 영역에만 안내)
+    if (data.run_mode === "blocked") {
+      const msg = "최소 3개의 리포트가 쌓여야 성장 리포트를 실행합니다.";
+      aggregateError.value = msg;
+      payloadReadyToRun.value = false;
+      // 기존 성장 리포트가 있으면 그대로 표시
+      if (data.user_growth_insight?.report_content) {
+        latestGrowthContent.value = data.user_growth_insight.report_content;
+        latestGrowthVersion.value = data.user_growth_insight.version || null;
+        latestGrowthIds.value = data.user_growth_insight.report_ids || [];
+      }
+      return true; // 페이로드는 읽었으나 실행은 안 함
+    }
+    // 최신 growth insight가 있으면 바로 채워서 표시
+    if (data.user_growth_insight && data.user_growth_insight.report_content) {
+      latestGrowthContent.value = data.user_growth_insight.report_content;
+      latestGrowthVersion.value = data.user_growth_insight.version || null;
+      latestGrowthIds.value = data.user_growth_insight.report_ids || [];
+    }
+    // incremental/cached 등의 이전 결과가 있으면 즉시 표출
+    if (!latestGrowthContent.value && payloadPrevAgentResult.value) {
+      latestGrowthContent.value = payloadPrevAgentResult.value;
+      latestGrowthIds.value =
+        data.user_growth_insight?.report_ids || payloadReportIds.value || [];
+      if (!payloadLatestAt.value) {
+        payloadLatestAt.value =
+          data.latest_created_at ||
+          data.latest_updated_at ||
+          data.user_growth_insight?.created_at ||
+          new Date().toISOString();
+      }
+    }
+    // 백엔드가 cached라고 알려준 경우 바로 표시
+    if (!payloadReadyToRun.value && data.run_mode === "cached" && data.cached_agent_result) {
+      latestGrowthContent.value = data.cached_agent_result;
+      latestGrowthIds.value = data.user_growth_insight?.report_ids || [];
+    }
+    return true;
+  } catch (e) {
+    console.error(e);
+    aggregateError.value = "리포트 페이로드를 불러오지 못했습니다.";
+    return false;
+  }
+};
+
+const fetchPayloadAndMaybeAggregate = async () => {
+  const fetched = await fetchPayload();
+  if (!fetched) return;
+
+  const latest = payloadLatestAt.value || "";
+  let lastTs = "";
+  try {
+    lastTs = localStorage.getItem(AGG_TS_KEY) || "";
+  } catch {}
+
+  // blocked는 실행하지 않고 안내만 유지
+  if (payloadRunMode.value === "blocked") {
+    return;
+  }
+
+  // cached라면 기존 결과만 표시
+  if (payloadRunMode.value === "cached") {
+    const cached =
+      payloadCachedResult.value ||
+      payloadPrevAgentResult.value ||
+      payloadGrowth.value?.report_content;
+    if (cached) {
+      latestGrowthContent.value = cached;
+      latestGrowthIds.value =
+        payloadGrowth.value?.report_ids || payloadReportIds.value || [];
+    }
+    return;
+  }
+
+  // 새 리포트가 있으면 바로 갱신 실행
+  const hasNewReports =
+    payloadReportIds.value.some((id) => !latestGrowthIds.value.includes(id));
+  if (
+    hasNewReports ||
+    payloadRunMode.value === "initial" ||
+    payloadRunMode.value === "incremental" ||
+    (latest && latest !== lastTs)
+  ) {
+    void runAggregateAgent();
+    return;
+  }
+
+  // 최신 growth insight가 없거나, latest ts가 바뀌었으면 실행 시도
+  if ((!latestGrowthContent.value || (latest && latest !== lastTs))) {
+    void runAggregateAgent();
+  }
+};
 const mapProfileToForm = (data) => {
   profileForm.graduated_school = data.graduated_school || "";
   profileForm.university = data.university || "";
@@ -548,12 +1004,16 @@ const formatList = (arr) => {
   margin: 0;
   font-size: 22px;
   font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
 }
 
 .reports-subtitle {
-  margin: 4px 0 0;
+  margin: 6px 0 0;
   color: #4b5563;
   font-size: 14px;
+  letter-spacing: -0.01em;
+  line-height: 1.6;
 }
 
 .refresh-btn {
@@ -681,6 +1141,115 @@ const formatList = (arr) => {
   height: 100%;
   border: none;
   background: #0f1115;
+}
+
+.insight-card {
+  width: min(960px, 100%);
+  border: 1px dashed #d4d4d8;
+  background: linear-gradient(135deg, #fbfbfe 0%, #f4f6ff 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.insight-title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.insight-desc {
+  margin: 6px 0 0;
+  color: #4b5563;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  line-height: 1.6;
+}
+
+.insight-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.trend-box {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.trend-chart {
+  width: 180px;
+  height: 50px;
+}
+.trend-chart svg {
+  width: 100%;
+  height: 100%;
+}
+.trend-placeholder {
+  width: 180px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  color: #6b7280;
+  background: #f9fafb;
+  border-radius: 8px;
+  border: 1px dashed #e5e7eb;
+}
+
+
+.agent-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.agent-status {
+  font-size: 13px;
+  color: #475569;
+}
+
+.agent-status.error {
+  color: #dc2626;
+}
+
+.agent-updated {
+  justify-self: end;
+  font-size: 13px;
+  color: #4b5563;
+}
+
+.agent-output {
+  margin-top: 8px;
+  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  background: #fff;
+  padding: 12px;
+  white-space: pre-line;
+  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #0f172a;
+}
+
+.agg-section {
+  margin-bottom: 10px;
+}
+
+.agg-title {
+  font-weight: 800;
+  margin-bottom: 6px;
+}
+
+.agg-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #1f2937;
 }
 
 @media (max-width: 768px) {

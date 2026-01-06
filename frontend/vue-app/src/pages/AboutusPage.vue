@@ -105,7 +105,7 @@ const members = [
   { name: "김규리", role: "Project Manager", img: new URL("../assets/김규리.png", import.meta.url).href, github: "https://github.com/GyuriKimm" },
   { name: "김준규", role: "Assoc. PM", img: new URL("../assets/김준규.png", import.meta.url).href, github: "https://github.com/JungyuOO" },
   { name: "김민주", role: "Crew", img: new URL("../assets/김민주.png", import.meta.url).href, github: "https://github.com/kmjj0801" },
-  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong00" },
+  { name: "손주영", role: "Crew", img: new URL("../assets/손주영.png", import.meta.url).href, github: "https://github.com/sonjuyeong-00" },
   { name: "정동석", role: "Crew", img: new URL("../assets/정동석.jpg", import.meta.url).href, github: "https://github.com/dsj-1004" },
   { name: "채린", role: "Crew", img: new URL("../assets/채린.png", import.meta.url).href, github: "https://github.com/cofls99" },
 ];

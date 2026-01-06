@@ -11,6 +11,7 @@ import io
 import os
 import tempfile
 import wave
+import threading
 from typing import Any, Dict, List, Optional, Mapping
 
 from openai import OpenAI
@@ -56,7 +57,9 @@ class STTClient:
         self._prompt = (prompt or "").strip()
         self._extra_engine_kwargs: Dict[str, Any] = dict(extra_engine_kwargs)
 
-        self._lock = asyncio.Lock()
+        # Use a simple threading lock to serialize OpenAI calls and avoid
+        # creating/destroying event loops per request on Windows (Proactor loop issues).
+        self._lock = threading.Lock()
 
     # --- (옵션) 정말로 raw PCM을 받을 때만 쓰는 유틸: 지금은 안 써도 됨 ----
     @staticmethod
@@ -176,15 +179,16 @@ class STTClient:
     #  STT 메인 로직 (async)
     # -------------------------
 
-    async def _run_once_pcm(self, pcm_bytes: bytes) -> List[Dict[str, Any]]:
-        loop = asyncio.get_running_loop()
-        async with self._lock:
-            return await loop.run_in_executor(
-                None, self._transcribe_pcm_sync_impl, pcm_bytes
-            )
-
     async def transcribe_pcm(self, pcm_bytes: bytes) -> List[Dict[str, Any]]:
-        return await self._run_once_pcm(pcm_bytes)
+        """
+        Async-friendly wrapper: runs the sync transcribe in a thread executor
+        so callers inside an event loop can await safely without spawning
+        new event loops (which breaks on Windows Proactor).
+        """
+        loop = asyncio.get_running_loop()
+        return await loop.run_in_executor(None, self.transcribe_pcm_sync, pcm_bytes)
 
     def transcribe_pcm_sync(self, pcm_bytes: bytes) -> List[Dict[str, Any]]:
-        return asyncio.run(self.transcribe_pcm(pcm_bytes))
+        # Serialize OpenAI calls; avoid asyncio.run to prevent Proactor cleanup errors
+        with self._lock:
+            return self._transcribe_pcm_sync_impl(pcm_bytes)

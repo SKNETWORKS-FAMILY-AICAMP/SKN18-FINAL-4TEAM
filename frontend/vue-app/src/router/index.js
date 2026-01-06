@@ -13,6 +13,7 @@ import LiveCodingSettingPage from "../pages/LiveCodingSettingPage.vue";
 import ProfileEditPage from "../pages/ProfileEditPage.vue";
 import RenderingPage from "../pages/rendering.vue";
 import ShowReportPage from "../pages/showreport.vue";
+import StudyPlanPage from "../pages/StudyPlanPage.vue";
 
 const routes = [
   { path: "/", name: "home", component: MainPage },
@@ -28,6 +29,7 @@ const routes = [
   { path: "/profile/edit", name: "profile-edit", component: ProfileEditPage, meta: { requiresAuth: true } },
   { path: "/coding-test/rendering", name: "livecoding-rendering", component: RenderingPage },
   { path: "/coding-test/report", name: "livecoding-report", component: ShowReportPage },
+  { path: "/studyplan", name: "studyplan", component: StudyPlanPage },
 ];
 
 const router = createRouter({

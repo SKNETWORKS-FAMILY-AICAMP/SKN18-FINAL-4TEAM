@@ -1,4 +1,6 @@
 import csv
+import ast
+import json
 from pathlib import Path
 import psycopg2
 from psycopg2 import sql
@@ -32,6 +34,19 @@ with open(CSV_DIR / "coding_problems.csv", "r", encoding="utf-8-sig", newline=""
     reader = csv.DictReader(f)
     count = 0
     for row in reader:
+        algorithm = row.get("algorithm")
+        if algorithm:
+            # Normalize algorithm field to valid JSON (Postgres json/jsonb)
+            try:
+                json.loads(algorithm)
+                algorithm_json = algorithm
+            except json.JSONDecodeError:
+                try:
+                    algorithm_json = json.dumps(ast.literal_eval(algorithm))
+                except (ValueError, SyntaxError):
+                    algorithm_json = json.dumps([algorithm])
+        else:
+            algorithm_json = None
         cur.execute(
             "INSERT INTO coding_problem (problem_id, problem, difficulty, category, algorithm) "
             "VALUES (%s, %s, %s, %s, %s)",
@@ -40,7 +55,7 @@ with open(CSV_DIR / "coding_problems.csv", "r", encoding="utf-8-sig", newline=""
                 row["problem"],
                 row["difficulty"],
                 row["category"],
-                row.get("algorithm"),
+                algorithm_json,
             )
         )
         count += 1

@@ -84,6 +84,7 @@ class LiveCodingPreloadView(APIView):
                 "function_name": problem_lang.function_name,
                 "starter_code": problem_lang.starter_code,
                 "test_cases": test_cases,
+                "algorithm":  problem.algorithm
             },
             status=status.HTTP_200_OK,
         )

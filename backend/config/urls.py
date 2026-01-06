@@ -6,4 +6,6 @@ urlpatterns = [
     path("api/", include("api.urls")),
     path("api/stt/", include("stt.urls")),
     path("mediapipe/", include("anti_cheat.urls")),
+    path("api/", include("api.urls")),
+    path("api/", include("planner.urls")),
 ]

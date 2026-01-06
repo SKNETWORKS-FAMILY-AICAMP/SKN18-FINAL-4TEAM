@@ -103,7 +103,7 @@ class LivecodingReport(models.Model):
     final_score = models.DecimalField(max_digits=6, decimal_places=2, null=True, blank=True)
     final_grade = models.CharField(max_length=8, null=True, blank=True)
     graph_output = models.JSONField(default=dict)
-    problem_text = models.TextField(null=True, blank=True)
+    problem = models.JSONField(null=True, blank=True, default=dict)
     code_feedback = models.TextField(null=True, blank=True)
     problem_solving_evaluation = models.JSONField(null=True, blank=True)
     initial_strategy = models.TextField(null=True, blank=True)
@@ -130,6 +130,24 @@ class LivecodingReport(models.Model):
         db_table = "livecoding_reports"
         indexes = [models.Index(fields=["user", "session_id"], name="idx_lc_report_user_sess")]
 
+class UserGrowthInsight(models.Model):
+    user_id = models.CharField(max_length=64)  # unique 제거
+    version = models.IntegerField()            # user별 증가
+    window_size = models.IntegerField(default=3)
+    report_ids = models.JSONField(default=list)
+    report_content = models.TextField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "user_growth_insight"
+        indexes = [
+            models.Index(fields=["user_id", "-version"]),
+            # 또는 created_at 기준
+        ]
+        constraints = [
+            models.UniqueConstraint(fields=["user_id", "version"], name="uq_user_version")
+        ]
 
 class ProfileOption(models.Model):
     id = models.AutoField(primary_key=True)

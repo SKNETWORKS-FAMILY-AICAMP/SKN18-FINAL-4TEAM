@@ -14,7 +14,9 @@ def _difficulties_from_grade(grade: str) -> list:
     if grade in {"B+", "B"}:
         return ["normal", "hard"]
     if grade in {"C+", "C"}:
-        return ["normal"]
+        return ["normal", "easy"]
+    if grade in {"D+", "D", "F"}:
+        return ["easy"]
     return ["normal"]
 
 

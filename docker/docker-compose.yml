@@ -32,8 +32,6 @@ services:
     image: neo4j:latest
     container_name: neo4j
     restart: unless-stopped
-    env_file:
-      - ../.env
     ports:
       - "7474:7474"
       - "7687:7687"

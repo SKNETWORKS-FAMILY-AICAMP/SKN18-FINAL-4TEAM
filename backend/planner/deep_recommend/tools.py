@@ -78,6 +78,9 @@ def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 5) -> Dict
         # domain은 반드시 둘 중 하나라고 했으니 equality로 강하게
         if domain in ("algorithm", "live_coding"):
             filters &= Q(domain=domain)
+            # live_coding은 언어 제약을 걸지 않는다
+            if domain == "live_coding":
+                code_lang_vals = []
         else:
             # 잘못 들어오면 결과 0이 나오게 하는 대신, note로 알려줌
             return {
@@ -92,7 +95,7 @@ def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 5) -> Dict
         else:
             return {"query": query, "results": [], "note": "missing category (list)"}
 
-        # code_lang도 ArrayField -> overlap (옵션)
+        # code_lang도 ArrayField -> overlap (옵션) — 단, live_coding일 땐 적용하지 않는다
         if code_lang_vals:
             filters &= Q(code_lang__overlap=code_lang_vals)
 
@@ -129,4 +132,15 @@ def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 5) -> Dict
     except Exception as exc:  # pragma: no cover
         return {"query": query, "results": [], "note": f"DB 조회 실패: {exc}", "debug": debug}
 
-    return {"query": query, "results": results, "note": ("ok" if results else "no results"), "debug": debug}
+    note = "ok" if results else "no results"
+    payload = {"query": query, "results": results, "note": note, "debug": debug}
+    try:
+        print(
+            f"[video_search_tool] note={note} mode={debug.get('mode')} "
+            f"domain={debug.get('domain', '')} category={debug.get('category', '')} "
+            f"code_lang={debug.get('code_lang', '')} results={len(results)}",
+            flush=True,
+        )
+    except Exception:
+        pass
+    return payload

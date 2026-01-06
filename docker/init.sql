@@ -73,6 +73,11 @@ CREATE TABLE recommended_videos (
   created_at    TIMESTAMP   DEFAULT CURRENT_TIMESTAMP
 );
 
+-- recommended_videos 인덱스 (검색 성능 향상)
+CREATE INDEX IF NOT EXISTS idx_rv_domain ON recommended_videos(domain);
+CREATE INDEX IF NOT EXISTS idx_rv_category_gin ON recommended_videos USING GIN(category);
+CREATE INDEX IF NOT EXISTS idx_rv_code_lang_gin ON recommended_videos USING GIN(code_lang);
+
 CREATE TABLE auth_identities (
   id SERIAL PRIMARY KEY,
   user_id VARCHAR(50) NOT NULL REFERENCES users(user_id) ON DELETE CASCADE,

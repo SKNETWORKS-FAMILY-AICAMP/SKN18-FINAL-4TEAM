@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -34,8 +34,28 @@ const calendarOptions = reactive({
 const isVideoOpen = ref(false);
 const activeVideo = ref(null);
 const lectureNote = ref('');
-const completionLevel = ref('완료');
 const reflectionSaving = ref(false);
+const statusLabel = computed(() => {
+  const raw = (activeVideo.value?.extendedProps?.is_completed || '').toString().toUpperCase();
+  if (raw === 'COMPLETE') return '완료';
+  if (raw === 'NEEDS_WORK' || raw === 'NEEDS_WORK') return '미흡';
+  if (raw === 'POLISH') return '수정 필요';
+  return '미진행';
+});
+const statusClass = computed(() => {
+  const label = statusLabel.value;
+  if (label === '완료') return 'status-badge--done';
+  if (label === '수정 필요') return 'status-badge--doing';
+  if (label === '미흡') return 'status-badge--todo';
+  return 'status-badge--todo';
+});
+const statusStyle = computed(() => {
+  const label = statusLabel.value;
+  if (label === '완료') return { background: '#e7f5ff', color: '#1f6f54', border: '1px solid #86efac' };
+  if (label === '수정 필요') return { background: '#eef2ff', color: '#312e81', border: '1px solid #c7d2fe' };
+  if (label === '미흡') return { background: '#fff0e5', color: '#9a3412', border: '1px solid #fdba74' };
+  return { background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' };
+});
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return '';
@@ -56,7 +76,6 @@ function getYouTubeEmbedUrl(url) {
 function openVideoModal(event) {
   activeVideo.value = event;
   lectureNote.value = event?.extendedProps?.lecture_note ?? '';
-  completionLevel.value = event?.extendedProps?.is_completed ?? '완료';
   isVideoOpen.value = true;
 }
 
@@ -67,6 +86,12 @@ function closeVideoModal() {
 
 async function saveReflection() {
   if (!activeVideo.value) {
+    return;
+  }
+
+  const trimmedNote = (lectureNote.value || "").trim();
+  if (trimmedNote.length < 30) {
+    alert("회고는 30자 이상 작성해주세요.");
     return;
   }
 
@@ -88,8 +113,7 @@ async function saveReflection() {
       `${BACKEND_BASE}/api/tasks/reflection/`,
       {
         task_id: taskId,
-        lecture_note: lectureNote.value,
-        completion_level: completionLevel.value
+        lecture_note: trimmedNote
       },
       {
         headers: {
@@ -98,21 +122,28 @@ async function saveReflection() {
       }
     );
 
-    const updatedComment = response.data?.lecture_note ?? lectureNote.value;
-    const updatedCompleted = response.data?.is_completed ?? completionLevel.value;
+    const updatedComment = response.data?.lecture_note ?? trimmedNote;
+    const updatedCompleted = response.data?.is_completed ?? statusLabel.value;
+    const coachOutput = response.data?.coach_output ?? '';
     if (typeof activeVideo.value.setExtendedProp === 'function') {
       activeVideo.value.setExtendedProp('lecture_note', updatedComment);
       activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
+      if (coachOutput) activeVideo.value.setExtendedProp('coach_output', coachOutput);
     } else {
       activeVideo.value.extendedProps = {
         ...(activeVideo.value.extendedProps || {}),
         lecture_note: updatedComment,
-        is_completed: updatedCompleted
+        is_completed: updatedCompleted,
+        ...(coachOutput ? { coach_output: coachOutput } : {}),
       };
     }
   } catch (error) {
     console.error(error);
-    alert("회고 저장에 실패했습니다.");
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.detail ||
+      "회고 저장에 실패했습니다.";
+    alert(message);
   } finally {
     reflectionSaving.value = false;
   }
@@ -243,6 +274,11 @@ onMounted(() => {
           </div>
           <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
         </div>
+        <div class="video-status">
+          <span :class="['status-badge', statusClass]" :style="statusStyle">
+            {{ statusLabel }}
+          </span>
+        </div>
         <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
         <div class="video-frame">
             <iframe
@@ -258,20 +294,11 @@ onMounted(() => {
         <div class="reflection-block">
           <div class="reflection-fields">
             <label class="reflection-label">
-              완료 상태
-              <select v-model="completionLevel" class="reflection-select" aria-label="완료 상태 선택">
-                <option value="미진행">미진행</option>
-                <option value="진행중">진행중</option>
-                <option value="완료">완료</option>
-              </select>
-            </label>
-            <label class="reflection-label">
               공부한 내용
               <textarea
                 v-model="lectureNote"
                 class="reflection-input"
                 rows="3"
-                maxlength="200"
                 placeholder="오늘 배운 내용을 적어주세요. 추후 AI코치가 피드백을 제공해드립니다."
               ></textarea>
             </label>
@@ -471,7 +498,6 @@ onMounted(() => {
   color: #2f2a1f;
 }
 
-:global(.reflection-select),
 :global(.reflection-input) {
   border: 1px solid #d2d6dc;
   border-radius: 12px;
@@ -545,3 +571,34 @@ onMounted(() => {
   background-color: #fff9db !important;
 }
 </style>
+:global(.video-status) {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+.status-badge--todo {
+  background: #fff0e5;
+  color: #9a3412;
+  border: 1px solid #fdba74;
+}
+.status-badge--doing {
+  background: #eef2ff;
+  color: #312e81;
+  border: 1px solid #c7d2fe;
+}
+.status-badge--done {
+  background: #e6f7ec;
+  color: #14532d;
+  border: 1px solid #86efac;
+}

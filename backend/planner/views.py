@@ -6,10 +6,11 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 from django.db import transaction
 from .deep_recommend.graph import create_recommend_graph
-from .models import StudyPlan, DailyTask
+from .deep_coach.graph import create_evidence_coach_graph
+from .models import StudyPlan, DailyTask, RecommendedVideo
 from api.models import UserGrowthInsight, UserProfile
 
-
+# video recommendation graph 호출
 class GeneratePlanView(APIView):
     permission_classes = [IsAuthenticated]
     agent_app = create_recommend_graph()
@@ -112,7 +113,7 @@ class GeneratePlanView(APIView):
             print(f"[GeneratePlanView] error: {exc}", flush=True)
             return Response({"error": str(exc)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
+# 기존 plan 불러오기
 class LatestStudyPlanView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -162,7 +163,7 @@ class LatestStudyPlanView(APIView):
             status=status.HTTP_200_OK,
         )
 
-
+# 사용자 글 입력 
 class StudyTaskReflectionView(APIView):
     permission_classes = [IsAuthenticated]
 
@@ -172,22 +173,48 @@ class StudyTaskReflectionView(APIView):
             return Response({"error": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
 
         task_id = request.data.get("task_id")
-        completion_level = request.data.get("completion_level") or "완료"
         lecture_note = request.data.get("lecture_note", "")
 
         if task_id is None:
             return Response({"error": "task_id는 필수입니다."}, status=status.HTTP_400_BAD_REQUEST)
 
         lecture_note = (lecture_note or "").strip()
-        if len(lecture_note) > 200:
-            return Response({"error": "lecture_note는 200자 이하여야 합니다."}, status=status.HTTP_400_BAD_REQUEST)
+        if len(lecture_note) < 30:
+            return Response({"error": "올바른 내용을 입력해주세요."}, status=status.HTTP_400_BAD_REQUEST)
 
         task = DailyTask.objects.filter(id=task_id, plan__user=user).first()
         if not task:
             return Response({"error": "작업을 찾을 수 없습니다."}, status=status.HTTP_404_NOT_FOUND)
 
-        task.lecture_note = lecture_note
-        task.is_completed = completion_level
+        # deep_coach 호출: 사용자 글 + 영상 요약 기반 completion_level/feedback
+        video_summary = ""
+        if task.video_id:
+            rv = RecommendedVideo.objects.filter(id=task.video_id).first()
+            video_summary = rv.summary if rv else ""
+
+        coach_input = {
+            "user_id": getattr(user, "user_id", None) or getattr(user, "id", None) or str(user),
+            "video_id": str(task.video_id) if task.video_id is not None else "",
+            "video_summary": video_summary,
+            "draft": lecture_note,
+        }
+        coach_result = {}
+        try:
+            coach_app = create_evidence_coach_graph()
+            coach_result = coach_app.invoke(coach_input)
+            print(f"[coach] input={coach_input} output={coach_result}", flush=True)
+        except Exception as exc:
+            print(f"[StudyTaskReflectionView] coach error: {exc}", flush=True)
+
+        completion_level = coach_result.get("completion_level") or "완료"
+        coach_output = coach_result.get("coach_output") or ""
+
+        # completion_level이 COMPLETE이면 사용자가 입력한 lecture_note 그대로 저장,
+        # 그 외에는 coach_output이 있으면 coach_output을 저장(없으면 사용자가 입력한 내용을 저장)
+        note_to_save = lecture_note if completion_level == "COMPLETE" else coach_output
+
+        task.lecture_note = note_to_save
+        task.is_completed = completion_level or "완료"
         task.save(update_fields=["lecture_note", "is_completed"])
 
         return Response(
@@ -195,6 +222,7 @@ class StudyTaskReflectionView(APIView):
                 "task_id": task.id,
                 "lecture_note": task.lecture_note,
                 "is_completed": task.is_completed,
+                "coach_output": coach_output,
             },
             status=status.HTTP_200_OK,
         )

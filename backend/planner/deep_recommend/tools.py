@@ -32,38 +32,6 @@ def _create_agent(*, model_name: str = DEFAULT_MODEL_NAME, tools: Optional[list]
         tools=tools or [],
         system_prompt=system_prompt,
 )
-    
-def safe_json_parse(text: str) -> Dict[str, Any]:
-    """
-    LLM 응답에서 JSON을 최대한 안전하게 파싱한다.
-    """
-    if not text:
-        return {}
-
-    # 1) 바로 파싱 시도
-    try:
-        return json.loads(text)
-    except Exception:
-        pass
-
-    # 2) ```json ``` 코드블록 제거
-    cleaned = re.sub(r"```json|```", "", text).strip()
-    try:
-        return json.loads(cleaned)
-    except Exception:
-        pass
-
-    # 3) JSON object 부분만 추출
-    match = re.search(r"\{[\s\S]*\}", text)
-    if match:
-        try:
-            return json.loads(match.group())
-        except Exception:
-            pass
-
-    # 4) 실패 시 로그용 반환
-    raise ValueError(f"JSON parsing failed. raw text:\n{text}")
-
 
 @tool
 def video_search_tool(query: Union[str, Dict[str, Any]], limit: int = 5) -> Dict[str, Any]:

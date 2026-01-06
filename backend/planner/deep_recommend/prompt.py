@@ -49,7 +49,7 @@ growth_report와 user_profile만 근거로 needs_profile을 정규화한다.
   예) "python" → "Python 중심", "AI/ML 엔지니어" → "AI/ML 직무 지향", "딥러닝 모델링" → "딥러닝 모델링 관심".
 
 4) language (문자열)
-- user_profile의 tech_stack 등에서 추정(없으면 "").
+- user_profile의 tech_stack 등에서 코드 언어 추정(없으면 "").
 
 반드시 아래 JSON만 반환:
 {
@@ -84,7 +84,7 @@ SLOT_PLANNER_PROMPT = f"""
 규칙:
 - day는 1부터 7까지 1씩 증가.
 - day_plan_topic은 day 1~3 개념/기초, day 4~7 심화/적용 흐름으로 설계한다.
-- domain은 algorithm | live_coding 중 하나만 사용.
+- domain은 algorithm | live_coding 중 하나만 사용하고 7일 계획에 두개는 모두 들어가도록 설계
 - category는 domain에 따라 선택:
   - domain=algorithm → 아래 목록 중 하나를 정확히 사용: {ALGO_CATEGORY_HINT}
   - domain=live_coding → 아래 목록 중 하나를 정확히 사용: {LIVE_CODING_CATEGORY_HINT}
@@ -98,7 +98,7 @@ VIDEO_SELECTOR_PROMPT = """
 너는 VideoSelectorAgent다.
 입력을 통해 넣어진 slots + needs_profile를 근거로, 각 day 슬롯에 맞는 RecommendedVideo 후보를 고른다.
 검색 방식(중요):
-- video_search_tool은 반드시 dict로 호출한다. (문자열 query 금지)
+- video_search_tool은 반드시 dict로 호출한다. (문자열 query 금지, 문자열 호출 시 즉시 실패로 간주하고 dict로 재호출)
 - dict 키 예시:
   {
     "topic": "<day_plan_topic>",
@@ -106,8 +106,6 @@ VIDEO_SELECTOR_PROMPT = """
     "domain": "<slot.domain>",         # "algorithm" | "live_coding"
     "code_lang": ["<needs_profile.language>"],
     "reason": "<slot.reason>",
-    "order": "random",
-    "offset": 0
   }
 
 절차:

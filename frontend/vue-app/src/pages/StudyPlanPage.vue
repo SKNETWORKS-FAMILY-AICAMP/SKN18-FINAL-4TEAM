@@ -32,6 +32,12 @@ const calendarOptions = reactive({
   height: 'auto'
 });
 
+// [New] Todo List Data (Computed from Calendar Events)
+const todoList = computed(() => {
+  // 날짜순 정렬
+  return [...calendarOptions.events].sort((a, b) => new Date(a.start) - new Date(b.start));
+});
+
 const isVideoOpen = ref(false);
 const activeVideo = ref(null);
 const lectureNote = ref('');
@@ -61,6 +67,22 @@ const statusStyle = computed(() => {
   return { background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' };
 });
 
+// Helper for Todo List Item Styling
+function getTodoStatusClass(event) {
+  const status = (event.extendedProps?.is_completed || '').toUpperCase();
+  if (status === 'COMPLETE') return 'todo-done';
+  if (status === 'NEEDS_WORK') return 'todo-pending'; // Or todo-fail
+  return 'todo-pending';
+}
+
+function getTodoStatusLabel(event) {
+  const status = (event.extendedProps?.is_completed || '').toUpperCase();
+  if (status === 'COMPLETE') return '완료';
+  if (status === 'NEEDS_WORK') return '미흡';
+  if (status === 'POLISH') return '수정 필요';
+  return '미진행';
+}
+
 function getYouTubeEmbedUrl(url) {
   if (!url) return '';
   try {
@@ -80,6 +102,28 @@ function getYouTubeEmbedUrl(url) {
 function openVideoModal(event) {
   activeVideo.value = event;
   lectureNote.value = event?.extendedProps?.lecture_note ?? '';
+  isVideoOpen.value = true;
+}
+
+// [New] Open modal from Todo List click (event is raw object here, not FullCalendar's info.event)
+function openVideoModalFromTodo(eventData) {
+  // Wrap raw data to mimic FullCalendar event object structure for compatibility
+  const mockEvent = {
+    title: eventData.title,
+    start: eventData.start,
+    extendedProps: eventData.extendedProps || {},
+    setExtendedProp: (key, val) => {
+        // Simple reactivity update for the local object
+        if(!eventData.extendedProps) eventData.extendedProps = {};
+        eventData.extendedProps[key] = val;
+    } 
+  };
+  // Or simply pass the raw object if your modal handles it. 
+  // Let's use a unified approach: assume activeVideo can be a plain object or FC Event.
+  // The existing template uses `activeVideo?.extendedProps...` which works for both.
+  
+  activeVideo.value = eventData; 
+  lectureNote.value = eventData.extendedProps?.lecture_note ?? '';
   isVideoOpen.value = true;
 }
 
@@ -126,18 +170,29 @@ async function saveReflection() {
     const updatedCompleted = response.data?.is_completed ?? statusLabel.value;
     const coachOutput = response.data?.coach_output ?? '';
 
+    // Update the reactive data source so UI updates immediately
+    // 1. If it's a FullCalendar event object
     if (typeof activeVideo.value.setExtendedProp === 'function') {
       activeVideo.value.setExtendedProp('lecture_note', updatedComment);
       activeVideo.value.setExtendedProp('is_completed', updatedCompleted);
       if (coachOutput) activeVideo.value.setExtendedProp('coach_output', coachOutput);
-    } else {
-      activeVideo.value.extendedProps = {
-        ...(activeVideo.value.extendedProps || {}),
-        lecture_note: updatedComment,
-        is_completed: updatedCompleted,
-        ...(coachOutput ? { coach_output: coachOutput } : {}),
-      };
+    } 
+    // 2. If it's a plain object (from Todo List) or fallback
+    else {
+      if(!activeVideo.value.extendedProps) activeVideo.value.extendedProps = {};
+      activeVideo.value.extendedProps.lecture_note = updatedComment;
+      activeVideo.value.extendedProps.is_completed = updatedCompleted;
+      if (coachOutput) activeVideo.value.extendedProps.coach_output = coachOutput;
     }
+    
+    // Also update the source array for the Todo List to reflect changes
+    const targetId = taskId;
+    const itemInList = calendarOptions.events.find(e => e.extendedProps?.task_id === targetId);
+    if(itemInList) {
+        itemInList.extendedProps.lecture_note = updatedComment;
+        itemInList.extendedProps.is_completed = updatedCompleted;
+    }
+
   } catch (error) {
     console.error(error);
     const message = error?.response?.data?.error || error?.response?.data?.detail || "회고 저장에 실패했습니다.";
@@ -184,7 +239,6 @@ async function generatePlan() {
       return;
     }
 
-    // duration은 7로 고정되어 전송됨
     const response = await axios.post(
       `${BACKEND_BASE}/api/generate-plan/`,
       { duration: duration.value },
@@ -222,17 +276,14 @@ onMounted(() => {
 
 <template>
   <div class="app-container">
-    <nav class="nav-header">
-        <RouterLink to="/" class="brand">JOBTORY</RouterLink>
-      </nav>
     <header class="header">
       <h1>AI 학습 코치</h1>
-      <p>약점 보완을 위해 라이브코딩 성장리포트 기반으로 맞춤형 커리큘럼을 만들어드립니다.</p>
+      <p>약점 보완을 위해 AI코치가 맞춤형 커리큘럼을 짜드립니다.</p>
     </header>
 
-    <div class="input-section">      
+    <div class="input-section">
+      <div class="input-label">라이브코딩 성장 리포트 기반 커리큘럼을 생성합니다.</div>
       <div class="fixed-duration-badge">1주 완성</div>
-
       <button 
         @click="generatePlan" 
         :disabled="loading" 
@@ -242,14 +293,48 @@ onMounted(() => {
       </button>
     </div>
 
-    <div class="calendar-wrapper">
-      <FullCalendar :options="calendarOptions" />
+    <div class="content-row">
+      <div class="calendar-wrapper">
+        <FullCalendar :options="calendarOptions" />
+      </div>
+
+      <div class="todo-wrapper">
+        <div class="todo-header">
+          <h3>TodoList</h3>
+          <span class="todo-count">{{ todoList.length }} Tasks</span>
+        </div>
+        <div class="todo-list custom-scrollbar">
+          <div v-if="todoList.length === 0" class="todo-empty">
+            아직 계획이 없습니다.<br>학습계획을 생성해보세요!
+          </div>
+          <div 
+            v-else
+            v-for="(item, index) in todoList" 
+            :key="index" 
+            class="todo-item"
+            @click="openVideoModalFromTodo(item)"
+          >
+            <div class="todo-date-badge">
+              <span class="day">Day</span>
+              <span class="num">{{ item.extendedProps?.day_number || (index + 1) }}</span>
+            </div>
+            <div class="todo-content">
+              <div class="todo-title">{{ item.title }}</div>
+              <div class="todo-tags">
+                <span class="todo-date">{{ item.start }}</span>
+                <span :class="['todo-status', getTodoStatusClass(item)]">
+                  {{ getTodoStatusLabel(item) }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
     <Teleport to="body">
       <div v-if="isVideoOpen" class="video-modal" role="dialog" aria-modal="true">
         <div class="video-backdrop" @click="closeVideoModal"></div>
-        
         <div class="video-sheet">
           <div class="video-header">
             <div class="video-title">
@@ -257,8 +342,7 @@ onMounted(() => {
             </div>
             <button type="button" class="video-close" @click="closeVideoModal"></button>
           </div>
-
-          <div class="video-body custom-scrollbar">
+          <div class="video-body">
             <div class="video-status">
               <span :class="['status-badge', statusClass]" :style="statusStyle">
                 {{ statusLabel }}
@@ -309,33 +393,11 @@ onMounted(() => {
 
 /* 전체 레이아웃 */
 .app-container {
-  max-width: 1000px;
+  max-width: 1200px; /* Width increased to accommodate side-by-side layout */
   margin: 0 auto;
   padding: 40px 20px;
   font-family: "SF Pro", sans-serif;
   color: #333;
-}
-
-/* 2. 네비게이션 (고정) */
-.nav-header {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  padding: 32px 40px;
-  z-index: 100;
-  display: flex;
-  align-items: center;
-}
-
-.brand {
-  font-family: "Inter", sans-serif;
-  font-size: 24px;
-  font-weight: 900;
-  color: #111827;
-  text-decoration: none;
-  letter-spacing: -0.02em;
-  cursor: pointer;
 }
 
 /* 헤더 */
@@ -361,8 +423,16 @@ onMounted(() => {
   gap: 15px;
   align-items: center;
   justify-content: center;
-  margin-bottom: 40px;
+  margin-bottom: 30px;
+  background: #f8f9fa;
   padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+}
+
+.input-label {
+  font-size: 1rem;
+  color: #555;
 }
 
 /* 1주 완성 배지 */
@@ -402,13 +472,159 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* 캘린더 스타일 커스텀 */
+/* [New] Content Row (Calendar + Todo) */
+.content-row {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+}
+
+/* Calendar Section */
 .calendar-wrapper {
+  flex: 2; /* Takes more space */
   background: white;
   padding: 20px;
   border-radius: 12px;
   box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  min-width: 0; /* Prevents overflow in flex items */
 }
+
+/* Todo List Section */
+.todo-wrapper {
+  flex: 1; /* Takes less space */
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.todo-header {
+  padding: 20px;
+  border-bottom: 1px solid #f1f5f9;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: #fff;
+}
+
+.todo-header h3 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #1e293b;
+}
+
+.todo-count {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #64748b;
+  background: #f1f5f9;
+  padding: 4px 8px;
+  border-radius: 99px;
+}
+
+.todo-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.todo-empty {
+  text-align: center;
+  color: #94a3b8;
+  padding: 40px 0;
+  font-size: 0.95rem;
+  line-height: 1.5;
+}
+
+.todo-item {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  display: flex;
+  gap: 16px;
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.todo-item:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+  border-color: #cbd5e1;
+}
+
+.todo-date-badge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: #eff6ff;
+  color: #3b82f6;
+  width: 50px;
+  height: 50px;
+  border-radius: 10px;
+  flex-shrink: 0;
+}
+
+.todo-date-badge .day { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; }
+.todo-date-badge .num { font-size: 1.2rem; font-weight: 800; line-height: 1; }
+
+.todo-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 6px;
+  min-width: 0; /* Text truncation fix */
+}
+
+.todo-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1e293b;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.todo-tags {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.todo-date {
+  font-size: 0.8rem;
+  color: #94a3b8;
+}
+
+.todo-status {
+  font-size: 0.75rem;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+
+.todo-done { color: #15803d; background: #dcfce7; }
+.todo-pending { color: #9a3412; background: #ffedd5; }
+
+/* Custom Scrollbar for Todo List & Modal */
+.custom-scrollbar::-webkit-scrollbar,
+:global(.video-body::-webkit-scrollbar) { width: 6px; }
+.custom-scrollbar::-webkit-scrollbar-thumb,
+:global(.video-body::-webkit-scrollbar-thumb) { background: #cbd5e1; border-radius: 3px; }
+.custom-scrollbar::-webkit-scrollbar-track,
+:global(.video-body::-webkit-scrollbar-track) { background: transparent; }
+
 
 /* =========================================
    [모달 디자인]
@@ -455,7 +671,7 @@ onMounted(() => {
   padding: 20px 24px;
   border-bottom: 1px solid #f1f5f9;
   background: #fff;
-  flex-shrink: 0; /* 크기 줄어들지 않음 */
+  flex-shrink: 0;
 }
 
 :global(.video-title) {
@@ -595,11 +811,6 @@ onMounted(() => {
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
-/* 스크롤바 커스텀 (다른 페이지와 동일 톤) */
-:global(.custom-scrollbar::-webkit-scrollbar) { width: 6px; }
-:global(.custom-scrollbar::-webkit-scrollbar-thumb) { background: #374151; border-radius: 3px; }
-:global(.custom-scrollbar::-webkit-scrollbar-track) { background: transparent; }
-
 /* 상태 배지 스타일 */
 .status-badge {
   display: inline-flex;
@@ -627,4 +838,14 @@ onMounted(() => {
 :deep(.fc-event.is-completed) { background-color: #cad4dc; color: #2c3e50; border-left-color: #4291b8; }
 :deep(.fc-event.is-completed:hover) { background-color: #cfe9ff; }
 :deep(.fc-day-today) { background-color: #fff9db !important; }
+
+/* Responsive */
+@media (max-width: 900px) {
+  .content-row {
+    flex-direction: column;
+  }
+  .todo-wrapper {
+    height: 400px;
+  }
+}
 </style>

@@ -9,11 +9,10 @@ from langgraph.checkpoint.redis import RedisSaver
 
 
 def _redis_url() -> str:
-    return (
-        os.getenv("REDIS_URL")
-        or getattr(settings, "REDIS_URL", None)
-        or "redis://127.0.0.1:6379/0"
-    )
+    url = os.getenv("REDIS_URL") or getattr(settings, "REDIS_URL", None)
+    if not url:
+        raise RuntimeError("REDIS_URL is required")
+    return url
 
 
 def load_chapter_channel_values(session_id: str, chapter: str) -> Dict[str, Any]:

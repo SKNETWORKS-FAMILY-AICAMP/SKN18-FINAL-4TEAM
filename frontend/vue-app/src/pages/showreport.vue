@@ -204,13 +204,11 @@
 
 <script setup>
 import { computed, onMounted, ref } from "vue";
+import API_BASE from "../config/apiBase";
 import { useRoute, useRouter } from "vue-router";
 import html2pdf from "html2pdf.js";
 
-const BACKEND_BASE =
-  import.meta.env.VITE_BACKEND_BASE ||
-  import.meta.env.VITE_BACKEND_URL ||
-  "http://localhost:8000";
+const BACKEND_BASE = API_BASE;
 
 const route = useRoute();
 const router = useRouter();

@@ -141,7 +141,9 @@ import { useRouter } from "vue-router";
 
 const router = useRouter();
 const typingLogo = new URL("../assets/mainpage_image2.png", import.meta.url).href;
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
+
+const BACKEND_BASE = API_BASE;
 
 /* ----- Session Logic ----- */
 const activeSessionId = ref(null);

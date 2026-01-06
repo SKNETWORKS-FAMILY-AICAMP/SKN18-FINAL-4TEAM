@@ -209,7 +209,11 @@ class StudyTaskReflectionView(APIView):
         completion_level = coach_result.get("completion_level") or "완료"
         coach_output = coach_result.get("coach_output") or ""
 
-        task.lecture_note = lecture_note
+        # completion_level이 COMPLETE이면 사용자가 입력한 lecture_note 그대로 저장,
+        # 그 외에는 coach_output이 있으면 coach_output을 저장(없으면 사용자가 입력한 내용을 저장)
+        note_to_save = lecture_note if completion_level == "COMPLETE" else coach_output
+
+        task.lecture_note = note_to_save
         task.is_completed = completion_level or "완료"
         task.save(update_fields=["lecture_note", "is_completed"])
 

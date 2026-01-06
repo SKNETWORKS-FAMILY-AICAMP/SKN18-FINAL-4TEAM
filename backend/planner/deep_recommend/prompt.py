@@ -27,27 +27,40 @@ LIVE_CODING_CATEGORY_HINT = ", ".join(LIVE_CODING_CATEGORIES)
 
 
 
-REPORT_ANALYZER_PROMPT = f"""
+REPORT_ANALYZER_PROMPT = """
 너는 ReportAnalyzerAgent다.
-입력으로 넣어진 growth_report와 user_profile를 합쳐 학습 니즈 프로필(needs_profile)을 정규화한다.
+growth_report와 user_profile만 근거로 needs_profile을 정규화한다.
+새 정보 발명 금지. 근거 없으면 빈 문자열/빈 배열로 둔다.
+
+작업:
+- needs_profile 4개 필드(goal, focus_topics, preferences, language)만 추출한다.
+
+추출 규칙:
+1) goal (1문장)
+- growth_report에서 개선/미흡/부족/자주 멈춤 등 긴급·반복 행동/문제를 1문장으로 요약.
+
+2) focus_topics (최대 3개)
+- growth_report에 약점으로 직접 언급된 알고리즘/도메인 키워드를 그대로 사용.
+- 우선순위: (a) 알고리즘명(BFS, 이분 탐색 등) → (b) 도메인(그래프, 구현/디버깅, 커뮤니케이션 등).
+
+3) preferences (배열)
+- user_profile에서만 추출. 없으면 [].
+- tech_stack, desired_role, detailed_role 등의 선호/목표를 간단 문구로 변환.
+  예) "python" → "Python 중심", "AI/ML 엔지니어" → "AI/ML 직무 지향", "딥러닝 모델링" → "딥러닝 모델링 관심".
+
+4) language (문자열)
+- user_profile의 tech_stack 등에서 추정(없으면 "").
 
 반드시 아래 JSON만 반환:
-{{
-  "needs_profile": {{
-    "goal": "당장 개선이 필요한 영역(약점/개선사항 기반) 최대 2문장",
-    "focus_topics": ["반복적으로 약한 알고리즘/면접기술 최대 3개"],
-    "language": "주 학습/설명 언어 코드(없으면 빈 문자열)"
-  }}
-}}
-
-추출 가이드:
-- goal: improvements/weaknesses에 해당하는 가장 긴급한 것 최대 2문장(텍스트에서 근거 추출).
-- focus_topics: 약점 반복 키워드 최대 3개.
-- language: user_profile에서만 추출. 없으면 빈 배열/빈 문자열.
-
-규칙:
-- 새 정보 발명 금지. 근거 없으면 빈 문자열/빈 배열로 둔다.
-- JSON 외 텍스트 출력 금지.
+{
+  "needs_profile": {
+    "goal": "...",
+    "focus_topics": ["...", "...", "..."],
+    "preferences": ["...", "..."],
+    "language": "..."
+  }
+}
+JSON 외 텍스트 출력 금지.
 """
 
 
@@ -101,6 +114,7 @@ VIDEO_SELECTOR_PROMPT = """
 - 각 슬롯마다 video_search_tool을 호출한다(기본 1회: order=random, limit=5, offset=0).
 - 관련성이 없거나 id/url이 비면 offset=5로 한 번 더 재검색한다.
 - 검색 결과 중 summary와 day_plan_topic이 가장 관련 높은 video 1개를 고른다.
+- 이전 슬롯에서 뽑은 video_id/video_url과 중복되는 영상은 선택하지 않는다.
 
 출력(JSON만):
 {

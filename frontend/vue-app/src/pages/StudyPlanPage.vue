@@ -49,6 +49,13 @@ const statusClass = computed(() => {
   if (label === '미흡') return 'status-badge--todo';
   return 'status-badge--todo';
 });
+const statusStyle = computed(() => {
+  const label = statusLabel.value;
+  if (label === '완료') return { background: '#e7f5ff', color: '#1f6f54', border: '1px solid #86efac' };
+  if (label === '수정 필요') return { background: '#eef2ff', color: '#312e81', border: '1px solid #c7d2fe' };
+  if (label === '미흡') return { background: '#fff0e5', color: '#9a3412', border: '1px solid #fdba74' };
+  return { background: '#f1f5f9', color: '#475569', border: '1px solid #cbd5e1' };
+});
 
 function getYouTubeEmbedUrl(url) {
   if (!url) return '';
@@ -258,7 +265,7 @@ onMounted(() => {
           <button type="button" class="video-close" @click="closeVideoModal">닫기</button>
         </div>
         <div class="video-status">
-          <span :class="['status-badge', statusClass]">
+          <span :class="['status-badge', statusClass]" :style="statusStyle">
             {{ statusLabel }}
           </span>
         </div>

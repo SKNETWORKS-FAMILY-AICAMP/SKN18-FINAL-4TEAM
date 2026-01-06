@@ -33,9 +33,10 @@ def judge_progress_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
     try:
         res = agent.invoke({"messages": [{"role": "user", "content": user_prompt}]})
         raw = res["messages"][-1].content
+        print(f"[deep_coach] judge raw={raw}", flush=True)
         parsed = safe_json_parse(raw)
     except Exception as e:
-        print(f"agent 호출 오류: {e}")
+        print(f"[deep_coach] judge error: {e}", flush=True)
 
     missing = parsed.get("missing_slots", [])
     lint = parsed.get("lint", [])
@@ -85,9 +86,10 @@ def final_feedback_agent_node(state: EvidenceCoachState )-> EvidenceCoachState:
             }
         )
         raw = res["messages"][-1].content
+        print(f"[deep_coach] feedback raw={raw}", flush=True)
         parsed = safe_json_parse(raw)   
     except Exception as e:
-        print(f"agent 호출 오류: {e}")
+        print(f"[deep_coach] feedback error: {e}", flush=True)
 
     state["coach_output"] = parsed.get("annotated_draft")
     return state

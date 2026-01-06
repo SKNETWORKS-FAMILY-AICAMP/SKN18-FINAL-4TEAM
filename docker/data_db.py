@@ -1,20 +1,28 @@
-import csv
 import ast
+import csv
 import json
+import os
 from pathlib import Path
+
 import psycopg2
 from psycopg2 import sql
 
 # CSV 경로는 실행 위치가 아니라 "이 파일 위치" 기준으로 잡기
 CSV_DIR = Path(__file__).resolve().parent / "csv_files"
 
-# Docker Compose 기준 연결 정보
+# 환경변수 기반 연결 정보 (ECS/로컬 공통)
+db_name = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME", "jobtory")
+db_user = os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "gyulcross")
+db_password = os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD", "gyulcross0113")
+db_host = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
+db_port = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
+
 conn = psycopg2.connect(
-    host="localhost",
-    port="5432",
-    database="jobtory",
-    user="gyulcross",
-    password="gyulcross0113"
+    host=db_host,
+    port=db_port,
+    database=db_name,
+    user=db_user,
+    password=db_password,
 )
 cur = conn.cursor()
 

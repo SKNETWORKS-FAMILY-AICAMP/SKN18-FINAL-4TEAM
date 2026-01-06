@@ -11,7 +11,10 @@ def _basic_auth_header(username: str, password: str) -> str:
 
 
 def _es_request(method: str, path: str, body=None, content_type="application/json") -> tuple[int, dict]:
-    es_url = os.getenv("ES_URL", "http://localhost:9200").rstrip("/")
+    es_url = os.getenv("ES_URL")
+    if not es_url:
+        raise RuntimeError("ES_URL is required")
+    es_url = es_url.rstrip("/")
     user = os.getenv("ES_USER", "elastic")
     pwd = os.getenv("ELASTIC_PASSWORD")
     if not pwd:

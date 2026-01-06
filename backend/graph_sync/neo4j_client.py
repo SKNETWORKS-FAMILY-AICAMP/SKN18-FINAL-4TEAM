@@ -19,7 +19,9 @@ def _parse_neo4j_auth():
 
 
 def post_cypher(query: str, params=None) -> dict:
-    url = os.getenv("NEO4J_HTTP_URL", "http://localhost:7474/db/neo4j/tx/commit")
+    url = os.getenv("NEO4J_HTTP_URL")
+    if not url:
+        raise RuntimeError("NEO4J_HTTP_URL is required")
     user = os.getenv("NEO4J_USER")
     pwd = os.getenv("NEO4J_PASSWORD")
     if not user or not pwd:

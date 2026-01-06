@@ -212,7 +212,9 @@ import AntiCheatAlert from "../components/AntiCheatAlert.vue";
 import CodeEditor from "../components/CodeEditor.vue";
 import { useAntiCheatStatus } from "../hooks/useAntiCheatStatus";
 
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
+
+const BACKEND_BASE = API_BASE;
 const route = useRoute();
 const router = useRouter();
 

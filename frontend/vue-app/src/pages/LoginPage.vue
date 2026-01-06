@@ -186,7 +186,9 @@ const togglePassword = () => {
 };
 
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-const redirectUri = "http://localhost:5174/login";
+const redirectUri =
+  import.meta.env.VITE_GOOGLE_REDIRECT_URI ||
+  `${window.location.origin}/login`;
 
 const handleGoogleLogin = () => {
   if (!GOOGLE_CLIENT_ID) {

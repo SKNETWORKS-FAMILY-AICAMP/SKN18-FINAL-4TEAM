@@ -89,6 +89,12 @@ async function saveReflection() {
     return;
   }
 
+  const trimmedNote = (lectureNote.value || "").trim();
+  if (trimmedNote.length < 30) {
+    alert("회고는 30자 이상 작성해주세요.");
+    return;
+  }
+
   const ok = await ensureValidSession();
   if (!ok) {
     alert("로그인이 필요합니다.");
@@ -107,7 +113,7 @@ async function saveReflection() {
       `${BACKEND_BASE}/api/tasks/reflection/`,
       {
         task_id: taskId,
-        lecture_note: lectureNote.value
+        lecture_note: trimmedNote
       },
       {
         headers: {
@@ -116,7 +122,7 @@ async function saveReflection() {
       }
     );
 
-    const updatedComment = response.data?.lecture_note ?? lectureNote.value;
+    const updatedComment = response.data?.lecture_note ?? trimmedNote;
     const updatedCompleted = response.data?.is_completed ?? statusLabel.value;
     const coachOutput = response.data?.coach_output ?? '';
     if (typeof activeVideo.value.setExtendedProp === 'function') {
@@ -133,7 +139,11 @@ async function saveReflection() {
     }
   } catch (error) {
     console.error(error);
-    alert("회고 저장에 실패했습니다.");
+    const message =
+      error?.response?.data?.error ||
+      error?.response?.data?.detail ||
+      "회고 저장에 실패했습니다.";
+    alert(message);
   } finally {
     reflectionSaving.value = false;
   }

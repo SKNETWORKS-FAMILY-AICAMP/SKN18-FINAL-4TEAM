@@ -1143,13 +1143,6 @@ const formatList = (arr) => {
   background: #0f1115;
 }
 
-@media (max-width: 768px) {
-  .nav-header {
-    padding: 20px;
-    justify-content: center;
-  }
-}
-
 .insight-card {
   width: min(960px, 100%);
   border: 1px dashed #d4d4d8;
@@ -1257,5 +1250,12 @@ const formatList = (arr) => {
   margin: 0;
   padding-left: 18px;
   color: #1f2937;
+}
+
+@media (max-width: 768px) {
+  .nav-header {
+    padding: 20px;
+    justify-content: center;
+  }
 }
 </style>

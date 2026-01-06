@@ -3,7 +3,8 @@ import json
 from dotenv import load_dotenv
 from .state import RecommendState
 from .prompt import REPORT_ANALYZER_PROMPT, SLOT_PLANNER_PROMPT, VIDEO_SELECTOR_PROMPT
-from .tools import _create_agent, safe_json_parse, video_search_tool
+from .tools import _create_agent, video_search_tool
+from planner.deep_coach.utils import safe_json_parse
 load_dotenv()
 
 

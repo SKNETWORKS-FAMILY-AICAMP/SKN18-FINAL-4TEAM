@@ -1,39 +1,6 @@
-import json
 from deepagents import create_deep_agent
 from langchain_openai import ChatOpenAI
-from utils import judge_calc_tool
-
-# judge 노드 출력 스키마: completion_level + missing_slots + lint + confidence
-'''
-{
-    "type": "object",
-    "properties": {
-        "completion_level": {"type": "string", "enum": ["COMPLETE", "NEEDS_WORK", "POLISH"]},
-        "missing_slots": {"type": "array", "items": {"type": "string"}},
-        "ambiguous_slots": {"type": "array", "items": {"type": "string"}},
-        "lint": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {"tag": {"type": "string"}, "message": {"type": "string"}},
-                "required": ["tag", "message"],
-            },
-        },
-    },
-    "required": ["completion_level", "missing_slots", "ambiguous_slots", "lint"],
-}
-'''
-
-'''
-{
-    "type": "object",
-    "properties": {
-        "annotated_draft": {"type": "string"},
-    },
-    "required": ["annotated_draft"],
-}
-'''
-
+from .utils import judge_calc_tool
 
 
 # coach 서브에이전트용 프롬프트
@@ -188,7 +155,7 @@ def create_judge_agent():
 
     메인 에이전트는 slot-matcher와 lint-checker를 task로 호출해 결과를 합산한다.
     """
-    base_model = ChatOpenAI(model="gpt-4o-mini", temperature=0, top_p=1)
+    base_model = ChatOpenAI(model="gpt-5-nano", temperature=0, top_p=1)
 
     return create_deep_agent(
         model=base_model,

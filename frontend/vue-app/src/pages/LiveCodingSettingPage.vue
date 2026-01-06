@@ -1,227 +1,201 @@
 <template>
   <div class="setting-root">
     <div class="setting-card">
-      <!-- 왼쪽 사이드바 -->
+      
       <aside class="step-sidebar">
-        <h2 class="sidebar-title">시험 안내</h2>
-        <ol class="step-list">
-          <li
-            v-for="item in steps"
-            :key="item.id"
-            :class="['step-item', stepClass(item.id)]"
+        <h2 class="sidebar-title">Environment Setup</h2>
+        <div class="step-progress">
+          <div 
+            v-for="(item, index) in steps" 
+            :key="item.id" 
+            class="step-item"
+            :class="stepClass(item.id)"
           >
-            <div class="step-index">{{ item.id }}</div>
-            <div class="step-label">{{ item.label }}</div>
-            <span v-if="item.id === 2 && cameraPassed" class="pass-badge">통과</span>
-            <!-- ✅ 마이크 + 스피커 둘 다 통과해야 3번에 뱃지 표시 -->
-            <span v-if="item.id === 3 && micPassed && speakerPassed" class="pass-badge"
-              >통과</span
-            >
-          </li>
-        </ol>
+            <div class="step-indicator">
+              <span v-if="isStepCompleted(item.id)" class="check-icon">✔</span>
+              <span v-else>{{ index + 1 }}</span>
+            </div>
+            <div class="step-info">
+              <span class="step-label">{{ item.label }}</span>
+              <span class="step-status" v-if="currentStep === item.id">Current Step</span>
+            </div>
+          </div>
+          <div class="progress-line-bg"></div>
+          <div class="progress-line-fill" :style="{ height: `${((currentStep - 1) / (steps.length - 1)) * 100}%` }"></div>
+        </div>
       </aside>
 
-      <!-- 오른쪽 컨텐츠 -->
       <section class="step-content">
-        <!-- 1. 안내 사항 -->
-        <div v-if="currentStep === 1" class="step-panel">
-          <h3 class="step-title">테스트 시작 전 안내 사항</h3>
-          <p class="step-desc">테스트 시작 전에 아래 내용을 확인해 주세요.</p>
+        
+        <div v-if="currentStep === 1" class="step-panel fade-in">
+          <div class="panel-header">
+            <h3>Before You Start</h3>
+            <p>안정적인 테스트 환경을 위해 다음 사항을 확인해주세요.</p>
+          </div>
+          
+          <div class="info-grid">
+            <div class="info-card">
+              <span class="icon">🖥️</span>
+              <h4>전체 화면</h4>
+              <p>부정행위 방지를 위해</p>
+              <p>전체 화면 모드로 진행됩니다.</p>
+            </div>
+            <div class="info-card">
+              <span class="icon">📷</span>
+              <h4>웹캠 & 마이크</h4>
+              <p>실시간 감독을 위해</p>
+              <p>장치 권한 허용이 필요합니다.</p>
+            </div>
+            <div class="info-card">
+              <span class="icon">📡</span>
+              <h4>네트워크</h4>
+              <p>끊김 없는 테스트를 위해</p>
+              <p>안정적인 인터넷을 사용하세요.</p>
+            </div>
+          </div>
+
           <ul class="bullet-list">
-            <li>테스트는 전체 화면 모드에서만 진행됩니다.</li>
-            <li>원활한 감독을 위해 카메라 및 마이크 권한 허용이 필요합니다.</li>
-            <li>화면 공유를 통해 코드 작성 화면이 실시간으로 전송됩니다.</li>
-            <li>다른 탭/창으로의 잦은 이동 등 부정행위가 감지될 경우 시험이 중단될 수 있습니다.</li>
-            <li>안정적인 네트워크 환경에서 참여해 주세요.</li>
-            <li>이해하셨다면 ‘다음’을 눌러 진행해주세요!</li>
-          </ul>
+              <li>작성된 코드는 화면 공유를 통해 실시간으로 전송됩니다.</li>
+              <li>다른 탭/창으로의 잦은 이동 등 부정행위가 감지되었을 경우
+              시험이 중단될 수 있습니다.</li>
+            </ul>
 
           <div class="panel-footer">
-            <button class="primary-btn" @click="goNext">다음</button>
+            <button class="btn-primary" @click="goNext">확인했습니다.</button>
           </div>
         </div>
 
-        <!-- 2. 웹캠 연결 -->
-        <div v-else-if="currentStep === 2" class="step-panel">
-          <h3 class="step-title">웹캠 연결</h3>
-          <p class="step-desc">
-            공정한 평가를 위해 카메라를 활성화해 주세요.<br />
-            얼굴이 화면 중앙의 테두리 안에 모두 보이도록 위치를 맞춰 주세요.
-          </p>
+        <div v-else-if="currentStep === 2" class="step-panel fade-in">
+          <div class="panel-header">
+            <h3>📷 Camera Check</h3>
+            <p>얼굴이 화면 중앙 프레임 안에 잘 들어오는지 확인해주세요.</p>
+          </div>
 
-          <div class="preview-box" :class="[previewBorderClass, cameraActive ? 'preview-active' : '']">
-            <video
-              ref="videoRef"
-              autoplay
-              playsinline
-              class="video-preview"
-              v-show="cameraActive"
-            ></video>
-            <div
-              v-if="cameraActive"
-              class="face-target-box"
-              :class="{
-                'target-success': detectionStatus === 'success',
-                'target-fail': detectionStatus === 'fail'
-              }"
-            ></div>
-            <div v-show="!cameraActive" class="preview-placeholder">
-              <div class="placeholder-illustration-wrap">
-                <img :src="faceDetectImage" alt="카메라 안내" class="placeholder-illustration" />
-              </div>
+          <div class="preview-container" :class="detectionStatus">
+            <video ref="videoRef" autoplay playsinline class="video-preview" v-show="cameraActive"></video>
+            
+            <div v-if="cameraActive" class="face-guide-box" :class="detectionStatus">
+              <div class="guide-corner top-left"></div>
+              <div class="guide-corner top-right"></div>
+              <div class="guide-corner bottom-left"></div>
+              <div class="guide-corner bottom-right"></div>
+            </div>
+
+            <div v-show="!cameraActive" class="placeholder-box">
+              <div class="placeholder-icon">ⓘ</div>
+              <p>카메라 연결이 필요합니다.</p>
             </div>
           </div>
-          <p class="help-text">
-            상태:
-            <strong>{{ cameraStatusText }}</strong>
-          </p>
 
-          <canvas ref="canvasRef" class="hidden-canvas"></canvas>
+          <div class="status-message">
+            <span class="status-dot" :class="detectionStatus"></span>
+            {{ cameraStatusText }}
+          </div>
+          
+          <canvas ref="canvasRef" class="hidden"></canvas>
 
           <div class="panel-footer">
-            <button class="secondary-btn" @click="goPrev">이전</button>
-            <button class="primary-btn" @click="startCameraTest" v-if="!cameraActive">
-              {{ cameraPassedOnce ? "웹캠 테스트 재시작" : "웹캠 테스트 시작" }}
+            <button class="btn-secondary" @click="goPrev">이전</button>
+            <button v-if="!cameraActive" class="btn-action" @click="startCameraTest">
+              {{ cameraPassedOnce ? "다시 테스트하기" : "카메라 켜기" }}
             </button>
-            <button
-              class="primary-btn"
-              :disabled="!cameraPassed"
-              @click="goNext"
-            >
-              다음
-            </button>
+            <button class="btn-primary" :disabled="!cameraPassed" @click="goNext">다음</button>
           </div>
         </div>
 
-        <!-- 3. 마이크/스피커 연결 -->
-        <div v-else-if="currentStep === 3" class="step-panel">
-          <h3 class="step-title">마이크 연결</h3>
-          <p class="step-desc">
-            아래 버튼을 눌러 마이크/스피커 테스트를 진행해 주세요. 말소리가 일정 기준 이상 감지되면 자동으로 통과합니다.
-          </p>
-
-          <!-- 🎤 마이크 테스트 -->
-          <div class="audio-test-box">
-            <label class="audio-label">마이크 입력 레벨</label>
-            <div class="audio-bar-wrapper">
-              <div class="audio-bar-bg">
-                <!-- 실시간 레벨 -->
-                <div
-                  class="audio-bar-fill"
-                  :style="{ width: micLevel + '%' }"
-                ></div>
-                <!-- ✅ 통과 기준선 표시 -->
-                <div
-                  class="audio-bar-threshold"
-                  :style="{ left: MIC_THRESHOLD_LEVEL + '%' }"
-                ></div>
-              </div>
-              <span class="audio-level-text">
-                {{ micLevel }}%
-              </span>
-            </div>
-            <p class="help-text small">
-              통과 기준: 바가 <strong>{{ MIC_THRESHOLD_LEVEL }}%</strong> 이상으로 올라가면 자동으로 통과합니다.
-            </p>
+        <div v-else-if="currentStep === 3" class="step-panel fade-in">
+          <div class="panel-header">
+            <h3>🎙️ Audio Check</h3>
+            <p>마이크 입력과 스피커 출력이 정상인지 확인해주세요.</p>
           </div>
 
-          <!-- 🔊 스피커 테스트 -->
-          <div class="speaker-test-box">
-            <label class="audio-label">스피커 테스트</label>
-            <div class="speaker-actions">
-              <button type="button" class="secondary-btn small" @click="playSpeakerTest">
-                테스트 음성 재생
-              </button>
-              <button
-                type="button"
-                class="secondary-btn small"
-                :disabled="!speakerTestPlayed"
-                @click="confirmSpeakerHeard"
-              >
-                소리가 들렸어요
+          <div class="test-module">
+            <div class="module-label">
+              <span>Microphone</span>
+              <span class="status-badge" :class="{ 'pass': micPassed }">{{ micPassed ? 'PASS' : 'CHECKING' }}</span>
+            </div>
+            
+            <div class="audio-visualizer">
+              <div class="bar-container">
+                <div class="bar-fill" :style="{ width: micLevel + '%' }"></div>
+                <div class="threshold-line" :style="{ left: MIC_THRESHOLD_LEVEL + '%' }" title="통과 기준선"></div>
+              </div>
+              <span class="level-text">{{ micLevel }}%</span>
+            </div>
+            <p class="module-desc">큰 소리로 말해서 게이지가 기준선({{ MIC_THRESHOLD_LEVEL }}%)을 넘기면 통과됩니다.</p>
+          </div>
+
+          <div class="test-module">
+            <div class="module-label">
+              <span>Speaker</span>
+              <span class="status-badge" :class="{ 'pass': speakerPassed }">{{ speakerPassed ? 'PASS' : 'PENDING' }}</span>
+            </div>
+            <div class="speaker-controls">
+              <button class="btn-small" @click="playSpeakerTest">🔊 테스트음 재생</button>
+              <button class="btn-small outline" :disabled="!speakerTestPlayed" @click="confirmSpeakerHeard">
+                {{ speakerPassed ? '확인 완료' : '잘 들려요 👌' }}
               </button>
             </div>
           </div>
 
-          <p class="help-text">
-            상태:
-            <strong>
-              {{
-                micPassed && speakerPassed
-                  ? "마이크·스피커 통과 ✅"
-                  : micChecking
-                  ? "음성 분석 중... 말을 해보세요 🎤"
-                  : !micPassed
-                  ? "마이크 테스트 필요 ❗"
-                  : !speakerPassed
-                  ? "스피커 테스트 필요 ❗"
-                  : "테스트 필요 ❗"
-              }}
-            </strong>
-          </p>
-
           <div class="panel-footer">
-            <button class="secondary-btn" @click="goPrev">이전</button>
-            <button class="primary-btn" @click="startMicTest">
-              {{ micChecking ? "테스트 중..." : "마이크/스피커 테스트" }}
+            <button class="btn-secondary" @click="goPrev">이전</button>
+            <button class="btn-action" @click="startMicTest" v-if="!micChecking && !micPassed">
+              마이크 테스트 시작
             </button>
-            <button
-              class="primary-btn"
-              :disabled="!micPassed || !speakerPassed"
-              @click="goNext"
-            >
-              다음
-            </button>
+            <button class="btn-primary" :disabled="!micPassed || !speakerPassed" @click="goNext">다음</button>
           </div>
         </div>
 
-        <!-- 4. 설정 완료 -->
-        <div v-else-if="currentStep === 4" class="step-panel">
-          <h3 class="step-title">설정 완료</h3>
-          <p class="step-desc">모든 준비가 완료되었습니다.</p>
+        <div v-else-if="currentStep === 4" class="step-panel fade-in">
+          <div class="panel-header center">
+            <div class="success-icon">🎉</div>
+            <h3>All Set!</h3>
+            <p>모든 준비가 완료되었습니다.</p>
+          </div>
+
+          <div class="final-check-list">
+            <div class="check-item">
+              <span class="check">✔</span> 웹캠 연결 확인됨
+            </div>
+            <div class="check-item">
+              <span class="check">✔</span> 오디오 장치 확인됨
+            </div>
+            <div class="check-item">
+              <span class="check">✔</span> 네트워크 상태 양호
+            </div>
+          </div>
 
           <ul class="bullet-list">
-            <li>웹캠과 마이크가 정상적으로 작동하는지 다시 한 번 확인해 주세요.</li>
             <li>테스트가 시작되면 제한 시간 내에 문제를 해결해야 합니다.</li>
-            <li>테스트 종료 후 결과와 피드백 리포트가 제공됩니다.</li>
+            <li>AI면접관이 작성된 코드를 바탕으로 질문하게 됩니다.</li>
+            <li>사용자는 하단의 [힌트 버튼]을 누르면 질문하실 수 있습니다.</li>
+            <li>테스트 종료 후에는 결과와 피드백 리포트가 제공됩니다.</li>
             <li>시작 버튼을 누르면 즉시 라이브 코딩 테스트가 시작됩니다.</li>
           </ul>
 
-          <div class="panel-footer">
-            <button class="secondary-btn" @click="goPrev">이전</button>
-            <button
-              class="primary-btn"
-              :disabled="!cameraPassed || !micPassed || !speakerPassed || isStarting"
-              @click="startTest"
-            >
-              {{ isStarting ? "시작 중..." : "시작" }}
+          <div class="panel-footer center">
+            <button class="btn-secondary" @click="goPrev">이전</button>
+            <button class="btn-primary large" :disabled="isStarting" @click="startTest">
+              {{ isStarting ? "시험장 입장 중..." : "시험 시작" }}
             </button>
           </div>
         </div>
+
       </section>
     </div>
-
   </div>
 </template>
 
 <script setup>
-import { ref, onBeforeUnmount, nextTick, computed } from "vue";
+import { ref, onBeforeUnmount, nextTick, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
-import { onMounted } from "vue"
 
 const router = useRouter();
-const faceDetectImage = new URL("../assets/face_detect_image.png", import.meta.url).href;
 const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
 const DEFAULT_LANGUAGE = "python";
 
-const resetLivecodingCaches = () => {
-  sessionStorage.removeItem("jobtory_intro_tts_text");
-  sessionStorage.removeItem("jobtory_intro_tts_audio");
-  sessionStorage.removeItem("jobtory_livecoding_problem_data");
-  localStorage.removeItem("jobtory_livecoding_session_id");
-};
-
-/* ----- 공통: 로그인 보장 헬퍼 ----- */
+// --- Helpers ---
 const ensureLoggedIn = () => {
   const token = localStorage.getItem("jobtory_access_token");
   if (!token) {
@@ -232,38 +206,39 @@ const ensureLoggedIn = () => {
   return token;
 };
 
-/* ----- 마이크 통과 기준 상수 (즉시 통과 버전) ----- */
-// rms가 이 값 이상이면 "충분히 크게 말한 것"으로 판단
+// --- Constants ---
 const RMS_THRESHOLD = 3;
+const MIC_THRESHOLD_LEVEL = Math.min(100, Math.round((RMS_THRESHOLD / 60) * 100));
 
-// UI용 퍼센트 기준선 (micLevel 계산 방식과 동일 스케일)
-const MIC_THRESHOLD_LEVEL = Math.min(
-  100,
-  Math.round((RMS_THRESHOLD / 60) * 100)
-);
-
-/* ----- 단계 ----- */
+// --- State ---
 const currentStep = ref(1);
 const steps = [
-  { id: 1, label: "안내 사항" },
-  { id: 2, label: "웹캠 연결" },
-  { id: 3, label: "마이크 연결" },
-  { id: 4, label: "설정 완료" },
+  { id: 1, label: "Notice" },
+  { id: 2, label: "Camera" },
+  { id: 3, label: "Audio" },
+  { id: 4, label: "Ready" },
 ];
 
+const cameraPassedOnce = ref(false);
+
+const isStepCompleted = (id) => {
+  if (id < currentStep.value) return true;
+  if (id === 2 && cameraPassed.value) return true;
+  if (id === 3 && micPassed.value && speakerPassed.value) return true;
+  return false;
+};
+
 const stepClass = (id) => {
-  if (id === currentStep.value) return "is-active";
-  if (id < currentStep.value) return "is-done";
-  return "is-upcoming";
+  if (id === currentStep.value) return "active";
+  if (id < currentStep.value) return "completed";
+  return "";
 };
 
 const goNext = () => {
   const prevStep = currentStep.value;
   if (prevStep === 2) {
     stopCamera();
-    if (cameraPassed.value) {
-      cameraPassedOnce.value = true;
-    }
+    if (cameraPassed.value) cameraPassedOnce.value = true;
   }
   if (currentStep.value < 4) currentStep.value += 1;
 };
@@ -279,32 +254,23 @@ const goPrev = () => {
   if (currentStep.value > 1) currentStep.value -= 1;
 };
 
-/* ----- 웹캠 체크 ----- */
+// --- Camera Logic (API Included) ---
 const videoRef = ref(null);
 const canvasRef = ref(null);
 const cameraActive = ref(false);
 const cameraPassed = ref(false);
-const cameraPassedOnce = ref(false);
 const cameraChecking = ref(false);
 let cameraStream = null;
 let mediapipeInterval = null;
 const detectionStatus = ref("idle"); // idle | success | fail
 
-const previewBorderClass = computed(() => {
-  if (!cameraActive.value) return "border-idle";
-  if (detectionStatus.value === "success") return "border-success";
-  if (detectionStatus.value === "fail") return "border-fail";
-  return "border-idle";
-});
-
 const cameraStatusText = computed(() => {
   if (cameraActive.value) {
-    if (detectionStatus.value === "success") return "얼굴 인식 성공! ✅";
-    if (cameraChecking.value) return "얼굴 감지 중...";
-    if (detectionStatus.value === "fail") return "얼굴이 인식되지 않았습니다.";
-    return "얼굴 감지 중...";
+    if (detectionStatus.value === "success") return "Face Detected";
+    if (detectionStatus.value === "fail") return "Face Not Found";
+    return "Detecting...";
   }
-  return cameraPassed.value ? "얼굴 인식 성공! ✅" : "테스트 필요 ❗";
+  return cameraPassed.value ? "Check Passed" : "Camera Required";
 });
 
 const stopFaceDetection = () => {
@@ -319,37 +285,22 @@ const sendFrameForMediapipe = async () => {
   if (!video || video.readyState < 2) return;
 
   const canvas = document.createElement("canvas");
-  // 경량화를 위해 해상도 축소
-  canvas.width = 192;
-  canvas.height = 108;
+  canvas.width = 192; canvas.height = 108;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
 
-  const vw = video.videoWidth || 640;
-  const vh = video.videoHeight || 360;
-  const scale = Math.min(canvas.width / vw, canvas.height / vh);
-  const dw = vw * scale;
-  const dh = vh * scale;
-  const dx = (canvas.width - dw) / 2;
-  const dy = (canvas.height - dh) / 2;
-
-  ctx.drawImage(video, dx, dy, dw, dh);
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
   canvas.toBlob(async (blob) => {
     if (!blob) return;
-
     const formData = new FormData();
     formData.append("image", blob, "frame.jpg");
 
     try {
-      // 설정 페이지는 얼굴 존재만 확인하는 경량 엔드포인트 사용
-      const resp = await fetch(
-        `${BACKEND_BASE}/mediapipe/presence/`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
+      const resp = await fetch(`${BACKEND_BASE}/mediapipe/presence/`, {
+        method: "POST",
+        body: formData,
+      });
 
       const data = await resp.json().catch(() => ({}));
       if (!resp.ok) {
@@ -362,7 +313,6 @@ const sendFrameForMediapipe = async () => {
       const hasFace = faceCount >= 1;
       detectionStatus.value = hasFace ? "success" : "fail";
       cameraPassed.value = hasFace;
-      // 한 번 성공하면 추가 요청을 중단해 부하를 줄입니다.
       if (hasFace) {
         stopFaceDetection();
       }
@@ -380,55 +330,19 @@ const startCameraTest = async () => {
 
   try {
     cameraStream = await navigator.mediaDevices.getUserMedia({ video: true });
-
     cameraActive.value = true;
     await nextTick();
-
     if (videoRef.value) {
       videoRef.value.srcObject = cameraStream;
     }
 
     setTimeout(() => {
-      checkCameraBrightness();
       stopFaceDetection();
-      mediapipeInterval = setInterval(() => {
-        void sendFrameForMediapipe();
-      }, 1000);
+      mediapipeInterval = setInterval(() => void sendFrameForMediapipe(), 1000);
     }, 800);
   } catch (e) {
     cameraChecking.value = false;
-    alert("웹캠 접근이 거부되었습니다. 브라우저 권한 설정을 확인해 주세요.");
-  }
-};
-
-const checkCameraBrightness = () => {
-  try {
-    const video = videoRef.value;
-    const canvas = canvasRef.value;
-    if (!video || !canvas) {
-      cameraChecking.value = false;
-      return;
-    }
-
-    const width = 160;
-    const height = 90;
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext("2d");
-    ctx.drawImage(video, 0, 0, width, height);
-    const frame = ctx.getImageData(0, 0, width, height);
-    const data = frame.data;
-
-    let total = 0;
-    for (let i = 0; i < data.length; i += 4) {
-      total += (data[i] + data[i + 1] + data[i + 2]) / 3;
-    }
-    // 밝기 값은 참고용으로만 사용 (통과/실패 판정은 서버 Mediapipe 결과에 따름)
-  } catch (e) {
-    cameraPassed.value = false;
-  } finally {
-    cameraChecking.value = false;
+    alert("웹캠 접근이 거부되었습니다. 권한을 확인해주세요.");
   }
 };
 
@@ -441,11 +355,12 @@ const stopCamera = () => {
   cameraActive.value = false;
 };
 
-/* ----- 마이크 체크 (기준선 넘는 순간 통과) ----- */
+// --- Audio Logic ---
 const micLevel = ref(0);
 const micPassed = ref(false);
 const micChecking = ref(false);
-
+const speakerPassed = ref(false);
+const speakerTestPlayed = ref(false);
 let micStream = null;
 let audioCtx = null;
 let analyser = null;
@@ -455,75 +370,58 @@ let micCheckTimeout = null;
 const startMicTest = async () => {
   micPassed.value = false;
   micChecking.value = true;
-
   stopMic();
 
   try {
     micStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
     audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     const source = audioCtx.createMediaStreamSource(micStream);
     analyser = audioCtx.createAnalyser();
     analyser.fftSize = 2048;
-
     source.connect(analyser);
 
     const dataArray = new Uint8Array(analyser.fftSize);
     let maxVolume = 0;
 
-    const updateLevel = () => {
+    const update = () => {
       if (!analyser) return;
       analyser.getByteTimeDomainData(dataArray);
-
       let sum = 0;
       for (let i = 0; i < dataArray.length; i++) {
         const v = dataArray[i] - 128;
         sum += v * v;
       }
       const rms = Math.sqrt(sum / dataArray.length);
-
       maxVolume = Math.max(maxVolume, rms);
-
-      // UI용 퍼센트 레벨
+      
       micLevel.value = Math.min(100, Math.round((rms / 60) * 100));
 
-      // ✅ 기준선 넘는 순간 통과 처리
       if (rms >= RMS_THRESHOLD) {
-        console.log("Mic passed with rms:", rms);
         micPassed.value = true;
         micChecking.value = false;
-        stopMic(false); // 스트림/타이머 정리 (레벨은 유지)
+        stopMic(false);
         return;
       }
-
-      micAnimationId = requestAnimationFrame(updateLevel);
+      micAnimationId = requestAnimationFrame(update);
     };
+    update();
 
-    updateLevel();
-
-    // 최대 5초까지만 기다리고, 그 안에 통과 못 하면 실패
     micCheckTimeout = setTimeout(() => {
       if (!micPassed.value) {
         micChecking.value = false;
-        console.log("Mic test failed, maxVolume:", maxVolume);
         stopMic(false);
+        console.log("Mic test failed", maxVolume);
       }
     }, 5000);
   } catch (e) {
     micChecking.value = false;
-    alert("마이크 접근이 거부되었습니다. 브라우저 권한 설정을 확인해 주세요.");
+    alert("마이크 접근이 거부되었습니다.");
   }
 };
 
-const stopMic = (resetLevel = true) => {
-  if (micAnimationId) {
-    cancelAnimationFrame(micAnimationId);
-    micAnimationId = null;
-  }
-  if (micCheckTimeout) {
-    clearTimeout(micCheckTimeout);
-    micCheckTimeout = null;
-  }
+const stopMic = (reset = true) => {
+  if (micAnimationId) cancelAnimationFrame(micAnimationId);
+  if (micCheckTimeout) clearTimeout(micCheckTimeout);
   if (micStream) {
     micStream.getTracks().forEach((t) => t.stop());
     micStream = null;
@@ -532,26 +430,17 @@ const stopMic = (resetLevel = true) => {
     audioCtx.close();
     audioCtx = null;
   }
-  if (resetLevel) {
-    micLevel.value = 0;
-  }
+  if (reset) micLevel.value = 0;
 };
-
-/* ----- 스피커 체크 ----- */
-const speakerPassed = ref(false);
-const speakerTestPlayed = ref(false);
 
 const playSpeakerTest = () => {
   speakerTestPlayed.value = true;
-
   const ctx = new (window.AudioContext || window.webkitAudioContext)();
   const osc = ctx.createOscillator();
   osc.type = "sine";
   osc.frequency.value = 880;
-
   osc.connect(ctx.destination);
   osc.start();
-
   setTimeout(() => {
     osc.stop();
     ctx.close();
@@ -562,9 +451,86 @@ const confirmSpeakerHeard = () => {
   speakerPassed.value = true;
 };
 
-
-/* ----- 마지막: 테스트 시작 ----- */
+// --- Test Start Logic (API Included) ---
 const isStarting = ref(false);
+const problemData = ref(null);
+const hasInitRun = ref(false);
+const isWarmed = ref(false);
+const isPreloading = ref(false);
+
+const loadSelectedProblem = () => {
+  if (problemData.value) return;
+  const raw = sessionStorage.getItem("jobtory_livecoding_problem_data");
+  if (!raw) return;
+  try {
+    const parsed = JSON.parse(raw);
+    if (parsed && parsed.problem_id) {
+      problemData.value = parsed;
+    }
+  } catch {}
+};
+
+const warmupLanggraph = async () => {
+  if (isWarmed.value) return true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
+      method: "GET",
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (resp.ok && data?.status === "warmed") {
+      isWarmed.value = true;
+      return true;
+    }
+  } catch (err) {
+    console.warn("warmup failed", err);
+  }
+  return false;
+};
+
+const preloadProblem = async () => {
+  if (problemData.value) return true;
+  if (isPreloading.value) return !!problemData.value;
+  isPreloading.value = true;
+  try {
+    const token = ensureLoggedIn();
+    if (!token) return false;
+
+    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ language: DEFAULT_LANGUAGE }),
+    });
+    const data = await resp.json().catch(() => ({}));
+    if (!resp.ok || !data?.problem_id) return false;
+    
+    problemData.value = data;
+    return true;
+  } catch (err) {
+    console.error(err);
+    return false;
+  } finally {
+    isPreloading.value = false;
+  }
+};
+
+const runInitialSetup = async () => {
+  if (hasInitRun.value) return true;
+  try {
+    loadSelectedProblem();
+    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
+    if (!warmOk || !preloaded) return false;
+    hasInitRun.value = true;
+    return true;
+  } catch {
+    return false;
+  }
+};
 
 const startTest = async () => {
   if (isStarting.value) return;
@@ -573,7 +539,6 @@ const startTest = async () => {
   isStarting.value = true;
 
   try {
-    // 기본 준비(warmup + 문제 프리로드)가 되어 있는지 확인
     if (!problemData.value) {
       const ok = await runInitialSetup();
       if (!ok) {
@@ -588,530 +553,364 @@ const startTest = async () => {
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({
-        problem_data: problemData.value,
-      }),
+      body: JSON.stringify({ problem_data: problemData.value }),
     });
 
     const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      window.alert(data.detail || "라이브 코딩 세션을 시작하지 못했습니다.");
+    if (!resp.ok || !data.session_id) {
+      window.alert(data.detail || "세션을 시작하지 못했습니다.");
       return;
     }
-    if (!data.session_id) {
-      window.alert("세션 ID를 받지 못했습니다. 다시 시도해 주세요.");
-      return;
-    }
+    
     localStorage.setItem("jobtory_livecoding_session_id", data.session_id);
     sessionStorage.removeItem("jobtory_livecoding_problem_data");
 
- 
     router.replace({
       name: "coding-session",
-      query: {
-        session_id: data.session_id,
-      },
+      query: { session_id: data.session_id },
     });
   } catch (err) {
     console.error(err);
-    window.alert(
-      "라이브 코딩 세션을 시작하지 못했습니다. 잠시 후 다시 시도해 주세요."
-    );
+    window.alert("오류가 발생했습니다.");
   } finally {
     isStarting.value = false;
   }
 };
 
-/* -----------------------------------------
-   LangGraph / 문제
--------------------------------------------- */
-const problemData = ref(null);
-const hasInitRun = ref(false);
-const isWarmed = ref(false);
-const isPreloading = ref(false);
-const loadSelectedProblem = () => {
-  if (problemData.value) return;
-  const raw = sessionStorage.getItem("jobtory_livecoding_problem_data");
-  if (!raw) return;
-  try {
-    const parsed = JSON.parse(raw);
-    if (parsed && parsed.problem_id && parsed.problem && parsed.test_cases) {
-      problemData.value = parsed;
-    }
-  } catch {
-    return;
-  }
-};
-const warmupLanggraph = async () => {
-  if (isWarmed.value) return true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
+onMounted(() => {
+  const token = ensureLoggedIn();
+  if (!token) return;
+  void runInitialSetup();
+});
 
-    const resp = await fetch(`${BACKEND_BASE}/api/warmup/langgraph/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (resp.ok && data?.status === "warmed") {
-      isWarmed.value = true;
-      return true;
-    }
-  } catch (err) {
-    console.warn("warmup failed", err);
-  }
-  return false;
-};
-
-const preloadProblem = async () => {
-  if (problemData.value) return true; // 이미 문제를 받아두었으면 다시 랜덤 요청하지 않음
-  if (isPreloading.value) return !!problemData.value;
-  isPreloading.value = true;
-  try {
-    const token = ensureLoggedIn();
-    if (!token) return false;
-
-    const resp = await fetch(`${BACKEND_BASE}/api/livecoding/preload/`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({
-        language: DEFAULT_LANGUAGE,
-      }),
-    });
-    const data = await resp.json().catch(() => ({}));
-    if (!resp.ok) {
-      window.alert(data?.detail || "문제 준비 중 오류가 발생했습니다.");
-      return false;
-    }
-    if (!data?.problem_id) {
-      window.alert("문제 정보를 받지 못했습니다. 다시 시도해 주세요.");
-      return false;
-    }
-    console.log("[livecoding][preload] problem loaded", {
-      problem_id: data.problem_id,
-    });
-    problemData.value = data;
-    return true;
-  } catch (err) {
-    console.error(err);
-    window.alert("문제 준비 중 오류가 발생했습니다. 다시 시도해 주세요.");
-    return false;
-  } finally {
-    isPreloading.value = false;
-  }
-};
-
-/* ----- 초기 자동 셋업: warmup + 문제 프리로드만 ----- */
-const runInitialSetup = async () => {
-  if (hasInitRun.value) return true;
-  try {
-    loadSelectedProblem();
-    const [warmOk, preloaded] = await Promise.all([warmupLanggraph(), preloadProblem()]);
-    if (!warmOk || !preloaded) return false;
-
-    hasInitRun.value = true;
-    return true;
-  } catch (e) {
-    console.error("runInitialSetup 실패:", e);
-    return false;
-  }
-};
-
-/* ----- 컴포넌트 언마운트 시 정리 ----- */
 onBeforeUnmount(() => {
   stopCamera();
   stopMic();
 });
-
-onMounted(() => {
-  const token = ensureLoggedIn();
-  if (!token) return;          // 로그인 페이지로 보내고 초기화 중단
-  void runInitialSetup();      // warmup + preload 실행
-});
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap");
+
 
 .setting-root {
   width: 100vw;
-  height: 100vh; /* 화면 꽉 채움 */
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #262728;
-  font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  overflow: hidden; /* 💡 바깥쪽 스크롤 원천 차단 */
+  background: #111827; /* Deep Dark */
+  font-family: "Inter", sans-serif;
+  color: #f3f4f6;
+  overflow: hidden;
 }
 
 .setting-card {
   display: grid;
-  grid-template-columns: 260px minmax(520px, 720px);
-  background: #e5e7eb;
-  border-radius: 14px;
+  grid-template-columns: 280px 1fr;
+  width: min(1000px, 95vw);
+  height: min(700px, 85vh);
+  background: #1f2937;
+  border-radius: 20px;
   overflow: hidden;
-  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.4);
-  width: 100%;
-  max-width: 1200px;
-  min-height: 80vh;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 
-/* 사이드바 */
+/* Sidebar */
 .step-sidebar {
-  background: #e5e7eb;
-  padding: 24px 20px;
-  border-right: 1px solid #d1d5db;
+  background: #18202f;
+  padding: 32px 24px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  position: relative;
 }
 
 .sidebar-title {
-  font-size: 18px;
-  font-weight: 800;
-  margin-bottom: 16px;
-  color: #111827;
+  font-size: 16px;
+  font-weight: 700;
+  color: #9ca3af;
+  margin-bottom: 32px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
 }
 
-.step-list {
-  list-style: none;
-  padding: 0;
-  margin: 0;
+.step-progress {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.progress-line-bg {
+  position: absolute;
+  top: 15px; left: 15px; bottom: 15px;
+  width: 2px;
+  background: #374151;
+  z-index: 0;
+}
+
+.progress-line-fill {
+  position: absolute;
+  top: 15px; left: 15px;
+  width: 2px;
+  background: #6366f1; /* Indigo */
+  z-index: 0;
+  transition: height 0.4s ease;
 }
 
 .step-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 4px;
-  border-radius: 8px;
-  font-size: 14px;
+  gap: 16px;
   position: relative;
+  z-index: 1;
+  opacity: 0.5;
+  transition: opacity 0.3s;
 }
 
-.step-index {
-  width: 24px;
-  height: 24px;
-  border-radius: 999px;
+.step-item.active,
+.step-item.completed {
+  opacity: 1;
+}
+
+.step-indicator {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #1f2937;
+  border: 2px solid #4b5563;
   display: flex;
   align-items: center;
   justify-content: center;
   font-weight: 700;
+  font-size: 14px;
+  color: #9ca3af;
+  transition: all 0.3s;
 }
 
-.step-label {
-  font-weight: 600;
+.step-item.active .step-indicator {
+  border-color: #6366f1;
+  color: #fff;
+  background: #6366f1;
+  box-shadow: 0 0 15px rgba(99, 102, 241, 0.4);
 }
 
-.pass-badge {
-  position: absolute;
-  right: 4px;
-  top: 7px;
-  font-size: 11px;
-  background: #10b981;
-  color: #f9fafb;
-  padding: 2px 6px;
-  border-radius: 999px;
+.step-item.completed .step-indicator {
+  border-color: #6366f1;
+  color: #6366f1;
+  background: #1f2937;
 }
 
-/* 상태별 스타일 */
-.step-item.is-active {
-  background: #d1d5db;
-}
+.check-icon { font-size: 12px; }
 
-.step-item.is-active .step-index {
-  background: #111827;
-  color: #f9fafb;
-}
+.step-info { display: flex; flex-direction: column; }
+.step-label { font-weight: 600; font-size: 15px; color: #f3f4f6; }
+.step-status { font-size: 11px; color: #6366f1; margin-top: 2px; }
 
-.step-item.is-done .step-index {
-  background: #10b981;
-  color: #f9fafb;
-}
-
-.step-item.is-upcoming .step-index {
-  background: #f9fafb;
-  color: #4b5563;
-}
-
-/* 오른쪽 패널 */
+/* Main Content */
 .step-content {
-  background: #f3f4f6;
-  padding: 28px 32px;
+  padding: 40px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  background: #1f2937;
 }
 
 .step-panel {
   display: flex;
   flex-direction: column;
   height: 100%;
+  animation: fadeIn 0.4s ease-out;
 }
 
-.step-title {
-  font-size: 20px;
+.panel-header h3 {
+  font-size: 24px;
   font-weight: 800;
-  margin-bottom: 8px;
-  color: #111827;
+  margin: 0 0 8px;
+  color: #fff;
 }
-
-.step-desc {
-  font-size: 14px;
-  color: #4b5563;
-  margin-bottom: 18px;
-}
+.panel-header p { color: #9ca3af; font-size: 14px; }
+.panel-header.center { text-align: center; }
 
 .bullet-list {
   margin: 0;
-  padding-left: 18px;
-  font-size: 14px;
-  color: #111827;
-}
-
-.bullet-list li + li {
-  margin-top: 6px;
-}
-
-/* 웹캠 프리뷰 */
-.preview-box {
-  margin-top: 18px;
-  flex: 0 0 auto;
-  border-radius: 10px;
-  border: 3px dashed #9ca3af;
-  background: #f1f3f5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  width: 100%;
-  height: 320px;
-  overflow: hidden;
-}
-
-.preview-active {
-  width: 60%;
-  margin-left: auto;
-  margin-right: auto;
-  transition: width 0.2s ease;
-}
-
-.border-idle {
-  border-style: dashed;
-  border-color: #9ca3af;
-}
-
-.border-success {
-  border-style: dashed;
-  border-color: #9ca3af;
-}
-
-.border-fail {
-  border-style: dashed;
-  border-color: #9ca3af;
-}
-
-.video-preview {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 9px;
-}
-
-.face-target-box {
-  position: absolute;
-  inset: 10%;
-  border: 4px solid #4b5563;
-  border-radius: 16px;
-  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.06);
-  pointer-events: none;
-  transition: border-color 0.2s ease;
-}
-
-.target-success {
-  border-color: #10b981;
-}
-
-.target-fail {
-  border-color: #ef4444;
-}
-
-.preview-placeholder {
+  list-style: none; /* 기본 점 제거 */
   display: flex;
   flex-direction: column;
-  align-items: center;
-  gap: 12px;
-  color: #1f2937;
-  text-align: center;
-  padding: 16px;
+  gap: 10px; /* 항목 간 간격 */
+  border-radius: 8px;
+  padding: 50px 135px;
 }
 
-.placeholder-illustration {
-  width: 176px;
-  height: auto;
-  border-radius: 12px;
-  opacity: 0.3;
-}
-
-.placeholder-illustration-wrap {
-  background: transparent;
-  border-radius: 0;
-  padding: 0;
-  box-shadow: none;
-}
-
-.camera-guidance {
-  margin-top: 14px;
+.bullet-list li {
+  position: relative;
+  padding-left: 20px; /* 불릿 공간 확보 */
   font-size: 14px;
   line-height: 1.6;
-  color: #1f2937;
+  color: #c9d1d9; /* 눈이 편안한 밝은 회색 */
+  letter-spacing: -0.01em;
+}
+
+/* 커스텀 불릿 포인트 */
+.bullet-list li::before {
+  content: "";
+  position: absolute;
+  left: 6px;
+  top: 10px; /* 텍스트 높이에 맞춰 중앙 정렬 */
+  width: 4px;
+  height: 4px;
+  background-color: #58a6ff; /* IDE 포인트 컬러 (블루) */
+  border-radius: 50%;
+}
+
+/* Info Cards (Step 1) */
+.info-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-top: 32px;
+}
+
+.info-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
   text-align: center;
 }
+.info-card .icon { font-size: 28px; display: block; margin-bottom: 12px; }
+.info-card h4 { margin: 0 0 6px; font-size: 14px; font-weight: 700; color: #e5e7eb; }
+.info-card p { margin: 0; font-size: 12px; color: #9ca3af; line-height: 1.5; }
 
-.test-running-text {
-  font-size: 14px;
-  color: #4b5563;
-  font-weight: 600;
-}
-
-/* 마이크 테스트 */
-.audio-test-box {
-  margin-top: 18px;
-}
-
-.audio-label {
-  font-size: 13px;
-  color: #4b5563;
-  margin-bottom: 6px;
-  display: block;
-}
-
-.audio-bar-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-
-.audio-bar-bg {
-  flex: 1;
-  height: 10px;
-  border-radius: 999px;
-  background: #e5e7eb;
+/* Camera Preview (Step 2) */
+.preview-container {
+  margin-top: 24px;
+  width: 100%;
+  height: 320px;
+  background: #111827;
+  border-radius: 16px;
+  border: 2px dashed #4b5563;
+  position: relative;
   overflow: hidden;
-  position: relative; /* 기준선 absolute 포지셔닝용 */
+  transition: border-color 0.3s;
 }
 
-.audio-bar-fill {
-  height: 100%;
-  border-radius: 999px;
-  background: #10b981;
-  transition: width 0.12s ease-out;
-}
+.preview-container.success { border-color: #10b981; border-style: solid; }
+.preview-container.fail { border-color: #ef4444; border-style: solid; }
 
-/* ✅ 통과 기준선 */
-.audio-bar-threshold {
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: #ef4444; /* 빨간 기준선 */
-  transform: translateX(-50%);
-  opacity: 0.9;
-}
+.video-preview { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); }
 
-.audio-level-text {
-  font-size: 12px;
-  color: #4b5563;
+.face-guide-box {
+  position: absolute; top: 15%; left: 25%; right: 25%; bottom: 15%;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-radius: 12px;
+  transition: border-color 0.3s;
 }
+.face-guide-box.success { border-color: #10b981; box-shadow: 0 0 20px rgba(16, 185, 129, 0.2); }
+.face-guide-box.fail { border-color: #ef4444; }
 
-/* 스피커 테스트 */
-.speaker-test-box {
-  margin-top: 16px;
-}
-
-.speaker-actions {
-  display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
-}
-
-.secondary-btn.small {
-  padding: 6px 12px;
-  font-size: 12px;
-}
-
-/* 공통 */
-.help-text {
-  margin-top: 10px;
-  font-size: 13px;
-  color: #4b5563;
-}
-
-.help-text.small {
-  font-size: 12px;
+.placeholder-box {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%;
   color: #6b7280;
 }
+.placeholder-icon { font-size: 40px; margin-bottom: 12px; opacity: 0.5; }
 
-/* 푸터 버튼 */
+.status-message {
+  margin-top: 16px;
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  font-size: 14px; font-weight: 600; color: #d1d5db;
+}
+.status-dot { width: 8px; height: 8px; border-radius: 50%; background: #6b7280; }
+.status-dot.success { background: #10b981; }
+.status-dot.fail { background: #ef4444; }
+
+/* Audio Module (Step 3) */
+.test-module {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 12px;
+  padding: 20px;
+  margin-top: 20px;
+}
+
+.module-label { display: flex; justify-content: space-between; margin-bottom: 12px; font-size: 14px; font-weight: 600; }
+.status-badge { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: #374151; color: #9ca3af; }
+.status-badge.pass { background: rgba(16, 185, 129, 0.2); color: #10b981; }
+
+.audio-visualizer { display: flex; align-items: center; gap: 12px; }
+.bar-container { flex: 1; height: 8px; background: #374151; border-radius: 99px; position: relative; overflow: hidden; }
+.bar-fill { height: 100%; background: #6366f1; border-radius: 99px; transition: width 0.1s; }
+.threshold-line { position: absolute; top: 0; bottom: 0; width: 2px; background: #ef4444; z-index: 2; }
+.level-text { font-family: "JetBrains Mono"; font-size: 12px; color: #9ca3af; width: 36px; text-align: right; }
+.module-desc { font-size: 12px; color: #6b7280; margin-top: 8px; }
+
+.speaker-controls { display: flex; gap: 10px; }
+
+/* Final Step */
+.final-check-list {
+  border-radius: 10px;
+  padding-top: 20px;
+  padding-left: 100px;
+  display: flex; flex-direction: row; gap: 20px;
+}
+.check-item { font-size: 15px; font-weight: 600; color: #d1d5db; display: flex; align-items: center; gap: 15px; }
+.check { color: #10b981; }
+.success-icon { font-size: 48px; margin-bottom: 16px; }
+
+/* Buttons */
 .panel-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 10px;
-  margin-top: auto;
-  padding-top: 24px;
-  flex-wrap: wrap;
+  margin-top: auto; padding-top: 32px;
+  display: flex; justify-content: flex-end; gap: 12px;
 }
+.panel-footer.center { justify-content: center; }
 
-.primary-btn,
-.secondary-btn {
-  min-width: 96px;
-  padding: 8px 18px;
-  border-radius: 8px;
-  border: none;
-  cursor: pointer;
-  font-size: 14px;
-  font-weight: 600;
-}
+button { cursor: pointer; transition: all 0.2s; border: none; font-family: inherit; }
 
-.primary-btn {
-  background: #111827;
-  color: #f9fafb;
+.btn-primary {
+  padding: 10px 24px;
+  background: #6366f1; color: white;
+  border-radius: 8px; font-weight: 600; font-size: 14px;
 }
+.btn-primary:hover { background: #4f46e5; transform: translateY(-1px); }
+.btn-primary:disabled { background: #374151; color: #9ca3af; cursor: not-allowed; transform: none; }
 
-.primary-btn:hover {
-  filter: brightness(1.05);
-}
+.btn-primary.large { padding: 14px 40px; font-size: 16px; }
 
-.primary-btn:disabled {
-  background: #6b7280;
-  cursor: not-allowed;
+.btn-secondary {
+  padding: 10px 20px;
+  background: transparent; color: #9ca3af;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px; font-weight: 500; font-size: 14px;
 }
+.btn-secondary:hover { border-color: #6366f1; color: #fff; }
 
-.secondary-btn {
-  background: #e5e7eb;
-  color: #111827;
+.btn-action {
+  padding: 10px 20px;
+  background: rgba(255, 255, 255, 0.1); color: #fff;
+  border-radius: 8px; font-size: 14px; font-weight: 600;
 }
+.btn-action:hover { background: rgba(255, 255, 255, 0.2); }
 
-.secondary-btn:hover {
-  filter: brightness(0.98);
+.btn-small {
+  padding: 6px 12px; border-radius: 6px; font-size: 12px; background: #374151; color: #e5e7eb;
 }
+.btn-small.outline { background: transparent; border: 1px solid #374151; }
+.btn-small:hover:not(:disabled) { background: #4b5563; }
 
-/* 숨김 캔버스 */
-.hidden-canvas {
-  display: none;
-}
+.hidden { display: none; }
+
+/* Animations */
+.fade-in { animation: fadeIn 0.4s ease-out; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+/* Scrollbar */
+.step-content::-webkit-scrollbar { width: 6px; }
+.step-content::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
 
 @media (max-width: 900px) {
-  .setting-root {
-    padding: 20px;
-  }
-
-  .setting-card {
-    grid-template-columns: 1fr;
-  }
-
-  .step-sidebar {
-    border-right: none;
-    border-bottom: 1px solid #d1d5db;
-  }
+  .setting-card { grid-template-columns: 1fr; height: auto; min-height: 100vh; border-radius: 0; }
+  .step-sidebar { display: none; } /* 모바일에서는 사이드바 숨김 */
+  .info-grid { grid-template-columns: 1fr; }
 }
 </style>

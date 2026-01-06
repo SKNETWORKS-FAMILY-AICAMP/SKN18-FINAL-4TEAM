@@ -109,7 +109,7 @@ with open(CSV_DIR / "final_data.csv", "r", encoding="utf-8-sig", newline="") as 
         domain = row.get("domain") or "algorithm"
         cur.execute(
             # 테이블 컬럼명이 현재 'doamin'으로 정의되어 있어 그대로 사용
-            "INSERT INTO recommended_videos (id, code_lang, video_url, summary, category, doamin) "
+            "INSERT INTO recommended_videos (id, code_lang, video_url, summary, category, domain) "
             "VALUES (%s, %s, %s, %s, %s, %s)",
             (
                 int(row["id"]) if row.get("id") else None,

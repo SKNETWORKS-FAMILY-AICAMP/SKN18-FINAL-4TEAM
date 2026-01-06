@@ -1,0 +1,17 @@
+{
+  "mappings": {
+    "properties": {
+      "problem_id": { "type": "keyword" },
+      "problem": { "type": "text" },
+      "category": { "type": "keyword", "fields": { "text": { "type": "text" } } },
+      "algorithm": { "type": "keyword" },
+      "difficulty": { "type": "keyword" },
+      "embedding": {
+        "type": "dense_vector",
+        "dims": 3072,
+        "index": true,
+        "similarity": "cosine"
+      }
+    }
+  }
+}

@@ -62,6 +62,8 @@ def _to_kst_iso(dt):
     return aware.isoformat()
 
 
+
+
 def health(request):
     return JsonResponse({"status": "ok"})
 
@@ -569,7 +571,17 @@ class LiveCodingStartView(APIView):
         problem_data = request.data.get("problem_data")
         if not isinstance(problem_data, dict):
             return Response({"detail": "problem_data가 필요합니다."}, status=400)
-        required = ["problem_id", "problem", "difficulty", "category", "language", "function_name", "starter_code", "test_cases"]
+        required = [
+            "problem_id",
+            "problem",
+            "difficulty",
+            "category",
+            "language",
+            "function_name",
+            "starter_code",
+            "test_cases",
+            "algorithm",
+        ]
         missing = [k for k in required if k not in problem_data]
         if missing:
             return Response({"detail": f"problem_data 필드 누락: {', '.join(missing)}"}, status=400)
@@ -597,6 +609,7 @@ class LiveCodingStartView(APIView):
                 "function_name":  problem_data['function_name'],
                 "starter_code": problem_data['starter_code'],
                 "test_cases":  problem_data['test_cases'],
+                "algorithm": problem_data["algorithm"],
             
         }
 
@@ -1819,6 +1832,15 @@ class LiveCodingFinalEvalReportView(APIView):
             # 캐시가 정리된 경우 DB에 저장된 리포트로 fallback
             report = LivecodingReport.objects.filter(session_id=session_id, user=user).first()
             if report:
+                graph_output = report.graph_output or {}
+                try:
+                    from graph_sync.graph_queue import enqueue_report_sync, enqueue_recommendations
+
+                    enqueue_report_sync(report.id)
+                    if not (graph_output.get("recommended_problems") or []):
+                        enqueue_recommendations(report.id, str(user.user_id), "python")
+                except Exception as e:
+                    print(f"[report_api] graph queue failed: {e}", flush=True)
                 return Response(
                     {
                         "status": "done",
@@ -1826,7 +1848,7 @@ class LiveCodingFinalEvalReportView(APIView):
                         "final_report_markdown": report.report_md or "",
                         "final_score": report.final_score,
                         "final_grade": report.final_grade,
-                        "problem_text": report.problem_text,
+                        "problem_text": (report.problem or {}).get("problem_text") if hasattr(report, "problem") else None,
                         "code_feedback": report.code_feedback,
                         "problem_solving_evaluation": report.problem_solving_evaluation,
                         "initial_strategy": report.initial_strategy,
@@ -1839,7 +1861,7 @@ class LiveCodingFinalEvalReportView(APIView):
                         "improvement": report.improvement,
                         "comprehensive_evaluation": report.comprehensive_evaluation,
                         "anti_cheat_summary": report.anti_cheat_summary,
-                        "graph_output": report.graph_output or {},
+                        "graph_output": graph_output,
                         "problem_eval_score": report.problem_eval_score,
                         "problem_eval_feedback": report.problem_eval_feedback,
                         "code_collab_score": report.code_collab_score,
@@ -1959,13 +1981,23 @@ class LiveCodingFinalEvalReportView(APIView):
                 values["graph_output"] = graph_output
                 print(f"[✗ 리포트 API] 문제 텍스트 로드 실패: {e}", flush=True)
         try:
+            # 문제 메타 구성 (JSON 저장용)
+            problem_key = f"livecoding:{session_id}:problem"
+            cached_problem = cache.get(problem_key) or {}
+            problem_payload = {
+                "problem_id": cached_problem.get("problem_id"),
+                "problem_text": cached_problem.get("problem") or cached_problem.get("problem_text"),
+                "difficulty": cached_problem.get("difficulty"),
+                "category": cached_problem.get("category"),
+                "algorithm": cached_problem.get("algorithm"),
+            }
             now_local = timezone.localtime(timezone.now(), ZoneInfo("Asia/Seoul"))
             defaults = {
                 "user": user,
                 "report_md": report_md,
                 "final_score": values.get("final_score"),
                 "final_grade": values.get("final_grade"),
-                "problem_text": graph_output.get("problem_text"),
+                "problem": problem_payload,
                 "code_feedback": graph_output.get("code_feedback"),
                 "problem_solving_evaluation": problem_solving_evaluation,
                 "initial_strategy": problem_solving_evaluation.get("initial_strategy"),
@@ -1997,6 +2029,18 @@ class LiveCodingFinalEvalReportView(APIView):
         except Exception as e:
             # 저장 실패는 조회 응답을 막지 않음
             print(f"[report_api] livecoding_reports upsert failed: {e}", flush=True)
+            report_obj = None
+
+        if report_obj:
+            try:
+                from graph_sync.graph_queue import enqueue_report_sync, enqueue_recommendations
+
+                enqueue_report_sync(report_obj.id)
+                if not (graph_output.get("recommended_problems") or []):
+                    language = (meta.get("language") or "python").lower()
+                    enqueue_recommendations(report_obj.id, str(user.user_id), language)
+            except Exception as e:
+                print(f"[report_api] graph queue failed: {e}", flush=True)
 
         # 리포트가 정상적으로 생성/저장된 이후에는
         # 해당 세션과 관련된 Redis 캐시/체크포인트를 모두 정리해
@@ -2159,6 +2203,38 @@ class LiveCodingReportListView(APIView):
         return Response({"results": results}, status=status.HTTP_200_OK)
 
 
+class LiveCodingReportTrendView(APIView):
+    """
+    사용자별 라이브코딩 리포트 점수 추세 (final_score만)
+    GET /api/livecoding/reports/trend/
+    """
+
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request):
+        user = getattr(request, "user", None)
+        if not isinstance(user, User):
+            return Response({"detail": "로그인이 필요합니다."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        reports = (
+            LivecodingReport.objects.filter(user=user, final_score__isnull=False)
+            .order_by("created_at", "id")
+            .only("session_id", "final_score", "created_at")
+        )
+
+        trend = [
+            {
+                "session_id": r.session_id,
+                "final_score": float(r.final_score) if r.final_score is not None else None,
+                "created_at": _to_kst_iso(r.created_at),
+            }
+            for r in reports
+        ]
+
+        return Response({"results": trend}, status=status.HTTP_200_OK)
+
+
 class LiveCodingReportDetailView(APIView):
     """
     DB에 저장된 최종 리포트 상세 (로그인 사용자 본인)
@@ -2185,7 +2261,7 @@ class LiveCodingReportDetailView(APIView):
                 "final_report_markdown": report.report_md or "",
                 "final_score": report.final_score,
                 "final_grade": report.final_grade,
-                "problem_text": report.problem_text,
+                "problem_text": (report.problem or {}).get("problem_text") if hasattr(report, "problem") else None,
                 "code_feedback": report.code_feedback,
                 "problem_solving_evaluation": report.problem_solving_evaluation,
                 "initial_strategy": report.initial_strategy,
@@ -2236,7 +2312,6 @@ def save_strategy_answer(request):
         
         # ✅ checkpoint에도 저장 (추가)
         try:
-            from langgraph.checkpoint.postgres import PostgresSaver
             from interview_engine.graph import get_checkpointer
             
             checkpointer = get_checkpointer()

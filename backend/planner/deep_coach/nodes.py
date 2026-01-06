@@ -2,7 +2,7 @@ import json
 from typing import Any, Dict
 from utils import _normalize_for_judge, _calc_tool_level,_choose_lenient
 from state import EvidenceCoachState
-from agents import create_judge_agent, create_feedback_agent
+from backend.planner.deep_coach.agents import create_judge_agent, create_feedback_agent
 from utils import safe_json_parse
 # ---------- node ----------
 def evidence_ingest_node(state: EvidenceCoachState) -> EvidenceCoachState:

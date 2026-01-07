@@ -30,6 +30,10 @@ cur = conn.cursor()
 print("기존 데이터 삭제 중...")
 try:
     cur.execute("TRUNCATE TABLE coding_problem_language, test_case, coding_problem, recommended_videos RESTART IDENTITY CASCADE;")
+    cur.execute(
+        "TRUNCATE TABLE coding_problem_language, test_case, coding_problem, recommended_videos "
+        "RESTART IDENTITY CASCADE;"
+    )
     conn.commit()
     print("기존 데이터 삭제 완료\n")
 except psycopg2.errors.UndefinedTable:
@@ -156,6 +160,7 @@ with open(CSV_DIR / "final_data.csv", "r", encoding="utf-8-sig", newline="") as 
             print(f"  {count}개 처리 중...")
     conn.commit()
     print(f"recommended_videos: 총 {count}개 완료\n")
+
 conn.commit()
 
 cur.close()

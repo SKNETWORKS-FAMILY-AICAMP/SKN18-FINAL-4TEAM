@@ -16,7 +16,8 @@ phases:
       - docker push $ECR_URI:$IMAGE_TAG
   post_build:
     commands:
-      - python - << 'PY'
+      - |
+        python - <<'PY'
         import json
         import os
 

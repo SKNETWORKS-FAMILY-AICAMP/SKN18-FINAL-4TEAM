@@ -28,8 +28,30 @@ phases:
         with open("taskdef.json", "r") as f:
             data = json.load(f)
 
+        # Keep only fields allowed by RegisterTaskDefinition.
+        allowed_keys = {
+            "family",
+            "taskRoleArn",
+            "executionRoleArn",
+            "networkMode",
+            "containerDefinitions",
+            "volumes",
+            "placementConstraints",
+            "requiresCompatibilities",
+            "cpu",
+            "memory",
+            "runtimePlatform",
+            "proxyConfiguration",
+            "inferenceAccelerators",
+            "ephemeralStorage",
+            "pidMode",
+            "ipcMode",
+            "tags",
+        }
+        cleaned = {k: v for k, v in data.items() if k in allowed_keys and v is not None}
+
         updated = False
-        for container in data.get("containerDefinitions", []):
+        for container in cleaned.get("containerDefinitions", []):
             if container.get("name") == container_name:
                 container["image"] = f"{ecr}:{tag}"
                 updated = True
@@ -39,7 +61,7 @@ phases:
             raise SystemExit(f"Container name {container_name} not found in taskdef.json")
 
         with open("rendered-taskdef.json", "w") as f:
-            json.dump(data, f)
+            json.dump(cleaned, f)
         PY
 
 artifacts:

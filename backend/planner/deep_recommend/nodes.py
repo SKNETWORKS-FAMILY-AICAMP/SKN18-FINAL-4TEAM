@@ -3,7 +3,9 @@ import json
 from dotenv import load_dotenv
 from .state import RecommendState
 from .prompt import REPORT_ANALYZER_PROMPT, SLOT_PLANNER_PROMPT, VIDEO_SELECTOR_PROMPT
-from .tools import _create_agent, video_search_tool
+from .tools import _create_agent, video_search_tool, DEFAULT_MODEL_NAME
+from langchain_openai import ChatOpenAI
+from langchain_core.messages import SystemMessage, HumanMessage
 from planner.deep_coach.utils import safe_json_parse
 load_dotenv()
 
@@ -12,18 +14,23 @@ load_dotenv()
 
 def report_analyzer(state: RecommendState) -> RecommendState:
 
-    user_id = state.get("user_id", ""),
-    growth_report= state.get("growth_report", ""),
-    user_profile= state.get("user_profile", {}),
-    agent = _create_agent(system_prompt=REPORT_ANALYZER_PROMPT)
+    user_id = state.get("user_id", "")
+    growth_report = state.get("growth_report", "")
+    user_profile = state.get("user_profile", {})
+    model = ChatOpenAI(model=DEFAULT_MODEL_NAME, temperature=0)
     prompt = f'''
         사용자 이름: {user_id}
         사용자 리포트: {growth_report}
         사용자 프로필: {user_profile}
     '''
     try:
-        res = agent.invoke({"messages": [{"role": "user", "content": prompt }]})
-        raw = res["messages"][-1].content
+        res = model.invoke(
+            [
+                SystemMessage(content=REPORT_ANALYZER_PROMPT),
+                HumanMessage(content=prompt),
+            ]
+        )
+        raw = getattr(res, "content", None) or str(res)
         parsed = safe_json_parse(raw)
         state["needs_profile"] = parsed.get("needs_profile")
     except Exception as exc:

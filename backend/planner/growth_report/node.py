@@ -38,50 +38,17 @@ def growth_delta_analyst(state: ReportState) -> ReportState:
     """
     prev = state.get("growth_report")
     prev_text = prev if isinstance(prev, str) else json.dumps(prev, ensure_ascii=False) if prev else "(이전 리포트 없음)"
+    reports = state.get("reports")
     user_prompt = f"""
     ### 이전 성장 리포트
     {prev_text}
 
     ### 현재 분석 대상 리포트
-    { _reports_to_text(state) }
+    {reports}
     """
     content = _call_llm(system_prompt, user_prompt)
     parsed = _parse_json(content)
     state["growth_delta"] = parsed if isinstance(parsed, dict) else {"raw": content}
-    return state
-
-
-def weakness_analyst(state: ReportState) -> ReportState:
-    system_prompt = """
-        # ROLE
-        너는 사용자의 누적 라이브코딩 면접 기록을 분석하는 약점 패턴 식별 노드다.
-
-        # TASK
-        - 반복적으로 관찰된 개선 필요 패턴만 식별한다.
-        - reports와 problem_algorithm 태그를 참고하여 알고리즘/자료구조 취약 영역을 포함한다.
-          (예: BFS/DP/Greedy/Stack/Heap/Tree/Graph/Array/Hash 등)
-        # CONSTRAINTS
-        - 단발성 실수 제외
-        - 최소 2개 이상의 report 근거 필요
-        - 정확히 3개
-        - 각 항목은 80자 이내 한 문장
-        - 비난/성격 판단 금지
-
-        # OUTPUT FORMAT (JSON only)
-        {
-            "weaknesses": [
-                {"title": "약점 요약(알고리즘/행동 포함)", "evidence": "반복 패턴 또는 report_ids"},
-                {"title": "약점 요약(알고리즘/행동 포함)", "evidence": "..."},
-                {"title": "약점 요약(알고리즘/행동 포함)", "evidence": "..."}
-            ]
-        }
-    """
-    low_algos = collect_low_score_algorithms(state.get("reports") or [], threshold=70.0)
-    algos_text = json.dumps(low_algos, ensure_ascii=False)
-    user_prompt = f"{_reports_to_text(state)}\n\n### 약한 알고리즘 리스트\n{algos_text}"
-    content = _call_llm(system_prompt, user_prompt)
-    parsed = _parse_json(content)
-    state["weaknesses"] = parsed.get("weaknesses") if isinstance(parsed, dict) else []
     return state
 
 
@@ -109,9 +76,9 @@ def strength_analyst(state: ReportState) -> ReportState:
             ]
         }
     """
-    high_algos = collect_high_score_algorithms(state.get("reports") or [], threshold=90.0)
-    algos_text = json.dumps(high_algos, ensure_ascii=False)
-    user_prompt = f"{_reports_to_text(state)}\n\n### 강한 알고리즘 리스트\n{algos_text}"
+    high_algos_text= state.get("high_algorithm_list")
+    reports = state.get("reports")
+    user_prompt = f"{reports}\n\n### 강한 알고리즘 리스트\n{high_algos_text}"
     content = _call_llm(system_prompt, user_prompt)
     parsed = _parse_json(content)
     state["strengths"] = parsed.get("strengths") if isinstance(parsed, dict) else []
@@ -121,32 +88,28 @@ def strength_analyst(state: ReportState) -> ReportState:
 def improvement_analyst(state: ReportState) -> ReportState:
     system_prompt = """
         # ROLE
-        너는 약점 분석 결과를 실행 가능한 행동으로 변환하는 개선 전략 생성 노드다.
+        너는 사용자의 리포트를 근거로 개선해야할 점을 요약하는 분석가다.
 
         # TASK
-        - 각 약점에 대해 다음 면접에서 바로 실행 가능한 행동을 제안한다.
+        - reports를 근거로 "어떤 점을 개선해야하는지"를 구체적으로 요약한다.
 
         # CONSTRAINTS
-        - weakness 항목과 1:1 매핑
         - 정확히 3개
-        - 추상적 조언 금지
-        - 성공 기준은 체크 가능해야 함
+        - 각 항목은 80자 이내 한 문장
+        - 추상적 조언 금지, 관찰된 부족만 요약
 
         # OUTPUT FORMAT (JSON Only)
         {
             "improvements": [
-                {
-                    "action": "구체적 행동 지침",
-                    "linked_weakness": "약점 요약",
-                    "success_criteria": ["체크 가능한 기준 1", "체크 가능한 기준 2"]
-                },
-                {"action": "...", "linked_weakness": "...", "success_criteria": ["...", "..."]},
-                {"action": "...", "linked_weakness": "...", "success_criteria": ["...", "..."]}
+                {"title": "개선점 요약(알고리즘/행동 포함)", "evidence": "반복 패턴 또는 report_ids"},
+                {"title": "...", "evidence": "..."},
+                {"title": "...", "evidence": "..."}
             ]
         }
     """
-    weaknesses = state.get("weaknesses") or []
-    user_prompt = json.dumps({"weaknesses": weaknesses, "reports": state.get("reports")}, ensure_ascii=False)
+    low_algos_text= state.get("low_algorithm_list")
+    reports = state.get("reports")
+    user_prompt = f"{reports}\n\n### 약한 알고리즘 리스트\n{low_algos_text}"
     content = _call_llm(system_prompt, user_prompt)
     parsed = _parse_json(content)
     state["improvements"] = parsed.get("improvements") if isinstance(parsed, dict) else []
@@ -180,7 +143,6 @@ def create_report_node(state: ReportState) -> ReportState:
     
     payload = {
         "strengths": state.get("strengths") or [],
-        "weaknesses": state.get("weaknesses") or [],
         "improvements": state.get("improvements") or [],
         "growth_delta": state.get("growth_delta", []) 
 

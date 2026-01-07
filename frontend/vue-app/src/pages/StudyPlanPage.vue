@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed } from 'vue';
+import { ref, reactive, onMounted, computed, nextTick } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -12,6 +12,7 @@ const duration = ref(7); // 기본 7일
 const loading = ref(false);
 const { token, ensureValidSession, BACKEND_BASE } = useAuth();
 const router = useRouter();
+const calendarRef = ref(null);
 const redirectToLogin = () => {
   const redirect = router.currentRoute?.value?.fullPath || "/login";
   router.push({ name: "login", query: { redirect } });
@@ -207,7 +208,16 @@ async function generatePlan() {
     );
 
     // 받은 데이터를 캘린더 옵션에 주입 (반응형으로 즉시 업데이트됨)
-    calendarOptions.events = response.data.events;
+    calendarOptions.events = Array.isArray(response.data.events)
+      ? [...response.data.events]
+      : [];
+    await nextTick();
+    const calendarApi = calendarRef.value?.getApi?.();
+    if (calendarApi) {
+      calendarApi.removeAllEvents();
+      calendarApi.addEventSource(calendarOptions.events);
+      calendarApi.render();
+    }
     
     alert("커리큘럼 생성이 완료되었습니다!");
 
@@ -259,7 +269,7 @@ onMounted(() => {
     </div>
 
     <div class="calendar-wrapper">
-      <FullCalendar :options="calendarOptions" />
+      <FullCalendar ref="calendarRef" :options="calendarOptions" />
     </div>
     <Teleport to="body">
       <div v-if="isVideoOpen" class="video-modal" role="dialog" aria-modal="true">

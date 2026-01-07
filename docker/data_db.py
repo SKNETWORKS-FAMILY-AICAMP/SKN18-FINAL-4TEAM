@@ -21,7 +21,7 @@ cur = conn.cursor()
 # 기존 데이터 삭제 (테이블이 있을 경우만)
 print("기존 데이터 삭제 중...")
 try:
-    cur.execute("TRUNCATE TABLE coding_problem_language, test_case, coding_problem RESTART IDENTITY CASCADE;")
+    cur.execute("TRUNCATE TABLE coding_problem_language, test_case, coding_problem, recommended_videos RESTART IDENTITY CASCADE;")
     conn.commit()
     print("기존 데이터 삭제 완료\n")
 except psycopg2.errors.UndefinedTable:
@@ -107,6 +107,47 @@ cur.execute(
     ).format(tbl=sql.Identifier("coding_problem"), col=sql.Identifier("problem_id")),
     ("coding_problem", "problem_id"),
 )
+
+
+# 4. recommended_videos
+print("recommended_videos 처리 시작...")
+with open(CSV_DIR / "final_data.csv", "r", encoding="utf-8-sig", newline="") as f:
+    reader = csv.DictReader(f)
+    count = 0
+    for row in reader:
+        def parse_array(cell, field_name):
+            if not cell or not cell.strip():
+                return []
+            try:
+                return json.loads(cell)
+            except Exception:
+                try:
+                    return ast.literal_eval(cell)
+                except Exception:
+                    print(f"경고: {field_name} 파싱 실패, 빈 배열로 처리합니다. 원본 값: {cell[:80]}")
+                    return []
+
+        code_lang = parse_array(row.get("code_lang"), "code_lang")
+        category = parse_array(row.get("category"), "category")
+        domain = row.get("domain") or "algorithm"
+        cur.execute(
+            # 테이블 컬럼명이 현재 'doamin'으로 정의되어 있어 그대로 사용
+            "INSERT INTO recommended_videos (id, code_lang, video_url, summary, category, domain) "
+            "VALUES (%s, %s, %s, %s, %s, %s)",
+            (
+                int(row["id"]) if row.get("id") else None,
+                code_lang,
+                row["video_url"],
+                row["summary"],
+                category,
+                domain,
+            )
+        )
+        count += 1
+        if count % 100 == 0:
+            print(f"  {count}개 처리 중...")
+    conn.commit()
+    print(f"recommended_videos: 총 {count}개 완료\n")
 conn.commit()
 
 cur.close()

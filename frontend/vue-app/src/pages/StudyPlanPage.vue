@@ -18,6 +18,12 @@ const redirectToLogin = () => {
   router.push({ name: "login", query: { redirect } });
 };
 
+function getEventClassNames(arg) {
+  const status = (arg?.event?.extendedProps?.is_completed || '').toString().toUpperCase();
+  if (status === 'COMPLETE') return ['is-completed'];
+  return ['is-pending'];
+}
+
 // FullCalendar 설정 및 데이터 관리
 const calendarOptions = reactive({
   plugins: [ dayGridPlugin, interactionPlugin ],
@@ -28,6 +34,7 @@ const calendarOptions = reactive({
     right: 'dayGridMonth'
   },
   events: [], 
+  eventClassNames: getEventClassNames,
   eventClick: handleEventClick,
   height: 'auto', // 달력 높이는 내용에 맞게 자동 조절
   dayMaxEvents: true
@@ -374,7 +381,7 @@ onMounted(() => {
 :global(body) {
   background: #f8f4eb;
   margin: 0;
-  font-family: "SF Pro", -apple-system, BlinkMacSystemFont, sans-serif;
+  font-family: "Inter", sans-serif;
   overflow-x: hidden
 }
 
@@ -501,7 +508,7 @@ onMounted(() => {
   /* height: auto; (기본값) -> 달력은 내용에 따라 늘어남 */
 }
 
-/* --- [수정된 부분] 투두 리스트 섹션 --- */
+/* --- 투두 리스트 섹션 --- */
 .todo-wrapper {
   flex: 1;
   background: white;
@@ -512,7 +519,7 @@ onMounted(() => {
   flex-direction: column;
   
   /* 고정 높이 설정 (스크롤을 위해 필수) */
-  height: 628px; 
+  height: 588px; 
   overflow: hidden;
 }
 
@@ -545,7 +552,7 @@ onMounted(() => {
   flex: 1;
   overflow-y: auto; /* 내용이 많으면 스크롤 */
   padding: 16px;
-  background: #f8fafc;
+  background: #f9fafb;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -581,8 +588,8 @@ onMounted(() => {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: #eff6ff;
-  color: #3b82f6;
+  background: #f9fafb;
+  color: #1e293b;
   width: 50px;
   height: 50px;
   border-radius: 10px;
@@ -778,7 +785,7 @@ onMounted(() => {
   border-radius: 8px;
   padding: 12px;
   font-size: 0.95rem;
-  font-family: inherit;
+  font-family: "Inter", sans-serif;
   resize: vertical;
   background: #fff;
   transition: border-color 0.2s;
@@ -841,8 +848,8 @@ onMounted(() => {
 }
 :deep(.fc-event.is-pending) { background-color: #6abaff; color: #fff; border-left-color: #4291b8; }
 :deep(.fc-event.is-pending:hover) { background-color: #9bc7e6; }
-:deep(.fc-event.is-completed) { background-color: #cad4dc; color: #2c3e50; border-left-color: #4291b8; }
-:deep(.fc-event.is-completed:hover) { background-color: #cfe9ff; }
+:deep(.fc-event.is-completed) { background-color: #78808bff; color: #78808bff; border-left-color: #78808bff; }
+:deep(.fc-event.is-completed:hover) { background-color: #78808bff; }
 :deep(.fc-day-today) { background-color: #fff9db !important; }
 
 /* Responsive */

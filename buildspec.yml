@@ -9,7 +9,7 @@ phases:
   pre_build:
     commands:
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 816292901195.dkr.ecr.ap-northeast-2.amazonaws.com
-      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
+      - IMAGE_TAG=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c1-7)
   build:
     commands:
       - docker build -f backend/Dockerfile -t $ECR_URI:$IMAGE_TAG .

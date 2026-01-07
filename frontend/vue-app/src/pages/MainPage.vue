@@ -20,6 +20,9 @@
             <RouterLink to="/coding-test" class="dropdown-link dropdown-link--menu" @click="closeMenu">
               LIVE CODING
             </RouterLink>
+            <RouterLink to="/studyplan" class="dropdown-link dropdown-link--menu" @click="closeMenu">
+              PLANNER
+            </RouterLink>
           </div>
         </Transition>
       </div>

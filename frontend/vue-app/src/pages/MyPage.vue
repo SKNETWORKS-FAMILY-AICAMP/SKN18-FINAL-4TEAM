@@ -130,9 +130,9 @@
               <div class="report-session">세션 ID: {{ r.session_id }}</div>
               <div class="report-grade" v-if="r.final_grade">등급 {{ r.final_grade }}</div>
               <div class="report-score" v-if="r.final_score">점수 {{ r.final_score }}</div>
-              <div class="report-date" v-if="r.updated_at">갱신 {{ formatDate(r.updated_at) }}</div>
             </div>
             <div class="report-actions">
+              <div class="report-date" v-if="r.created_at">생성 시점: {{ formatDate(r.created_at) }}</div>
               <button class="view-btn" @click="openReport(r.session_id)">보기</button>
               <a v-if="r.pdf_path" class="pdf-link" :href="r.pdf_path" target="_blank" rel="noopener"
                 >저장된 PDF</a
@@ -176,7 +176,7 @@
             </span>
           </div>
           <div v-if="payloadLatestAt" class="agent-updated">
-            최근 갱신 시점: {{ formatDate(payloadLatestAt) }}
+            최근 갱신 시점: {{ formatDateTime(payloadLatestAt) }}
           </div>
         </div>
         <div v-if="parsedAggregate" class="agent-output rich">
@@ -429,7 +429,17 @@ const formatDate = (iso) => {
   if (!iso) return "";
   try {
     const d = new Date(iso);
-    return d.toLocaleString();
+    return d.toLocaleDateString("ko-KR");
+  } catch {
+    return iso;
+  }
+};
+
+const formatDateTime = (iso) => {
+  if (!iso) return "";
+  try {
+    const d = new Date(iso);
+    return d.toLocaleString("ko-KR");
   } catch {
     return iso;
   }
@@ -589,12 +599,16 @@ const runAggregateAgent = async () => {
     // 페이로드 최신 ts 로컬 저장
     const ts =
       data.latest_updated_at ||
+      data.latest_created_at ||
       payloadLatestAt.value ||
-      new Date().toISOString();
-    payloadLatestAt.value = ts;
-    try {
-      localStorage.setItem(AGG_TS_KEY, ts);
-    } catch {}
+      data.user_growth_insight?.created_at ||
+      "";
+    if (ts) {
+      payloadLatestAt.value = ts;
+      try {
+        localStorage.setItem(AGG_TS_KEY, ts);
+      } catch {}
+    }
   } catch (e) {
     console.error(e);
     aggregateError.value = "에이전트 실행 중 오류가 발생했습니다.";
@@ -662,7 +676,7 @@ const fetchPayload = async () => {
           data.latest_created_at ||
           data.latest_updated_at ||
           data.user_growth_insight?.created_at ||
-          new Date().toISOString();
+          "";
       }
     }
     // 백엔드가 cached라고 알려준 경우 바로 표시
@@ -1052,8 +1066,14 @@ const formatList = (arr) => {
 
 .report-actions {
   display: flex;
-  gap: 8px;
+  gap: 16px;
   align-items: center;
+}
+
+.report-date {
+  font-size: 13px;
+  color: #6b7280;
+  margin-right: 4px;
 }
 
 .view-btn {
@@ -1141,13 +1161,6 @@ const formatList = (arr) => {
   height: 100%;
   border: none;
   background: #0f1115;
-}
-
-@media (max-width: 768px) {
-  .nav-header {
-    padding: 20px;
-    justify-content: center;
-  }
 }
 
 .insight-card {
@@ -1257,5 +1270,12 @@ const formatList = (arr) => {
   margin: 0;
   padding-left: 18px;
   color: #1f2937;
+}
+
+@media (max-width: 768px) {
+  .nav-header {
+    padding: 20px;
+    justify-content: center;
+  }
 }
 </style>

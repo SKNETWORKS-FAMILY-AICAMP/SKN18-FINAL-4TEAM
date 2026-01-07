@@ -241,17 +241,14 @@ onMounted(() => {
 <template>
   <div class="app-container">
     <header class="header">
-      <h1> AI 학습 코치</h1>
-      <p>약점 보완을 위해 AI코치가 맞춤형 커리큘럼을 짜드립니다.</p>
+      <h1>AI 학습 코치</h1>
     </header>
 
     <div class="input-section">
-      <div class="input-label">라이브코딩 성장 리포트 기반 커리큘럼을 생성합니다.</div>
-      <select v-model="duration" class="input-select">
-        <option :value="7">1주 완성</option>
-        <option :value="30">4주 완성</option>
-      </select>
-
+      <div class="input-textblock">
+        <div class="input-label">사용자 맞춤형 7일 플랜</div>
+        <div class="input-helper">라이브 코딩 테스트 결과를 바탕으로 보완이 필요한 부분에 맞춘 커리큘럼을 제공합니다.</div>
+      </div>
       <button 
         @click="generatePlan" 
         :disabled="loading" 
@@ -334,66 +331,81 @@ onMounted(() => {
 /* 헤더 */
 .header {
   text-align: center;
-  margin-bottom: 40px;
+  margin-bottom: 28px;
 }
 
 .header h1 {
-  font-size: 2.5rem;
-  color: #2c3e50;
+  font-size: 2.8rem;
+  color: #1f2f3f;
   margin-bottom: 10px;
+  letter-spacing: -0.02em;
 }
 
 .header p {
-  color: #7f8c8d;
-  font-size: 1.1rem;
+  color: #5d6674;
+  font-size: 1.15rem;
 }
 
 /* 입력 섹션 */
 .input-section {
   display: flex;
-  gap: 10px;
-  justify-content: center;
-  margin-bottom: 40px;
-  background: #f8f9fa;
-  padding: 20px;
-  border-radius: 12px;
-  box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+  justify-content: space-between;
+  align-items: center;
+  gap: 28px;
+  flex-wrap: wrap;
+  margin: 28px 0 40px;
+  background: linear-gradient(135deg, #f9fbff, #f6f7fa);
+  padding: 24px 30px;
+  border-radius: 16px;
+  border: 1px solid #e6ebf3;
+  box-shadow: 0 10px 28px rgba(31, 45, 79, 0.08);
 }
 
-.input-text {
-  width: 400px;
-  padding: 12px 15px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
-  font-size: 1rem;
+.input-textblock {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
-.input-select {
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 8px;
+.input-label {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: #1f2f3f;
+}
+
+.input-helper {
+  color: #5d6674;
   font-size: 1rem;
 }
 
 .btn-generate {
-  padding: 1px 20px;
+  padding: 15px 30px;
   background-color: #1f2933; 
   color: white;
   border: none;
-  border-radius: 5px;
-  font-size: 1rem;
-  font-weight: bold;
+  border-radius: 12px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  margin-left: auto;
+  min-width: 180px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.2s, transform 0.15s ease, box-shadow 0.2s ease;
+  box-shadow: 0 12px 24px rgba(31, 41, 51, 0.2);
 }
 
 .btn-generate:hover {
-  background-color: #33a06f;
+  background-color: #2d7a56;
+  transform: translateY(-1px);
+  box-shadow: 0 16px 32px rgba(45, 122, 86, 0.25);
 }
 
 .btn-generate:disabled {
   background-color: #8ab0caff;
   cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
 /* 캘린더 스타일 커스텀 */

@@ -60,12 +60,12 @@ phases:
         if not updated:
             raise SystemExit(f"Container name {container_name} not found in taskdef.json")
 
-        with open("rendered-taskdef.json", "w") as f:
+        with open("taskdef.json", "w") as f:
             json.dump(cleaned, f)
         PY
 
 artifacts:
   files:
     - appspec.yaml
-    - rendered-taskdef.json
+    - taskdef.json
   discard-paths: yes

@@ -192,7 +192,9 @@ import { ref, onBeforeUnmount, nextTick, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 
 const router = useRouter();
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
+
+const BACKEND_BASE = API_BASE;
 const DEFAULT_LANGUAGE = "python";
 
 // --- Helpers ---

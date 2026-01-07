@@ -1,7 +1,9 @@
 import { computed, ref } from "vue";
 
 const tokenKey = "jobtory_access_token";
-const BACKEND_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
+
+const BACKEND_BASE = API_BASE;
 
 const token = ref(localStorage.getItem(tokenKey) || "");
 const user = ref(null);

@@ -175,7 +175,7 @@ import { computed, ref, watch } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 
 const router = useRouter();
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
 
 // Refs & Form Data
 const usernameInput = ref(null);

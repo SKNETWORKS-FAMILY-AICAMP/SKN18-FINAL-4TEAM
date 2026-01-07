@@ -1,6 +1,6 @@
 import { ref } from "vue";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
 
 // 서버가 준비되지 않았을 때도 화면이 비어 보이지 않도록 기본값 제공
 

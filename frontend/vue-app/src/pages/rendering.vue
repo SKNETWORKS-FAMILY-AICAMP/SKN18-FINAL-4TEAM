@@ -94,13 +94,11 @@
 
 <script setup>
 import { computed, onBeforeUnmount, onMounted, ref } from "vue";
+import API_BASE from "../config/apiBase";
 import { useRoute, useRouter } from "vue-router";
 
 // ✅ 기존 로직 100% 유지
-const BACKEND_BASE =
-  import.meta.env.VITE_BACKEND_BASE ||
-  import.meta.env.VITE_BACKEND_URL ||
-  "http://localhost:8000";
+const BACKEND_BASE = API_BASE;
 
 const router = useRouter();
 const route = useRoute();

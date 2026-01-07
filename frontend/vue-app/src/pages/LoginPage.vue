@@ -337,19 +337,25 @@ const handleSubmit = async () => {
   cursor: pointer;
 }
 
-/* 메인 컨테이너 */
 .login-container {
   position: relative;
   z-index: 10;
   width: 100%;
-  padding: 20px;
+  
+  /* [수정] 화면 전체 높이를 최소한으로 잡고, 내용이 많으면 스크롤 되도록 */
+  min-height: 100vh;
+  padding: 10px 10px;
   display: flex;
   justify-content: center;
+  align-items: center; /* 수직 중앙 정렬 */
+  box-sizing: border-box; /* 패딩 포함 크기 계산 */
+  overflow-y: auto; /* 화면보다 카드가 길어지면 스크롤 생김 */
 }
 
 .login-wrapper {
   width: 100%;
-  max-width: 900px;
+  max-width: 750px;  
+  min-height: 450px;
   animation: fadeUp 0.6s ease-out;
 }
 
@@ -361,7 +367,8 @@ const handleSubmit = async () => {
   border: 1px solid rgba(0, 0, 0, 0.05);
   display: grid;
   grid-template-columns: 1fr 1fr;
-  overflow: hidden;
+  overflow: hidden; /* 모서리 둥글게 유지 */
+  height: 100%; /* wrapper 높이에 맞춤 */
 }
 
 /* 왼쪽 인트로 영역 */
@@ -398,7 +405,7 @@ const handleSubmit = async () => {
 
 /* 오른쪽 폼 영역 */
 .login-form-area {
-  padding: 60px 48px;
+  padding: 45px 50px;
   display: flex;
   flex-direction: column;
   justify-content: center;
@@ -407,7 +414,7 @@ const handleSubmit = async () => {
 .login-form {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 10px;
 }
 
 .form-group {

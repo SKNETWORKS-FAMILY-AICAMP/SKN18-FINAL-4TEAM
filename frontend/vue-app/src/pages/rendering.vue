@@ -41,7 +41,7 @@
         </div>
 
         <p v-if="errorMessage" class="error-msg">
-          ⚠️ {{ errorMessage }}
+           {{ errorMessage }}
         </p>
       </section>
 
@@ -156,7 +156,6 @@ const progressPercent = computed(() => {
   if (!steps.length) return 0;
   // 저장 완료(saved) 상태면 100% 강제
   if (statusStep.value === 'saved') return 100;
-  
   const idx = Math.min(currentStepIndex.value, steps.length);
   // 조금 더 부드러운 진행바를 위해 기본값 + 난수(Fake progress) 대신 정직한 단계별 % 사용
   return Math.round(((idx) / (steps.length - 1)) * 100);
@@ -280,23 +279,25 @@ onBeforeUnmount(() => {
 
 /* --- Layout & Background --- */
 .rendering-page {
-  min-height: 100vh;
+  height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #0B1120; /* Deep Dark Navy */
-  color: #f1f5f9;
+  background: #f8f4eb;
+  color: #111827;
   font-family: "Inter", sans-serif;
   position: relative;
   overflow: hidden;
+  padding: 16px;
+  box-sizing: border-box;
 }
 
 .bg-grid {
   position: absolute;
   inset: 0;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
 }
@@ -306,7 +307,7 @@ onBeforeUnmount(() => {
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
   width: 600px; height: 600px;
-  background: radial-gradient(circle, rgba(99, 102, 241, 0.15) 0%, transparent 70%);
+  background: radial-gradient(circle, rgba(15, 23, 42, 0.08) 0%, transparent 70%);
   filter: blur(80px);
   pointer-events: none;
 }
@@ -315,17 +316,17 @@ onBeforeUnmount(() => {
 .rendering-card {
   width: 100%;
   max-width: 600px;
-  background: rgba(30, 41, 59, 0.6); /* Glassmorphism */
-  backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 24px;
   padding: 0;
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 24px 50px -20px rgba(15, 23, 42, 0.2);
   display: flex;
   flex-direction: column;
   overflow: hidden;
   position: relative;
   z-index: 1;
+  max-height: calc(100vh - 32px);
 }
 
 /* --- Header --- */
@@ -333,9 +334,9 @@ onBeforeUnmount(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 20px 32px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-  background: rgba(0, 0, 0, 0.2);
+  padding: 16px 24px;
+  border-bottom: 1px solid #e2e8f0;
+  background: #f8fafc;
 }
 
 .brand {
@@ -344,20 +345,24 @@ onBeforeUnmount(() => {
   gap: 8px;
 }
 .logo-icon { font-size: 20px; }
-.logo-text { font-family: "JetBrains Mono", monospace; font-weight: 800; font-size: 14px; letter-spacing: 0.05em; color: #fff; }
+.logo-text { 
+  font-family: "Inter",  sans-serif; 
+  color: #111827;
+  font-style: normal;
+  font-weight: 900; }
 
 .badge {
   font-size: 11px;
   font-weight: 700;
-  color: #94a3b8;
-  background: rgba(255, 255, 255, 0.1);
+  color: #64748b;
+  background: #e2e8f0;
   padding: 4px 10px;
   border-radius: 99px;
 }
 
 /* --- Loader & Status Section --- */
 .loader-block {
-  padding: 48px 32px 32px;
+  padding: 32px 24px 24px;
   text-align: center;
   display: flex;
   flex-direction: column;
@@ -366,8 +371,8 @@ onBeforeUnmount(() => {
 
 .visual-area {
   position: relative;
-  width: 80px; height: 80px;
-  margin-bottom: 24px;
+  width: 72px; height: 72px;
+  margin-bottom: 16px;
   display: flex; align-items: center; justify-content: center;
 }
 
@@ -375,54 +380,54 @@ onBeforeUnmount(() => {
   position: absolute;
   inset: 0;
   border-radius: 50%;
-  border: 2px solid rgba(99, 102, 241, 0.3);
+  border: 2px solid rgba(15, 23, 42, 0.15);
   animation: ripple 2s infinite;
 }
 
 .icon-box {
-  width: 64px; height: 64px;
-  background: #1e293b;
+  width: 56px; height: 56px;
+  background: #f1f5f9;
   border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
-  border: 1px solid rgba(99, 102, 241, 0.3);
-  box-shadow: 0 0 20px rgba(99, 102, 241, 0.2);
+  border: 1px solid rgba(15, 23, 42, 0.15);
+  box-shadow: 0 0 18px rgba(15, 23, 42, 0.1);
 }
 
 .loader-spinner {
-  width: 32px; height: 32px;
+  width: 28px; height: 28px;
   border: 3px solid transparent;
-  border-top-color: #818cf8;
-  border-right-color: #818cf8;
+  border-top-color: #111827;
+  border-right-color: #111827;
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
 
 .status-title {
   margin: 0 0 8px;
-  font-size: 24px;
+  font-size: 20px;
   font-weight: 800;
-  color: #fff;
+  color: #111827;
 }
 .dots { animation: blink 1.5s infinite; }
 
 .status-desc {
-  margin: 0 0 32px;
-  font-size: 15px;
-  color: #94a3b8;
+  margin: 0 0 20px;
+  font-size: 14px;
+  color: #64748b;
 }
 
 /* Progress Bar */
 .progress-container { width: 100%; max-width: 400px; }
 .progress-bar-bg {
   height: 8px;
-  background: rgba(255, 255, 255, 0.1);
+  background: #e2e8f0;
   border-radius: 99px;
   overflow: hidden;
   margin-bottom: 8px;
 }
 .progress-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #6366f1, #a855f7);
+  background: #111827;
   border-radius: 99px;
   position: relative;
   transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
@@ -434,24 +439,24 @@ onBeforeUnmount(() => {
 }
 .progress-info {
   display: flex; justify-content: space-between;
-  font-size: 12px; color: #94a3b8; font-family: "JetBrains Mono", monospace;
+  font-size: 12px; color: #64748b; font-family: "Inter", sans-serif;
 }
 
 .error-msg {
   margin-top: 20px;
-  color: #f87171;
+  color: #dc2626;
   font-size: 14px;
-  background: rgba(239, 68, 68, 0.1);
+  background: #fef2f2;
   padding: 10px 16px;
   border-radius: 8px;
-  border: 1px solid rgba(239, 68, 68, 0.2);
+  border: 1px solid #fecaca;
 }
 
 /* --- Timeline Area --- */
 .timeline-area {
-  background: rgba(0, 0, 0, 0.2);
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
-  padding: 24px 40px;
+  background: #f8fafc;
+  border-top: 1px solid #e2e8f0;
+  padding: 16px 24px;
 }
 .step-list {
   list-style: none; padding: 0; margin: 0;
@@ -460,7 +465,7 @@ onBeforeUnmount(() => {
 .step-item {
   display: flex; gap: 20px;
   position: relative;
-  padding-bottom: 24px;
+  padding-bottom: 16px;
 }
 .step-item:last-child { padding-bottom: 0; }
 
@@ -470,67 +475,67 @@ onBeforeUnmount(() => {
 }
 .line {
   position: absolute; top: 24px; bottom: 0; left: 11px; /* dot center */
-  width: 2px; background: rgba(255, 255, 255, 0.1);
+  width: 2px; background: #e2e8f0;
 }
-.step-item.done .line { background: #6366f1; } /* 완료된 라인 색상 */
+.step-item.done .line { background: #111827; } /* 완료된 라인 색상 */
 .step-item:last-child .line { display: none; }
 
 .dot {
   width: 24px; height: 24px; border-radius: 50%;
-  background: #1e293b; border: 2px solid rgba(255, 255, 255, 0.2);
+  background: #f1f5f9; border: 2px solid rgba(255, 255, 255, 0.2);
   display: flex; align-items: center; justify-content: center;
   z-index: 2; transition: all 0.3s;
 }
 .step-item.active .dot {
-  border-color: #818cf8;
-  background: rgba(99, 102, 241, 0.2);
-  box-shadow: 0 0 0 4px rgba(99, 102, 241, 0.1);
+  border-color: #111827;
+  background: #f1f5f9;
+  box-shadow: 0 0 0 4px rgba(15, 23, 42, 0.08);
 }
 .step-item.done .dot {
-  background: #6366f1; border-color: #6366f1;
+  background: #111827; border-color: #111827;
 }
 
-.check-icon { font-size: 12px; color: #fff; }
+.check-icon { font-size: 12px; color: #111827; }
 .loading-dot {
-  width: 8px; height: 8px; background: #818cf8; border-radius: 50%;
+  width: 8px; height: 8px; background: #111827; border-radius: 50%;
   animation: pulse 1.5s infinite;
 }
 
 .step-content { flex: 1; padding-top: 2px; }
 .step-head { display: flex; justify-content: space-between; align-items: center; }
 .step-label { font-size: 14px; font-weight: 600; color: #64748b; transition: color 0.3s; }
-.step-item.active .step-label { color: #fff; }
-.step-item.done .step-label { color: #cbd5e1; }
+.step-item.active .step-label { color: #111827; }
+.step-item.done .step-label { color: #1f2937; }
 
 .step-status-text {
   font-size: 12px; font-weight: 500; color: #64748b;
 }
-.step-item.active .step-status-text { color: #818cf8; }
-.step-item.done .step-status-text { color: #10b981; }
+.step-item.active .step-status-text { color: #111827; }
+.step-item.done .step-status-text { color: #16a34a; }
 
 /* --- Debug Terminal --- */
 .terminal-box {
   margin: 20px 32px 32px;
-  background: #0f0f12;
-  border: 1px solid #333;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   border-radius: 8px;
-  font-family: "JetBrains Mono", monospace;
+  font-family: "Inter", sans-serif;
   overflow: hidden;
 }
 .terminal-header {
-  background: #1a1a1d; padding: 8px 12px; display: flex; align-items: center; gap: 6px;
+  background: #f8fafc; padding: 8px 12px; display: flex; align-items: center; gap: 6px;
 }
 .dot { width: 10px; height: 10px; border-radius: 50%; }
 .dot.red { background: #ef4444; }
 .dot.yellow { background: #f59e0b; }
 .dot.green { background: #10b981; }
-.terminal-title { margin-left: 8px; font-size: 12px; color: #666; }
+.terminal-title { margin-left: 8px; font-size: 12px; color: #64748b; }
 .terminal-body {
-  padding: 12px; margin: 0; font-size: 11px; color: #22c55e;
+  padding: 12px; margin: 0; font-size: 11px; color: #16a34a;
   overflow-x: auto; max-height: 150px;
 }
 .terminal-footer {
-  padding: 4px 12px; border-top: 1px solid #222; font-size: 10px; color: #555; text-align: right;
+  padding: 4px 12px; border-top: 1px solid #e2e8f0; font-size: 10px; color: #94a3b8; text-align: right;
 }
 
 /* Animations */

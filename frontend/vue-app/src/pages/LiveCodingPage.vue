@@ -2,6 +2,10 @@
   <div class="live-page">
     <div class="bg-grid"></div>
 
+    <header class="live-header">
+      <RouterLink to="/" class="live-brand">JOBTORY</RouterLink>
+    </header>
+
     <div class="live-hero">
       <div class="hero-text fade-in-up">
         <p class="eyebrow">JobTory Live Coding</p>
@@ -19,7 +23,7 @@
         <div v-if="showSessionChoice" class="session-choice fade-in">
           <div class="choice-content">
             <p class="choice-msg">진행 중인 세션이 있습니다.</p>
-            <div class="session-choice-buttons">
+            <div class="session-choice-buttons">  
               <button
                 type="button"
                 class="session-choice-button primary"
@@ -339,27 +343,47 @@ const difficultyChipClass = (value) => {
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500&display=swap");
 
 .live-page {
-  min-height: 81vh;
-  padding: 80px 40px 96px;
-  background: #0B1120; /* Session Page와 동일한 배경색 */
-  color: #e5e7eb;
+  height: 100vh;
+  padding: 100px 28px;
+  background: #f8f4eb; 
+  color: #111827;
   font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   display: flex;
   flex-direction: column;
-  gap: 64px;
+  gap: 20px;
   overflow: hidden;
   position: relative;
+  box-sizing: border-box;
 }
 
 .bg-grid {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
   background-image: 
-    linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+    linear-gradient(rgba(15, 23, 42, 0.06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(15, 23, 42, 0.06) 1px, transparent 1px);
   background-size: 40px 40px;
   pointer-events: none;
   z-index: 0;
+}
+
+.live-header {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  padding: 32px 40px;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+}
+
+.live-brand {
+  font-weight: 900;
+  font-size: 24px;
+  color: #111827;
+  text-decoration: none;
+  letter-spacing: -0.02em;
 }
 
 /* ----- Hero Section ----- */
@@ -369,7 +393,7 @@ const difficultyChipClass = (value) => {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   align-items: center;
-  gap: 40px;
+  gap: 20px;
   position: relative;
   z-index: 1;
 }
@@ -378,31 +402,31 @@ const difficultyChipClass = (value) => {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 20px;
+  gap: 16px;
 }
 
 .eyebrow {
   margin: 0;
   font-size: 16px;
   font-weight: 700;
-  color: #38bdf8; /* 스카이블루 포인트 */
+  color: #111827; /* 스카이블루 포인트 */
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  background: rgba(56, 189, 248, 0.1);
+  background: #bababaff;
   padding: 6px 12px;
   border-radius: 4px;
 }
 
 .title {
   margin: 0;
-  font-size: 56px;
+  font-size: 40px;
   line-height: 1.1;
   font-weight: 800;
-  color: #fff;
+  color: #111827;
 }
 
 .highlight {
-  background: linear-gradient(to right, #38bdf8, #818cf8);
+  background: linear-gradient(to right, #111827, #334155);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -413,18 +437,18 @@ const difficultyChipClass = (value) => {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  margin-top: 10px;
-  padding: 16px 36px;
+  margin-top: 6px;
+  padding: 10px 24px;
   border-radius: 14px;
-  background: #ffffff;
-  color: #0f172a;
+  background: #111827;
+  color: #ffffff;
   font-weight: 800;
-  font-size: 18px;
+  font-size: 15px;
   border: none;
   cursor: pointer;
   overflow: hidden;
   transition: transform 0.2s;
-  box-shadow: 0 0 20px rgba(56, 189, 248, 0.2);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.15);
 }
 
 .start-btn span { position: relative; z-index: 2; }
@@ -432,7 +456,7 @@ const difficultyChipClass = (value) => {
 .btn-glow {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: linear-gradient(120deg, transparent, rgba(56, 189, 248, 0.4), transparent);
+  background: linear-gradient(120deg, transparent, rgba(255, 255, 255, 0.35), transparent);
   transform: translateX(-100%);
   transition: 0.6s;
   z-index: 1;
@@ -453,10 +477,10 @@ const difficultyChipClass = (value) => {
 
 .hero-image {
   width: 100%;
-  max-width: 480px;
+  max-width: 320px;
   height: auto;
   display: block;
-  filter: drop-shadow(0 25px 50px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 18px 40px rgba(15, 23, 42, 0.25));
 }
 
 .floating-anim {
@@ -474,36 +498,36 @@ const difficultyChipClass = (value) => {
   margin: 0 auto;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 24px;
+  gap: 12px;
   z-index: 1;
 }
 
 .feature-card {
   position: relative;
-  background: rgba(30, 41, 59, 0.4); /* Glassmorphism */
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 20px;
-  padding: 40px 24px;
+  background: rgba(255, 255, 255, 0.85); /* Light glass */
+  border: 1px solid #e2e8f0;
+  border-radius: 18px;
+  padding: 20px 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 10px;
   align-items: flex-start;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.12);
   transition: transform 0.3s ease;
 }
 
 .feature-card:hover {
   transform: translateY(-5px);
-  border-color: rgba(56, 189, 248, 0.3);
+  border-color: rgba(15, 23, 42, 0.2);
 }
 
 .feature-icon {
-  width: 50px; height: 50px;
+  width: 44px; height: 44px;
   border-radius: 12px;
   display: flex; align-items: center; justify-content: center;
-  font-size: 24px;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 20px;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
 }
 
 .icon-one { color: #f472b6; }
@@ -512,16 +536,16 @@ const difficultyChipClass = (value) => {
 
 .feature-content h3 {
   margin: 0 0 6px;
-  font-size: 18px;
+  font-size: 15px;
   font-weight: 700;
-  color: #fff;
+  color: #111827;
 }
 
 .feature-content p {
   margin: 0;
-  font-size: 14px;
-  color: #9ca3af;
-  line-height: 1.5;
+  font-size: 12px;
+  color: #64748b;
+  line-height: 1.4;
 }
 
 /* Session Choice */
@@ -529,21 +553,21 @@ const difficultyChipClass = (value) => {
   margin-top: 20px;
   padding: 16px 20px;
   border-radius: 12px;
-  background: rgba(15, 23, 42, 0.8);
-  border: 1px solid rgba(56, 189, 248, 0.3);
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
   display: inline-block;
   backdrop-filter: blur(8px);
 }
-.choice-msg { margin: 0 0 10px; font-size: 14px; color: #e5e7eb; }
+.choice-msg { margin: 0 0 10px; font-size: 14px; color: #111827; }
 .session-choice-buttons { display: flex; gap: 10px; }
 .session-choice-button {
   padding: 8px 16px; border-radius: 8px; border: none;
   font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s;
 }
-.session-choice-button.primary { background: #38bdf8; color: #0f172a; }
-.session-choice-button.primary:hover { background: #0ea5e9; }
-.session-choice-button.ghost { background: transparent; border: 1px solid rgba(255,255,255,0.2); color: #e5e7eb; }
-.session-choice-button.ghost:hover { border-color: #fff; color: #fff; }
+.session-choice-button.primary { background: #111827; color: #ffffff; }
+.session-choice-button.primary:hover { background: #1f2937; }
+.session-choice-button.ghost { background: transparent; border: 1px solid #cbd5e1; color: #111827; }
+.session-choice-button.ghost:hover { border-color: #111827; color: #111827; }
 
 /* =======================================================
    [추천 문제 모달 - Session Page 테마 적용]
@@ -551,74 +575,74 @@ const difficultyChipClass = (value) => {
 
 .recommend-modal-overlay {
   position: fixed; inset: 0;
-  background: rgba(0, 0, 0, 0.85);
+  background: rgba(15, 23, 42, 0.4);
   backdrop-filter: blur(4px);
   display: flex; align-items: center; justify-content: center;
-  z-index: 2000; padding: 20px;
+  z-index: 2000; padding: 16px;
   animation: fadeIn 0.3s ease-out;
 }
 
 .recommend-modal {
   width: 100%; max-width: 1000px;
-  background: #0B1120; /* 배경 통일 */
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: #f8f4eb; /* 배경 통일 */
+  border: 1px solid #e2e8f0;
   border-radius: 16px;
   box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
   display: flex; flex-direction: column;
-  max-height: 85vh; overflow: hidden;
-  color: #e5e7eb;
+  max-height: 75vh; overflow: hidden;
+  color: #111827;
   animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .recommend-modal-header {
   display: flex; align-items: center; justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  background: rgba(15, 23, 42, 0.6);
+  padding: 16px 20px;
+  border-bottom: 1px solid #cccbcbff;
+  background: #f8f4eb;
 }
 
 .recommend-modal-header h3 {
-  margin: 0; font-size: 20px; font-weight: 700; color: #fff;
+  margin: 0; font-size: 20px; font-weight: 700; color: #111827;
   letter-spacing: -0.01em;
 }
 
 .recommend-close {
-  background: transparent; border: 1px solid rgba(255, 255, 255, 0.15);
-  color: #9ca3af; border-radius: 6px; padding: 6px;
+  background: transparent; border: 1px solid #cbd5e1;
+  color: #64748b; border-radius: 6px; padding: 6px;
   cursor: pointer; transition: all 0.2s; display: flex;
 }
-.recommend-close:hover { color: #fff; border-color: #fff; background: rgba(255,255,255,0.1); }
+.recommend-close:hover { color: #111827; border-color: #111827; background: rgba(255,255,255,0.1); }
 
 .recommend-body {
-  padding: 24px;
-  overflow-y: auto;
-  background: #0B1120;
+  padding: 16px;
+  overflow-y: hidden;
+  background: #f8f4eb;
 }
 
 .recommend-desc {
-  margin: 0 0 24px; font-size: 14px; color: #9ca3af; text-align: center;
+  margin: 0 0 16px; font-size: 13px; color: #64748b; text-align: center;
 }
 
 .recommend-grid {
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;
 }
 
 /* 문제 카드 스타일 (세션 페이지 패널 스타일) */
 .recommend-card {
-  background: rgba(30, 41, 59, 0.3); /* 반투명 배경 */
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: #ffffff; /* light */
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
-  padding: 20px;
+  padding: 16px;
   display: flex; flex-direction: column; gap: 12px;
   transition: all 0.2s ease;
-  height: 360px; /* 높이 고정 */
+  height: 300px; /* 높이 고정 */
 }
 
 .recommend-card:hover {
   transform: translateY(-4px);
-  background: rgba(30, 41, 59, 0.6);
-  border-color: rgba(56, 189, 248, 0.4); /* 호버 시 네온 블루 */
-  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
+  background: #f8fafc;
+  border-color: rgba(15, 23, 42, 0.2);
+  box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
 }
 
 .card-top {
@@ -626,8 +650,8 @@ const difficultyChipClass = (value) => {
 }
 
 .category-badge {
-  font-size: 11px; font-weight: 700; color: #38bdf8;
-  background: rgba(56, 189, 248, 0.1); padding: 4px 8px; border-radius: 4px;
+  font-size: 11px; font-weight: 700; color: #111827;
+  background: #f1f5f9; padding: 4px 8px; border-radius: 4px;
 }
 
 .difficulty-badge {
@@ -636,24 +660,24 @@ const difficultyChipClass = (value) => {
 .chip-easy { color: #4ade80; border-color: rgba(74,222,128,0.3); }
 .chip-medium { color: #fbbf24; border-color: rgba(251,191,36,0.3); }
 .chip-hard { color: #f87171; border-color: rgba(248,113,113,0.3); }
-.chip-default { color: #9ca3af; border-color: rgba(156,163,175,0.3); }
+.chip-default { color: #64748b; border-color: rgba(156,163,175,0.3); }
 
 .card-title {
-  margin: 0; font-size: 16px; font-weight: 700; color: #fff;
-  line-height: 1.4; height: 46px; overflow: hidden;
+  margin: 0; font-size: 16px; font-weight: 700; color: #111827;
+  line-height: 1.4; height: 42px; overflow: hidden;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }
 
 .card-meta {
-  font-size: 12px; color: #9ca3af; font-family: "JetBrains Mono", monospace;
+  font-size: 12px; color: #64748b; font-family: "JetBrains Mono", monospace;
 }
 
 .card-preview {
   flex: 1; margin: 0;
-  background: #020617; /* 에디터 배경색 */
-  border: 1px solid rgba(255,255,255,0.05);
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
   border-radius: 8px; padding: 12px;
-  font-size: 12px; line-height: 1.6; color: #cbd5e1;
+  font-size: 11px; line-height: 1.5; color: #475569;
   white-space: pre-wrap; overflow: hidden;
   mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
   -webkit-mask-image: linear-gradient(to bottom, black 60%, transparent 100%);
@@ -662,17 +686,17 @@ const difficultyChipClass = (value) => {
 .card-action-btn {
   width: 100%; padding: 12px; border-radius: 8px;
   font-size: 14px; font-weight: 700;
-  background: #2563eb; color: #fff; border: none;
+  background: #111827; color: #ffffff; border: none;
   cursor: pointer; transition: all 0.2s;
   margin-top: auto;
 }
-.card-action-btn:hover { background: #1d4ed8; }
+.card-action-btn:hover { background: #1f2937; }
 
-.recommend-empty { padding: 40px; text-align: center; color: #6b7280; }
+.recommend-empty { padding: 40px; text-align: center; color: #94a3b8; }
 
 /* Scrollbar */
 .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #374151; border-radius: 3px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 
 /* Animations */
@@ -686,7 +710,7 @@ const difficultyChipClass = (value) => {
 @keyframes slideUp { from { transform: translateY(30px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 
 @media (max-width: 900px) {
-  .live-page { padding: 60px 24px; height: auto; overflow-y: auto; }
+  .live-page { padding: 24px 20px; height: 100vh; overflow: hidden; }
   .live-hero { grid-template-columns: 1fr; text-align: center; gap: 40px; }
   .hero-text { align-items: center; }
   .title { font-size: 40px; }

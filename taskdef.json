@@ -1,0 +1,156 @@
+{
+  "compatibilities": [
+    "EC2",
+    "FARGATE",
+    "MANAGED_INSTANCES"
+  ],
+  "containerDefinitions": [
+    {
+      "cpu": 0,
+      "environment": [],
+      "environmentFiles": [],
+      "essential": true,
+      "image": "816292901195.dkr.ecr.ap-northeast-2.amazonaws.com/jobtory-backend:latest",
+      "logConfiguration": {
+        "logDriver": "awslogs",
+        "options": {
+          "awslogs-group": "/ecs/jobtory-backend-task",
+          "awslogs-create-group": "true",
+          "awslogs-region": "ap-northeast-2",
+          "awslogs-stream-prefix": "ecs"
+        },
+        "secretOptions": []
+      },
+      "mountPoints": [],
+      "name": "jobtory-backend",
+      "portMappings": [
+        {
+          "appProtocol": "http",
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "name": "jobtory-backend-8000-tcp",
+          "protocol": "tcp"
+        }
+      ],
+      "secrets": [
+        {
+          "name": "DB_HOST",
+          "valueFrom": "/jobtory/prod/DB_HOST"
+        },
+        {
+          "name": "DB_NAME",
+          "valueFrom": "/jobtory/prod/DB_NAME"
+        },
+        {
+          "name": "DB_PASSWORD",
+          "valueFrom": "/jobtory/prod/DB_PASSWORD"
+        },
+        {
+          "name": "DB_PORT",
+          "valueFrom": "/jobtory/prod/DB_PORT"
+        },
+        {
+          "name": "DB_USER",
+          "valueFrom": "/jobtory/prod/DB_USER"
+        },
+        {
+          "name": "DJANGO_ALLOWED_HOSTS",
+          "valueFrom": "/jobtory/prod/DJANGO_ALLOWED_HOSTS"
+        },
+        {
+          "name": "DJANGO_DEBUG",
+          "valueFrom": "/jobtory/prod/DJANGO_DEBUG"
+        },
+        {
+          "name": "DJANGO_SECRET_KEY",
+          "valueFrom": "/jobtory/prod/DJANGO_SECRET_KEY"
+        },
+        {
+          "name": "ELASTICSEARCH_HOST",
+          "valueFrom": "/jobtory/prod/ELASTICSEARCH_HOST"
+        },
+        {
+          "name": "ES_URL",
+          "valueFrom": "/jobtory/prod/ES_URL"
+        },
+        {
+          "name": "FRONTEND_BASE_URL",
+          "valueFrom": "/jobtory/prod/FRONTEND_BASE_URL"
+        },
+        {
+          "name": "GOOGLE_REDIRECT_URI",
+          "valueFrom": "/jobtory/prod/GOOGLE_REDIRECT_URI"
+        },
+        {
+          "name": "NEO4J_AUTH",
+          "valueFrom": "/jobtory/prod/NEO4J_AUTH"
+        },
+        {
+          "name": "NEO4J_HTTP_URL",
+          "valueFrom": "/jobtory/prod/NEO4J_HTTP_URL"
+        },
+        {
+          "name": "REDIS_URL",
+          "valueFrom": "/jobtory/prod/REDIS_URL"
+        },
+        {
+          "name": "OPENAI_API_KEY",
+          "valueFrom": "/jobtory/prod/OPENAI_API_KEY"
+        }
+      ],
+      "systemControls": [],
+      "ulimits": [],
+      "volumesFrom": []
+    }
+  ],
+  "cpu": "1024",
+  "enableFaultInjection": false,
+  "executionRoleArn": "arn:aws:iam::816292901195:role/jobtory-ecs-task-execution",
+  "family": "jobtory-backend-task",
+  "memory": "3072",
+  "networkMode": "awsvpc",
+  "placementConstraints": [],
+  "registeredAt": "2026-01-07T13:39:11.471Z",
+  "registeredBy": "arn:aws:iam::816292901195:user/student",
+  "requiresAttributes": [
+    {
+      "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
+    },
+    {
+      "name": "ecs.capability.execution-role-awslogs"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.ecr-auth"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
+    },
+    {
+      "name": "ecs.capability.execution-role-ecr-pull"
+    },
+    {
+      "name": "ecs.capability.secrets.ssm.environment-variables"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
+    },
+    {
+      "name": "ecs.capability.task-eni"
+    },
+    {
+      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
+    }
+  ],
+  "requiresCompatibilities": [
+    "FARGATE"
+  ],
+  "revision": 4,
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
+  "status": "ACTIVE",
+  "taskDefinitionArn": "arn:aws:ecs:ap-northeast-2:816292901195:task-definition/jobtory-backend-task:4",
+  "volumes": [],
+  "tags": []
+}

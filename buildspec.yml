@@ -1,0 +1,48 @@
+version: 0.2
+
+env:
+  variables:
+    AWS_DEFAULT_REGION: ap-northeast-2
+    ECR_URI: 816292901195.dkr.ecr.ap-northeast-2.amazonaws.com/jobtory-backend
+
+phases:
+  pre_build:
+    commands:
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 816292901195.dkr.ecr.ap-northeast-2.amazonaws.com
+      - IMAGE_TAG=${CODEBUILD_RESOLVED_SOURCE_VERSION:0:7}
+  build:
+    commands:
+      - docker build -f backend/Dockerfile -t $ECR_URI:$IMAGE_TAG .
+      - docker push $ECR_URI:$IMAGE_TAG
+  post_build:
+    commands:
+      - python - << 'PY'
+        import json
+        import os
+
+        ecr = os.environ["ECR_URI"]
+        tag = os.environ["IMAGE_TAG"]
+        container_name = "jobtory-backend"
+
+        with open("taskdef.json", "r") as f:
+            data = json.load(f)
+
+        updated = False
+        for container in data.get("containerDefinitions", []):
+            if container.get("name") == container_name:
+                container["image"] = f"{ecr}:{tag}"
+                updated = True
+                break
+
+        if not updated:
+            raise SystemExit(f"Container name {container_name} not found in taskdef.json")
+
+        with open("rendered-taskdef.json", "w") as f:
+            json.dump(data, f)
+        PY
+
+artifacts:
+  files:
+    - appspec.yaml
+    - rendered-taskdef.json
+  discard-paths: yes

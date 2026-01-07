@@ -102,7 +102,6 @@ def plan_builder(state: RecommendState) -> RecommendState:
         why_selected = slot.get("reason") 
         cand = cand_by_day.get(day) or {}
         video = cand.get("video") or {}
-
         raw_id = video.get("id")
         try:
             video_id = int(raw_id) if raw_id not in (None, "") else None

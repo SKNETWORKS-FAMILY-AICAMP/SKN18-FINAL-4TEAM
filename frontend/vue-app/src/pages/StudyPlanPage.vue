@@ -1,5 +1,5 @@
 <script setup>
-import { ref, reactive, onMounted, computed, nextTick } from 'vue';
+import { ref, reactive, onMounted, computed } from 'vue';
 import FullCalendar from '@fullcalendar/vue3';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
@@ -348,6 +348,9 @@ onMounted(() => {
               </span>
             </div>
             <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
+            <div class="video-reason" v-if="activeVideo?.extendedProps?.why_selected || activeVideo?.extendedProps?.why_seleted">
+              {{ activeVideo.extendedProps.why_selected || activeVideo.extendedProps.why_seleted }}
+            </div>
             <div class="video-frame">
               <iframe
                 v-if="getYouTubeEmbedUrl(activeVideo?.url)"
@@ -424,7 +427,6 @@ onMounted(() => {
   font-size: 3.0rem;
   color: #2c3e50;
   margin-bottom: 10px;
-  letter-spacing: -0.02em;
 }
 
 .nav-header {
@@ -497,8 +499,6 @@ onMounted(() => {
 .btn-generate:disabled {
   background-color: #8ab0ca;
   cursor: not-allowed;
-  transform: none;
-  box-shadow: none;
 }
 
 /* --- [수정된 부분] 컨텐츠 레이아웃 --- */
@@ -753,6 +753,13 @@ onMounted(() => {
   color: #0f172a;
   line-height: 1.3;
 }
+
+:global(.video-reason) {
+  font-size: 0.95rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
 
 :global(.video-frame) {
   width: 100%;

@@ -8,12 +8,17 @@
           <div class="divider"></div>
           <div class="session-info">SESSION #{{ sessionId.slice(0, 8) }}</div>
         </div>
+        
         <div class="actions">
           <button class="btn ghost" @click="goHome" :disabled="loading">초기 화면</button>
           <button class="btn ghost" @click="reload" :disabled="loading">새로고침</button>
           <button class="btn primary" @click="downloadPdf" :disabled="loading || !reportMarkdown">
             PDF 내보내기
           </button>
+          <button class="btn close" @click="close" :disabled="loading || !reportMarkdown">
+            닫기
+          </button>
+          
         </div>
       </header>
 
@@ -483,6 +488,14 @@ const fetchReport = async () => {
 
 const reload = () => fetchReport();
 
+const close = () => {
+  if (window.self !== window.top) {
+    window.parent.postMessage({ type: "close-report-modal" }, window.location.origin);
+    return;
+  }
+  router.back();
+};
+
 const pdfTarget = ref(null);
 const downloadPdf = async () => {
   if (!pdfTarget.value) return;
@@ -529,6 +542,12 @@ const extractProblemDescription = (fullText) => {
 <style scoped>
 @import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap");
 @import url("https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap");
+
+:global(html, body) {
+  margin: 0;
+  padding: 0;
+  background: #0B1120;
+}
 
 .page {
   /* [핵심] 화면 고정 & 전체 스크롤 제거 */
@@ -593,6 +612,8 @@ const extractProblemDescription = (fullText) => {
 .btn.ghost:hover { background: rgba(255,255,255,0.05); color: #fff; }
 .btn.primary { background: #6366f1; color: white; }
 .btn.primary:hover { background: #4f46e5; }
+.btn.close { background: #27285fff; color: white; }
+.btn.close:hover { background: #27285fff; }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* 상태 메시지 (중앙 정렬) */

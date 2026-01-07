@@ -42,7 +42,12 @@ const calendarOptions = reactive({
 
 // Todo List Data (날짜순 정렬)
 const todoList = computed(() => {
-  return [...calendarOptions.events].sort((a, b) => new Date(a.start) - new Date(b.start));
+  return [...calendarOptions.events]
+    .filter((event) => {
+      const status = (event.extendedProps?.is_completed || '').toString().toUpperCase();
+      return status !== 'COMPLETE';
+    })
+    .sort((a, b) => new Date(a.start) - new Date(b.start));
 });
 
 const isVideoOpen = ref(false);
@@ -260,17 +265,17 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="app-container">
-    <div class="bg-grid"></div>
+  <div class="studyplan-page">
+    <nav class="nav-header">
+      <RouterLink to="/" class="brand">JOBTORY</RouterLink>
+    </nav>
 
-    <header class="header">
-      <nav class="nav-header">
-        <RouterLink to="/" class="brand">JOBTORY</RouterLink>
-      </nav>
-      <div class="header-content">
-        <h1>AI 학습 코치</h1>
-      </div>
-    </header>
+    <div class="app-container">
+      <header class="header">
+        <div class="header-content">
+          <h1>AI 학습 코치</h1>
+        </div>
+      </header>
 
     <div class="input-section">
       <div class="input-label">약점 보완을 위해 라이브코딩 성장리포트 기반 맞춤형 커리큘럼을 생성합니다.</div>
@@ -291,7 +296,10 @@ onMounted(() => {
 
       <div class="todo-wrapper">
         <div class="todo-header">
-          <h3>TodoList</h3>
+          <div class="todo-title">
+            <h3>TodoList</h3>
+            <span class="todo-accent" aria-hidden="true"></span>
+          </div>
           <span class="todo-count">{{ todoList.length }} Tasks</span>
         </div>
         <div class="todo-list custom-scrollbar">
@@ -373,30 +381,30 @@ onMounted(() => {
         </div>
       </div>
     </Teleport>
+    </div>
   </div>
 </template>
 
 <style scoped>
 /* 기본 배경색 */
-:global(body) {
+:global(html, body) {
   background: #f8f4eb;
   margin: 0;
   font-family: "Inter", sans-serif;
-  overflow-x: hidden
+  overflow-x: hidden;
+  scrollbar-width: none;
 }
 
-.bg-grid {
-  position: fixed;
-  top: 0; left: 0; width: 100%; height: 100%;
-  z-index: -1;
-  pointer-events: none;
-  background-image: 
-    linear-gradient(rgba(0, 0, 0, 0.03) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(0, 0, 0, 0.03) 1px, transparent 1px);
-  background-size: 40px 40px;
+:global(body::-webkit-scrollbar) {
+  display: none;
 }
 
 /* 전체 레이아웃 */
+.studyplan-page {
+  position: relative;
+  min-height: 100vh;
+}
+
 .app-container {
   max-width: 1200px;
   margin: 0 auto;
@@ -409,6 +417,7 @@ onMounted(() => {
   text-align: center;
   margin-bottom: 40px;
   padding-top: 40px;
+  position: relative;
 }
 
 .header-content h1 {
@@ -556,7 +565,13 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  scrollbar-width: none;
 }
+
+.todo-list::-webkit-scrollbar {
+  display: none;
+}
+
 
 .todo-empty {
   text-align: center;

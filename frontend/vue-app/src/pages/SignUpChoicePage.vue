@@ -27,9 +27,7 @@
               <h2 class="card-title">개인 회원</h2>
               <p class="card-desc">취업 준비생 / 일반 사용자</p>
             </div>
-            <div class="arrow-btn">
-              <span class="arrow-icon">→</span>
-            </div>
+            
           </div>
         </button>
 
@@ -41,9 +39,6 @@
             <div class="text-group">
               <h2 class="card-title">기업 회원</h2>
               <p class="card-desc">채용 담당자 / 기업 관리자</p>
-            </div>
-            <div class="arrow-btn">
-              <span class="arrow-icon">→</span>
             </div>
           </div>
         </button>
@@ -106,9 +101,6 @@ const goToTerms = (type) => {
   }
 }
 
-/* -------------------------------------- */
-/* ... 기존 스타일 그대로 유지 ... */
-
 .signup-page {
   position: relative;
   width: 100vw;
@@ -122,7 +114,6 @@ const goToTerms = (type) => {
   overflow: hidden;
 }
 
-/* ... (나머지 스타일 동일) ... */
 .bg-grid {
   position: absolute;
   top: 0; left: 0; width: 100%; height: 100%;
@@ -142,7 +133,7 @@ const goToTerms = (type) => {
   max-width: 900px;
   display: flex;
   flex-direction: column;
-  gap: 60px;
+  gap: 40px;
   max-height: 100vh;
   overflow-y: auto;
   padding: 40px 20px;
@@ -195,7 +186,7 @@ const goToTerms = (type) => {
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.06);
   border-radius: 24px;
-  padding: 48px 32px;
+  padding: 40px 32px;
   text-align: center;
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.25, 0.8, 0.25, 1);
@@ -244,7 +235,7 @@ const goToTerms = (type) => {
 .text-group {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 15px;
 }
 
 .card-title {
@@ -259,29 +250,6 @@ const goToTerms = (type) => {
   font-size: 16px;
   color: #6b7280;
   font-weight: 500;
-}
-
-.arrow-btn {
-  margin-top: 16px;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background: #f3f4f6;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-}
-
-.arrow-icon {
-  font-size: 20px;
-  font-weight: 600;
-  color: #111827;
-}
-
-.choice-card:hover .arrow-btn {
-  background: #111827;
-  transform: translateX(5px);
 }
 
 .choice-card:hover .arrow-icon { color: #ffffff; }

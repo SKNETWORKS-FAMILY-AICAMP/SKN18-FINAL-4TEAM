@@ -1,7 +1,24 @@
 <template>
   <div class="landing">
     <header class="landing-header">
-      <div class="nav-dropdown" ref="dropdownContainer">
+      <button
+        ref="mobileHamburgerButton"
+        type="button"
+        class="mobile-hamburger mobile-only"
+        aria-label="Open menu"
+        :aria-expanded="isMobileMenuOpen"
+        aria-haspopup="true"
+        @click.stop="toggleMobileMenu"
+      >
+        <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+          <path
+            fill="currentColor"
+            d="M4 6.5h16a1 1 0 0 0 0-2H4a1 1 0 0 0 0 2Zm16 4.5H4a1 1 0 0 0 0 2h16a1 1 0 0 0 0-2Zm0 6.5H4a1 1 0 0 0 0 2h16a1 1 0 0 0 0-2Z"
+          />
+        </svg>
+      </button>
+
+      <div class="nav-dropdown desktop-only" ref="dropdownContainer">
         <button
           class="nav-pill"
           @click="toggleMenu"
@@ -27,9 +44,10 @@
         </Transition>
       </div>
 
-      <h1 class="nav-logo">JOBTORY</h1>
+      <h1 class="nav-logo desktop-only">JOBTORY</h1>
+      <h1 class="nav-logo nav-logo--mobile mobile-only">JOBTORY</h1>
 
-      <div class="nav-dropdown" ref="userDropdownContainer">
+      <div class="nav-dropdown desktop-only" ref="userDropdownContainer">
         <button
           class="nav-pill"
           @click="toggleUserMenu"
@@ -68,6 +86,64 @@
           </div>
         </Transition>
       </div>
+
+      <Transition name="mobile-drawer">
+        <div
+          v-show="isMobileMenuOpen"
+          class="mobile-drawer-overlay"
+          role="presentation"
+          @click="closeMobileMenu"
+        >
+          <aside
+            ref="mobileMenuContainer"
+            class="mobile-drawer"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Mobile navigation menu"
+            @click.stop
+          >
+            <div class="mobile-drawer-header">
+              <div class="mobile-drawer-title">MENU</div>
+              <button type="button" class="mobile-drawer-close" aria-label="Close menu" @click="closeMobileMenu">
+                ✕
+              </button>
+            </div>
+
+            <nav class="mobile-drawer-nav">
+              <RouterLink to="/aboutus" class="mobile-drawer-link" @click="closeMobileMenu">ABOUT US</RouterLink>
+              <RouterLink to="/coding-test" class="mobile-drawer-link" @click="closeMobileMenu">LIVE CODING</RouterLink>
+              <RouterLink to="/studyplan" class="mobile-drawer-link" @click="closeMobileMenu">PLANNER</RouterLink>
+
+              <div class="mobile-drawer-divider"></div>
+
+              <template v-if="isAuthenticated">
+                <div class="mobile-drawer-user">{{ userName }}</div>
+                <RouterLink :to="{ name: 'mypage' }" class="mobile-drawer-link" @click="closeMobileMenu">MYPAGE</RouterLink>
+                <button
+                  type="button"
+                  class="mobile-drawer-link mobile-drawer-button"
+                  :class="{ 'mobile-drawer-button--loading': isLoggingOut }"
+                  :disabled="isLoggingOut"
+                  @click="handleLogout"
+                >
+                  <span v-if="isLoggingOut" class="spinner" aria-hidden="true"></span>
+                  <span>{{ isLoggingOut ? "LOGOUT" : "LOGOUT" }}</span>
+                </button>
+              </template>
+              <template v-else>
+                <RouterLink :to="{ name: 'login' }" class="mobile-drawer-link" @click="closeMobileMenu">LOGIN</RouterLink>
+                <RouterLink
+                  :to="{ name: 'signup-choice' }"
+                  class="mobile-drawer-link"
+                  @click="closeMobileMenu"
+                >
+                  SIGNUP
+                </RouterLink>
+              </template>
+            </nav>
+          </aside>
+        </div>
+      </Transition>
     </header>
 
     <section class="hero">
@@ -350,7 +426,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted, reactive, ref } from "vue";
+import { computed, onMounted, onUnmounted, reactive, ref, watch } from "vue";
 import { RouterLink, useRoute, useRouter } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
 import ForcedExitAlert from "../components/ForcedExitAlert.vue";
@@ -364,12 +440,23 @@ const { isAuthenticated, user, fetchProfile, logout, token } = useAuth();
 const { options: optionData, loading: optionsLoading, error: optionsError, fetchProfileOptions } = useProfileOptions();
 const isMenuOpen = ref(false);
 const isDropdownOpen = ref(false); 
+const isMobileMenuOpen = ref(false);
 const dropdownContainer = ref(null); 
 const userDropdownContainer = ref(null); 
+const mobileMenuContainer = ref(null);
+const mobileHamburgerButton = ref(null);
 const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value; };
 const closeMenu = () => { isMenuOpen.value = false; };
 const toggleUserMenu = () => { isDropdownOpen.value = !isDropdownOpen.value; };
 const closeUserMenu = () => { isDropdownOpen.value = false; };
+const toggleMobileMenu = () => {
+  isMobileMenuOpen.value = !isMobileMenuOpen.value;
+  closeMenu();
+  closeUserMenu();
+};
+const closeMobileMenu = () => {
+  isMobileMenuOpen.value = false;
+};
 const isLoggingOut = ref(false);
 const showForcedExit = ref(false);
 const showProfileModal = ref(false);
@@ -416,6 +503,14 @@ const handleClickOutside = (event) => {
   if (userDropdownContainer.value && !userDropdownContainer.value.contains(event.target)) {
     closeUserMenu();
   }
+  if (
+    isMobileMenuOpen.value &&
+    mobileMenuContainer.value &&
+    !mobileMenuContainer.value.contains(event.target) &&
+    !(mobileHamburgerButton.value && mobileHamburgerButton.value.contains(event.target))
+  ) {
+    closeMobileMenu();
+  }
 };
 
 const handleMouseMove = (e) => {
@@ -439,6 +534,7 @@ const handleLogout = async () => {
     await logout();
     closeDropdown();
     isMenuOpen.value = false;
+    closeMobileMenu();
     await router.push({ name: "login" });
   } catch (err) {
     console.error("[logout] failed", err);
@@ -533,8 +629,17 @@ const checkForcedAlert = () => {
   }
 };
 
+const handleKeydown = (event) => {
+  if (event.key === "Escape") {
+    closeMobileMenu();
+    closeMenu();
+    closeUserMenu();
+  }
+};
+
 onMounted(() => {
   document.addEventListener("click", handleClickOutside);
+  window.addEventListener("keydown", handleKeydown);
   window.addEventListener("storage", syncProfile);
   syncProfile();
   void fetchProfileOptions().catch(() => {});
@@ -549,8 +654,17 @@ onMounted(() => {
 
 onUnmounted(() => {
   document.removeEventListener("click", handleClickOutside);
+  window.removeEventListener("keydown", handleKeydown);
   window.removeEventListener("storage", syncProfile);
   window.removeEventListener("storage", syncProfile);
+});
+
+watch(isMobileMenuOpen, (open) => {
+  try {
+    document.body.style.overflow = open ? "hidden" : "";
+  } catch {
+    // ignore
+  }
 });
 
 const heroImage = new URL("../assets/mainpage_image1.png", import.meta.url).href;
@@ -583,6 +697,14 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   z-index: 100;
 }
 
+.desktop-only {
+  display: block;
+}
+
+.mobile-only {
+  display: none !important;
+}
+
 .nav-logo {
   position: absolute;
   width: 471px;
@@ -596,6 +718,157 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
   font-size: 96px;
   line-height: 116px;
   color: #000000;
+}
+
+.nav-logo--mobile {
+  position: static;
+  width: auto;
+  height: auto;
+  transform: none;
+  font-weight: 900;
+  font-size: 28px;
+  line-height: 1;
+}
+
+.mobile-hamburger {
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  border-radius: 999px;
+  background: #020617;
+  color: #f9fafb;
+  border: none;
+  cursor: pointer;
+}
+
+.mobile-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(2, 6, 23, 0.45);
+  backdrop-filter: blur(6px);
+  z-index: 200;
+}
+
+.mobile-drawer {
+  position: absolute;
+  top: 0;
+  right: 0;
+  height: 100%;
+  width: min(360px, 92vw);
+  background: #0b1220;
+  border-left: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 18px 16px;
+  box-shadow: -20px 0 60px rgba(0, 0, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.mobile-drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 2px 2px;
+}
+
+.mobile-drawer-title {
+  color: #f9fafb;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.mobile-drawer-close {
+  width: 40px;
+  height: 40px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f9fafb;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-drawer-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-top: 6px;
+}
+
+.mobile-drawer-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 12px;
+  border-radius: 12px;
+  color: #f9fafb;
+  text-decoration: none;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.mobile-drawer-link:hover {
+  background: rgba(255, 255, 255, 0.10);
+}
+
+.mobile-drawer-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.10);
+  margin: 8px 0;
+}
+
+.mobile-drawer-user {
+  color: rgba(255, 255, 255, 0.80);
+  font-weight: 700;
+  padding: 0 4px;
+}
+
+.mobile-drawer-button {
+  width: 100%;
+  text-align: left;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  cursor: pointer;
+  font: inherit;
+}
+
+.mobile-drawer-button:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.mobile-drawer-button--loading .spinner {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid #ffffff;
+  border-top-color: transparent;
+  animation: spin 0.8s linear infinite;
+}
+
+.mobile-drawer-enter-active,
+.mobile-drawer-leave-active {
+  transition: opacity 0.2s ease;
+}
+
+.mobile-drawer-enter-from,
+.mobile-drawer-leave-to {
+  opacity: 0;
+}
+
+.mobile-drawer-enter-active .mobile-drawer,
+.mobile-drawer-leave-active .mobile-drawer {
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.mobile-drawer-enter-from .mobile-drawer,
+.mobile-drawer-leave-to .mobile-drawer {
+  transform: translateX(18px);
 }
 
 .nav-pill {
@@ -686,6 +959,27 @@ const heroImage4 = new URL("../assets/mainpage_image4.png", import.meta.url).hre
 .dropdown-button:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+@media (max-width: 1200px) {
+  .landing-header {
+    padding: 24px 18px;
+    justify-content: center;
+  }
+
+  .desktop-only {
+    display: none !important;
+  }
+
+  .mobile-only {
+    display: block !important;
+  }
+
+  .mobile-hamburger {
+    display: inline-flex !important;
+    position: absolute;
+    left: 18px;
+  }
 }
 
 /* Dropdown Animation */

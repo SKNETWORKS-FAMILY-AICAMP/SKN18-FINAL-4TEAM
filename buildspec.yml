@@ -8,14 +8,21 @@ env:
 phases:
   pre_build:
     commands:
+      - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin 816292901195.dkr.ecr.ap-northeast-2.amazonaws.com
       - IMAGE_TAG=$(echo "$CODEBUILD_RESOLVED_SOURCE_VERSION" | cut -c1-7)
+      - echo "Image tag is $IMAGE_TAG"
+      
   build:
     commands:
+      - echo "Building Docker image..."
       - docker build -f backend/Dockerfile -t $ECR_URI:$IMAGE_TAG .
+      - echo "Pushing Docker image to ECR..."
       - docker push $ECR_URI:$IMAGE_TAG
+      
   post_build:
     commands:
+      - echo "Updating task definition with new image..."
       - |
         python - <<'PY'
         import json
@@ -25,10 +32,11 @@ phases:
         tag = os.environ["IMAGE_TAG"]
         container_name = "jobtory-backend"
 
+        print(f"Reading taskdef.json...")
         with open("taskdef.json", "r") as f:
             data = json.load(f)
 
-        # Keep only fields allowed by RegisterTaskDefinition.
+        # RegisterTaskDefinition API에서 허용하는 필드만 유지
         allowed_keys = {
             "family",
             "taskRoleArn",
@@ -46,23 +54,46 @@ phases:
             "ephemeralStorage",
             "pidMode",
             "ipcMode",
-            "tags",
         }
+        
         cleaned = {k: v for k, v in data.items() if k in allowed_keys and v is not None}
 
+        # 컨테이너 정의 내부의 불필요한 필드 정리
+        if "containerDefinitions" in cleaned:
+            for container in cleaned["containerDefinitions"]:
+                # secretOptions 제거
+                if "logConfiguration" in container:
+                    if "secretOptions" in container["logConfiguration"]:
+                        del container["logConfiguration"]["secretOptions"]
+
+        # 이미지 태그 업데이트
         updated = False
         for container in cleaned.get("containerDefinitions", []):
             if container.get("name") == container_name:
+                old_image = container.get("image", "")
                 container["image"] = f"{ecr}:{tag}"
+                print(f"Updated image from '{old_image}' to '{ecr}:{tag}'")
                 updated = True
                 break
 
         if not updated:
-            raise SystemExit(f"Container name {container_name} not found in taskdef.json")
+            raise SystemExit(f"ERROR: Container name '{container_name}' not found in taskdef.json")
 
+        # 정리된 task definition 저장
         with open("taskdef.json", "w") as f:
-            json.dump(cleaned, f)
+            json.dump(cleaned, f, indent=2)
+        
+        print("✓ taskdef.json cleaned and updated successfully")
         PY
+      - echo "=== Generated taskdef.json ==="
+      - cat taskdef.json
+      - echo ""
+      - echo "=== Checking appspec.yaml ==="
+      - cat appspec.yaml
+      - echo ""
+      - echo "=== Verifying artifact files ==="
+      - ls -la appspec.yaml taskdef.json
+      - echo "Build completed successfully!"
 
 artifacts:
   files:

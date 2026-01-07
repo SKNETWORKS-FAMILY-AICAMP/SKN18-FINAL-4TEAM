@@ -1,9 +1,9 @@
-version: 1.0
+version: 0.0
 Resources:
   - TargetService:
       Type: AWS::ECS::Service
       Properties:
-        TaskDefinition: taskdef.json
+        TaskDefinition: <TASK_DEFINITION>
         LoadBalancerInfo:
-          ContainerName: jobtory-backend
+          ContainerName: "jobtory-backend"
           ContainerPort: 8000

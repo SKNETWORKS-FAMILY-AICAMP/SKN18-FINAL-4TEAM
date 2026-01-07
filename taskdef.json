@@ -1,16 +1,29 @@
 {
-  "compatibilities": [
-    "EC2",
-    "FARGATE",
-    "MANAGED_INSTANCES"
-  ],
+  "family": "jobtory-backend-task",
+  "executionRoleArn": "arn:aws:iam::816292901195:role/jobtory-ecs-task-execution",
+  "networkMode": "awsvpc",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "1024",
+  "memory": "3072",
+  "runtimePlatform": {
+    "cpuArchitecture": "X86_64",
+    "operatingSystemFamily": "LINUX"
+  },
   "containerDefinitions": [
     {
-      "cpu": 0,
-      "environment": [],
-      "environmentFiles": [],
-      "essential": true,
+      "name": "jobtory-backend",
       "image": "816292901195.dkr.ecr.ap-northeast-2.amazonaws.com/jobtory-backend:latest",
+      "essential": true,
+      "cpu": 0,
+      "portMappings": [
+        {
+          "containerPort": 8000,
+          "hostPort": 8000,
+          "protocol": "tcp",
+          "appProtocol": "http",
+          "name": "jobtory-backend-8000-tcp"
+        }
+      ],
       "logConfiguration": {
         "logDriver": "awslogs",
         "options": {
@@ -18,20 +31,8 @@
           "awslogs-create-group": "true",
           "awslogs-region": "ap-northeast-2",
           "awslogs-stream-prefix": "ecs"
-        },
-        "secretOptions": []
-      },
-      "mountPoints": [],
-      "name": "jobtory-backend",
-      "portMappings": [
-        {
-          "appProtocol": "http",
-          "containerPort": 8000,
-          "hostPort": 8000,
-          "name": "jobtory-backend-8000-tcp",
-          "protocol": "tcp"
         }
-      ],
+      },
       "secrets": [
         {
           "name": "DB_HOST",
@@ -98,59 +99,14 @@
           "valueFrom": "/jobtory/prod/OPENAI_API_KEY"
         }
       ],
-      "systemControls": [],
+      "environment": [],
+      "environmentFiles": [],
+      "mountPoints": [],
+      "volumesFrom": [],
       "ulimits": [],
-      "volumesFrom": []
+      "systemControls": []
     }
   ],
-  "cpu": "1024",
-  "enableFaultInjection": false,
-  "executionRoleArn": "arn:aws:iam::816292901195:role/jobtory-ecs-task-execution",
-  "family": "jobtory-backend-task",
-  "memory": "3072",
-  "networkMode": "awsvpc",
-  "placementConstraints": [],
-  "registeredAt": "2026-01-07T13:39:11.471Z",
-  "registeredBy": "arn:aws:iam::816292901195:user/student",
-  "requiresAttributes": [
-    {
-      "name": "com.amazonaws.ecs.capability.logging-driver.awslogs"
-    },
-    {
-      "name": "ecs.capability.execution-role-awslogs"
-    },
-    {
-      "name": "com.amazonaws.ecs.capability.ecr-auth"
-    },
-    {
-      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.19"
-    },
-    {
-      "name": "ecs.capability.execution-role-ecr-pull"
-    },
-    {
-      "name": "ecs.capability.secrets.ssm.environment-variables"
-    },
-    {
-      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.18"
-    },
-    {
-      "name": "ecs.capability.task-eni"
-    },
-    {
-      "name": "com.amazonaws.ecs.capability.docker-remote-api.1.29"
-    }
-  ],
-  "requiresCompatibilities": [
-    "FARGATE"
-  ],
-  "revision": 4,
-  "runtimePlatform": {
-    "cpuArchitecture": "X86_64",
-    "operatingSystemFamily": "LINUX"
-  },
-  "status": "ACTIVE",
-  "taskDefinitionArn": "arn:aws:ecs:ap-northeast-2:816292901195:task-definition/jobtory-backend-task:4",
   "volumes": [],
-  "tags": []
+  "placementConstraints": []
 }

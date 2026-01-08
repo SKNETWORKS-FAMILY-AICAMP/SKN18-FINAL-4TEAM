@@ -348,6 +348,9 @@ onMounted(() => {
               </span>
             </div>
             <div class="video-meta">{{ activeVideo?.title || "학습 일정" }}</div>
+            <div class="video-reason" v-if="activeVideo?.extendedProps?.why_selected || activeVideo?.extendedProps?.why_seleted">
+              {{ activeVideo.extendedProps.why_selected || activeVideo.extendedProps.why_seleted }}
+            </div>
             <div class="video-frame">
               <iframe
                 v-if="getYouTubeEmbedUrl(activeVideo?.url)"
@@ -750,6 +753,13 @@ onMounted(() => {
   color: #0f172a;
   line-height: 1.3;
 }
+
+:global(.video-reason) {
+  font-size: 0.95rem;
+  color: #475569;
+  line-height: 1.5;
+}
+
 
 :global(.video-frame) {
   width: 100%;

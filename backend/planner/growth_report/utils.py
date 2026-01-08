@@ -22,12 +22,11 @@ def _parse_json(content: str) -> Dict[str, Any]:
         return {}
 
 
-def _reports_to_text(state: ReportState) -> str:
-    reps = state.get("reports") or []
-    if not reps:
+def _reports_to_text(reports) -> str:
+    if not reports:
         return "(보고서 없음)"
     texts: List[str] = []
-    for idx, r in enumerate(reps, 1):
+    for idx, r in enumerate(reports, 1):
         header = f"[리포트 {idx}]"
         # 비어 있지 않은 섹션만 붙여서 불필요한 빈 줄 제거
         raw_sections = [

@@ -145,6 +145,7 @@ class LatestStudyPlanView(APIView):
                         "day_number": task.day,
                         "task_id": task.id,
                         "is_completed": task.is_completed,
+                        "why_selected": task.why_selected,
                         "lecture_note": task.lecture_note,
                     },
                 }

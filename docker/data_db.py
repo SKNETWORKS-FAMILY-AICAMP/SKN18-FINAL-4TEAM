@@ -29,6 +29,7 @@ cur = conn.cursor()
 # 기존 데이터 삭제 (테이블이 있을 경우만)
 print("기존 데이터 삭제 중...")
 try:
+    cur.execute("TRUNCATE TABLE coding_problem_language, test_case, coding_problem, recommended_videos RESTART IDENTITY CASCADE;")
     cur.execute(
         "TRUNCATE TABLE coding_problem_language, test_case, coding_problem, recommended_videos "
         "RESTART IDENTITY CASCADE;"

@@ -46,7 +46,6 @@ growth_report와 user_profile만 근거로 needs_profile을 정규화한다.
 3) preferences (배열)
 - user_profile에서만 추출. 없으면 [].
 - tech_stack, desired_role, detailed_role 등의 선호/목표를 간단 문구로 변환.
-  예) "python" → "Python 중심", "AI/ML 엔지니어" → "AI/ML 직무 지향", "딥러닝 모델링" → "딥러닝 모델링 관심".
 
 4) language (문자열)
 - user_profile의 tech_stack 등에서 코드 언어 추정(없으면 "").
@@ -76,7 +75,7 @@ SLOT_PLANNER_PROMPT = f"""
       "day_plan_topic": "정확한 학습 주제",
       "domain": "algorithm | live_coding 중 하나",
       "category": "domain별 세부 카테고리",
-      "reason": "선택 이유(30자 이내)"
+      "reason": 이 부분을 왜 추천했는지(150자이내)
     }}
   ]
 }}
@@ -109,8 +108,8 @@ VIDEO_SELECTOR_PROMPT = """
   }
 
 절차:
-- 각 슬롯마다 video_search_tool을 호출한다(기본 1회: order=random, limit=5, offset=0).
-- 관련성이 없거나 id/url이 비면 offset=5로 한 번 더 재검색한다.
+- 각 슬롯마다 video_search_tool을 호출한다(기본 1회: limit=5).
+- 관련성이 없거나 id/url이 비면 재검색한다.
 - 검색 결과 중 summary와 day_plan_topic이 가장 관련 높은 video 1개를 고른다.
 - 이전 슬롯에서 뽑은 video_id/video_url과 중복되는 영상은 선택하지 않는다.
 
@@ -123,7 +122,6 @@ VIDEO_SELECTOR_PROMPT = """
       "video": {
         "id": "video_id"(빈 문자열 금지),
         "video_url": "url (빈 문자열 금지)",
-        "fit_reason": "30자"
       }
     }
   ]

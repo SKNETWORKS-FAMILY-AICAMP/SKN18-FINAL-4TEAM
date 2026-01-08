@@ -9,4 +9,7 @@ exec gunicorn config.wsgi:application \
   --bind 0.0.0.0:8000 \
   --workers "$GUNICORN_WORKERS" \
   --threads "$GUNICORN_THREADS" \
-  --timeout "$GUNICORN_TIMEOUT"
+  --timeout "$GUNICORN_TIMEOUT" \
+  --access-logfile - \
+  --error-logfile - \
+  --log-level info

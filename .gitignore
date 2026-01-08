@@ -2,7 +2,6 @@
 */postgres-data
 */*/node_modules
 backend/*/__pycache__
-backend/*/migrations
 .env
 */redis-data
 **/redis-data/

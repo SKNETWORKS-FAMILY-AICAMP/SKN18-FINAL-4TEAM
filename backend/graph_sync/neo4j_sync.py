@@ -114,6 +114,8 @@ def sync_report(
     problem_algorithms: list,
     strategy_algorithms: list,
     consistency_status: str,
+    problem_id: Optional[int],
+    solved_score: Optional[float],
 ):
     ensure_schema()
     ensure_problem_graph()
@@ -159,6 +161,13 @@ def sync_report(
         "    MERGE (s3:AlgoSkill {name: a}) "
         "    MERGE (e2)-[:SUPPORTS {weight: $consistency_weight}]->(s3) "
         "  ) "
+        ") "
+        "WITH u "
+        "FOREACH (_ IN CASE WHEN $problem_id IS NULL THEN [] ELSE [1] END | "
+        "  MERGE (p:Problem {problem_id: $problem_id}) "
+        "  MERGE (u)-[s:SOLVED]->(p) "
+        "  SET s.score = coalesce($solved_score, s.score, 1.0), "
+        "      s.ts = coalesce($created_at, s.ts) "
         ")"
     )
     params = {
@@ -168,5 +177,7 @@ def sync_report(
         "gap_algos": gap_algos,
         "missing_algos": missing_algos,
         "consistency_weight": consistency_weight,
+        "problem_id": problem_id,
+        "solved_score": float(solved_score) if solved_score is not None else None,
     }
     post_cypher(query, params)

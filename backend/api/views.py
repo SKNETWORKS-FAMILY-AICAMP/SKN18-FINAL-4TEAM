@@ -1710,9 +1710,27 @@ class LiveCodingFinalEvalStartView(APIView):
         if str(meta.get("user_id")) != str(user.user_id):
             return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
 
+        debug_key = f"livecoding:{session_id}:final-eval-debug"
+        cache.set(
+            debug_key,
+            {
+                "step": "start_received",
+                "status": "running",
+                "user_id": str(user.user_id),
+                "ts": timezone.now().isoformat(),
+            },
+            timeout=3600,
+        )
+        print(f"[final-eval] start received: {session_id}", flush=True)
+
         # ✅ 백그라운드 실행
         def _runner():
             try:
+                cache.set(
+                    debug_key,
+                    {"step": "graph_invoke_start", "status": "running", "ts": timezone.now().isoformat()},
+                    timeout=3600,
+                )
                 graph = get_cached_graph("chapter3")
                 config = {"configurable": {"thread_id": f"{session_id}:chapter3"}}
 
@@ -1733,6 +1751,11 @@ class LiveCodingFinalEvalStartView(APIView):
                     values = dict(snap.values or {})
                     values["step"] = values.get("step") or "saved"
                     values["status"] = "done"
+                    cache.set(
+                        debug_key,
+                        {"step": "graph_invoke_done", "status": "done", "ts": timezone.now().isoformat()},
+                        timeout=3600,
+                    )
                     # invoke가 체크포인터에 저장했겠지만, 보정 저장이 필요하면 노드에서 하거나
                     # 그래프 마지막 노드에서 saved로 세팅해.
                 except Exception:
@@ -1749,6 +1772,11 @@ class LiveCodingFinalEvalStartView(APIView):
                         "status": "error",
                         "error": str(e),
                     }
+                    cache.set(
+                        debug_key,
+                        {"step": "graph_invoke_error", "status": "error", "error": str(e), "ts": timezone.now().isoformat()},
+                        timeout=3600,
+                    )
                     # graph.invoke 대신 저장만 하고 싶으면 체크포인터 접근이 필요하지만
                     # 여기서는 최소로 "에러 상태를 state로 남길 수 있게" graph에 error node를 두는 걸 추천.
                     # (지금은 그냥 출력)

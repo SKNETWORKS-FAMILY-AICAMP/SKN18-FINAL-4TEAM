@@ -58,6 +58,14 @@ def sync_report_to_graph(report, user, graph_output: Dict[str, Any]) -> None:
         consistency_status = ps_eval.get("consistency_status") or ""
 
     problem_algorithms = _resolve_problem_algorithms(graph_output)
+    problem_id = graph_output.get("problem_id")
+    if not problem_id and isinstance(getattr(report, "problem", None), dict):
+        problem_id = report.problem.get("problem_id")
+    if problem_id is not None:
+        try:
+            problem_id = int(problem_id)
+        except (TypeError, ValueError):
+            problem_id = None
     sync_report(
         user_id=str(user.user_id),
         session_id=str(report.session_id),
@@ -65,4 +73,6 @@ def sync_report_to_graph(report, user, graph_output: Dict[str, Any]) -> None:
         problem_algorithms=problem_algorithms,
         strategy_algorithms=graph_output.get("strategy_algorithms") or [],
         consistency_status=consistency_status,
+        problem_id=problem_id,
+        solved_score=report.final_score,
     )

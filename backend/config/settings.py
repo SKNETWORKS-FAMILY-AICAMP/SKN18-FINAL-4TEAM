@@ -21,6 +21,7 @@ SECRET_KEY = _get_env_any("DJANGO_SECRET_KEY")
 DEBUG = os.getenv("DJANGO_DEBUG", "").lower() == "true"
 ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if os.getenv("DJANGO_ALLOWED_HOSTS") else []
 FRONTEND_BASE_URL = _get_env_any("FRONTEND_BASE_URL")
+FRONTEND_BASE_URLS = [url.strip() for url in FRONTEND_BASE_URL.split(",") if url.strip()]
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -105,7 +106,8 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
 CORS_ALLOW_ALL_ORIGINS = False
 CORS_ALLOW_CREDENTIALS = True
-CORS_ALLOWED_ORIGINS = [FRONTEND_BASE_URL]
+CORS_ALLOWED_ORIGINS = FRONTEND_BASE_URLS
+CSRF_TRUSTED_ORIGINS = FRONTEND_BASE_URLS
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [

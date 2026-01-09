@@ -1711,6 +1711,7 @@ class LiveCodingFinalEvalStartView(APIView):
             return Response({"detail": "이 세션에 접근할 권한이 없습니다."}, status=status.HTTP_403_FORBIDDEN)
 
         debug_key = f"livecoding:{session_id}:final-eval-debug"
+        status_key = f"livecoding:{session_id}:final-eval-status"
         cache.set(
             debug_key,
             {
@@ -1719,6 +1720,11 @@ class LiveCodingFinalEvalStartView(APIView):
                 "user_id": str(user.user_id),
                 "ts": timezone.now().isoformat(),
             },
+            timeout=3600,
+        )
+        cache.set(
+            status_key,
+            {"step": "init", "status": "running", "ts": timezone.now().isoformat()},
             timeout=3600,
         )
         print(f"[final-eval] start received: {session_id}", flush=True)
@@ -1741,7 +1747,15 @@ class LiveCodingFinalEvalStartView(APIView):
                     "status": "running",
                 }
 
-                graph.invoke(init_state, config=config)
+                result = graph.invoke(init_state, config=config)
+                if isinstance(result, dict):
+                    result.setdefault("step", "saved")
+                    result.setdefault("status", "done")
+                    cache.set(
+                        status_key,
+                        {**result, "ts": timezone.now().isoformat()},
+                        timeout=3600,
+                    )
 
                 # 그래프가 정상 종료되면 마지막 상태를 'saved/done'으로 맞춰두는 걸 추천
                 # (노드에서 처리해도 되고, 여기서 한 번 더 저장해도 됨)
@@ -1751,6 +1765,11 @@ class LiveCodingFinalEvalStartView(APIView):
                     values = dict(snap.values or {})
                     values["step"] = values.get("step") or "saved"
                     values["status"] = "done"
+                    cache.set(
+                        status_key,
+                        {**values, "ts": timezone.now().isoformat()},
+                        timeout=3600,
+                    )
                     cache.set(
                         debug_key,
                         {"step": "graph_invoke_done", "status": "done", "ts": timezone.now().isoformat()},
@@ -1772,6 +1791,11 @@ class LiveCodingFinalEvalStartView(APIView):
                         "status": "error",
                         "error": str(e),
                     }
+                    cache.set(
+                        status_key,
+                        {**err_state, "ts": timezone.now().isoformat()},
+                        timeout=3600,
+                    )
                     cache.set(
                         debug_key,
                         {"step": "graph_invoke_error", "status": "error", "error": str(e), "ts": timezone.now().isoformat()},
@@ -1820,6 +1844,11 @@ class LiveCodingFinalEvalStatusView(APIView):
             values = snap.values or {}
         except Exception:
             values = {}
+
+        if not values:
+            cached = cache.get(f"livecoding:{session_id}:final-eval-status") or {}
+            if isinstance(cached, dict):
+                values = cached
 
         # 그래프가 아직 시작 안됐거나 저장된 게 없으면 init으로 응답
         step = values.get("step") or "init"
@@ -1912,9 +1941,19 @@ class LiveCodingFinalEvalReportView(APIView):
             snap = graph.get_state(config)
             values = dict(snap.values or {})
         except Exception as e:
+            values = {}
+
+        if not values:
+            cached = cache.get(f"livecoding:{session_id}:final-eval-status") or {}
+            if isinstance(cached, dict):
+                values = cached
+            else:
+                values = {}
+
+        if not values:
             return Response(
-                {"detail": "final-eval state를 읽을 수 없습니다.", "error": str(e)},
-                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                {"status": "running", "step": "init"},
+                status=status.HTTP_202_ACCEPTED,
             )
 
         step = values.get("step") or "init"

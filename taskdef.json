@@ -79,8 +79,44 @@
           "valueFrom": "/jobtory/prod/FRONTEND_BASE_URL"
         },
         {
+          "name": "GOOGLE_CLIENT_ID",
+          "valueFrom": "/jobtory/prod/GOOGLE_CLIENT_ID"
+        },
+        {
+          "name": "GOOGLE_CLIENT_SECRET",
+          "valueFrom": "/jobtory/prod/GOOGLE_CLIENT_SECRET"
+        },
+        {
           "name": "GOOGLE_REDIRECT_URI",
           "valueFrom": "/jobtory/prod/GOOGLE_REDIRECT_URI"
+        },
+        {
+          "name": "EMAIL_BACKEND",
+          "valueFrom": "/jobtory/prod/EMAIL_BACKEND"
+        },
+        {
+          "name": "EMAIL_HOST",
+          "valueFrom": "/jobtory/prod/EMAIL_HOST"
+        },
+        {
+          "name": "EMAIL_PORT",
+          "valueFrom": "/jobtory/prod/EMAIL_PORT"
+        },
+        {
+          "name": "EMAIL_HOST_USER",
+          "valueFrom": "/jobtory/prod/EMAIL_HOST_USER"
+        },
+        {
+          "name": "EMAIL_HOST_PASSWORD",
+          "valueFrom": "/jobtory/prod/EMAIL_HOST_PASSWORD"
+        },
+        {
+          "name": "EMAIL_USE_TLS",
+          "valueFrom": "/jobtory/prod/EMAIL_USE_TLS"
+        },
+        {
+          "name": "DEFAULT_FROM_EMAIL",
+          "valueFrom": "/jobtory/prod/DEFAULT_FROM_EMAIL"
         },
         {
           "name": "NEO4J_AUTH",
@@ -89,6 +125,10 @@
         {
           "name": "NEO4J_HTTP_URL",
           "valueFrom": "/jobtory/prod/NEO4J_HTTP_URL"
+        },
+        {
+          "name": "ELASTIC_PASSWORD",
+          "valueFrom": "/jobtory/prod/ELASTIC_PASSWORD"
         },
         {
           "name": "REDIS_URL",

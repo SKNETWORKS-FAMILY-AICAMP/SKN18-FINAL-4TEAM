@@ -475,7 +475,7 @@ SKN18-FINAL-4TEAM/
 
 ```bash
 
-
+docker-compose -f docker/docker-compose.yml --env-file .env up -d
 python -m venv .venv --python 3.12
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt

@@ -188,7 +188,7 @@ JOBTORY의 라이브 코딩 면접은
      - 질문 응답 품질
      - 힌트 의존도
      - 실시간 피드백 반영 여부
-3. 평가 결과는 등급(S~F)과 함께
+3. 평가 결과는 등급(A+~F)과 함께
    - 점수 산출 근거
    - 코드 주석 기반 리뷰
    - 자연어 종합 피드백
@@ -201,7 +201,7 @@ JOBTORY의 라이브 코딩 면접은
 1. 사용자가 **3회 이상** 라이브 코딩 테스트에 응시하면,
    - 누적 리포트를 기반으로 **성장 리포트**가 생성됩니다.
    - 강점 / 약점 / 개선된 부분 / 변화 추이를 분석합니다.
-2. 성장 리포트를 입력으로 하여:
+2. 라이브 코딩 테스트 리포트를 입력으로 하여:
    - **맞춤 문제 추천**
      - Neo4j 기반 약점 알고리즘 후보 생성
      - Elasticsearch + Vector Search로 하이브리드 재랭크
@@ -214,7 +214,8 @@ JOBTORY의 라이브 코딩 면접은
 
 ---
 
-## 🧠 LangGraph 설계 (Intro / Coding / 종합 평가)
+## 🧠 LangGraph 설계 
+### 라이브 코딩 테스트 → 종합 평가 → 성장 분석 → 문제 추천 → 학습 설계 → 실행 코칭
 
 ### Stage 구성
 
@@ -243,17 +244,107 @@ JOBTORY의 라이브 코딩 면접은
   - **병렬 평가 노드**:
     - `code_collabo_eval_node`:
       - Redis에서 코드/메타 정보, 대화 로그 조회
-      - Ruff 분석 결과 + 질문/답변 히스토리 기반 **코드 품질(40점)·협업/커뮤니케이션(30점)** 점수 산출
+      - Ruff 분석 결과 + 질문/답변 히스토리 기반 **코드 품질(35점)·협업/커뮤니케이션(30점)** 점수 산출
       - 각 영역별 상세 피드백 생성
     - `problem_solving_eval_node`:
       - 최종 제출 코드의 테스트 케이스 실행 결과 분석
-      - 코드 변화 히스토리(intro 전략 → 최종 코드) 기반 **문제 해결 능력(30점)** 점수 산출
+      - 코드 변화 히스토리(intro 전략 → 최종 코드) 기반 **문제 해결 능력(35점)** 점수 산출
       - 알고리즘 효율성 및 접근 방식 피드백 생성
   - **종합 리포트 생성**:
-    - 3가지 점수 합산 → 100점 만점 환산 → S~F 등급 부여
+    - 3가지 점수 합산 → 100점 만점 환산 → A+~F 등급 부여
     - Markdown 형식의 상세 리포트(강점/약점/개선점) 생성
     - `GET /api/livecoding/final-eval/status/` 로 진행 상태 폴링(`rendering.vue`)
     - `GET /api/livecoding/final-eval/report/` 로 최종 리포트/점수/등급을 조회(`showreport.vue`)
+
+- **Chapter 4 – 성장 리포트 생성 (Growth Report Stage)**
+
+  - 실행 조건
+    - 사용자가 라이브 코딩 테스트를 **3회 이상 완료**한 경우 자동 실행
+  - **입력 데이터**
+    - 과거 N회(`>=3`)의 최종 평가 리포트
+    - 회차별 점수(코드 품질 / 문제 해결 / 협업)
+    - 알고리즘 태그, Ruff prefix, 전략 요약, 힌트 사용 이력
+  - 리포트 수집 및 정제
+    - 단발성 결과 제거를 위해 **2회 이상 반복된 패턴만 유효 신호로 채택**
+    - 점수 구간별 알고리즘/행동 패턴 집계
+  - 성장 분석 노드
+    - `strength_analysis_node`  
+      - 반복적으로 높은 점수를 기록한 영역 및 알고리즘 추출
+    - `weakness_analysis_node`  
+      - 지속적으로 낮은 점수를 기록한 영역 식별
+    - `delta_analysis_node`  
+      - 직전 성장 리포트 대비 **개선·정체·퇴보 변화** 분석
+  - 출력
+    - 강점(최대 3개)
+    - 개선점(최대 3개)
+    - 변화 요약(이전 대비 성장 포인트)
+    - 요약형 성장 리포트 텍스트(6~8문장)
+
+---
+
+- **Chapter 5 – 맞춤 문제 추천 (Problem Recommendation Stage)**
+
+  - 입력
+    - 최신 성장 리포트
+    - 취약 알고리즘, 전략 미흡 패턴, 적정 난이도 범위
+  - 그래프 기반 후보 생성
+    - 약점 알고리즘 → **Neo4j GraphDB**를 활용해 문제 후보 추출
+    - 사용자–알고리즘–문제 간 관계 기반 탐색
+  - 하이브리드 재랭크
+    - Elasticsearch 키워드 검색
+    - Vector Embedding 기반 의미 유사도 검색
+    - 알고리즘 일치도 + 난이도 적합도 종합 점수화
+  - 후보 필터링
+    - 이미 풀이한 문제 제거
+    - 난이도 급상승 문제 제한
+  - 출력
+    - 최종 추천 문제 리스트(기본 3문제)
+    - 각 문제별 추천 이유 및 예상 학습 포인트
+
+---
+
+- **Chapter 6 – 학습 코치 & 7일 학습 플랜 (Learning Coach Stage)**
+
+  - **6-1. 학습 상태 진단**
+
+  - 성장 리포트 및 사용자 프로필 기반 분석
+  - 현재 실력 구간 및 집중 학습 영역 도출
+  - 학습 상태 프로파일 생성
+    - `focus_topics`
+    - `recommended_depth` (개념 / 적용 / 실전)
+
+  ---
+
+  - **6-2. 7일 학습 플랜 설계**
+
+  - 약점 보완과 강점 유지를 동시에 고려한 학습 목표 설정
+  - **기초 → 응용 구조**의 7일 로드맵 생성
+    - Day 1~3: 개념 학습
+    - Day 4~7: 실전 문제 및 면접 대응
+  - 각 Day별 학습 주제, 알고리즘 카테고리, 콘텐츠 매핑
+
+  ---
+
+  - **6-3. 학습 콘텐츠 탐색**
+
+  - 사전 구축된 학습 영상/자료 DB 조회
+  - 알고리즘, 난이도, 길이 기준 필터링
+  - 중복 제거 후 **1일 1콘텐츠 매칭**
+
+  ---
+
+  - **6-4. 학습 피드백 생성 (실행 코치)**
+
+  - 사용자가 학습 후 회고 텍스트를 작성
+  - Deep Agent 기반 검증 수행
+    - 영상 핵심 내용 포함 여부
+    - 논리 / 사실 / 표현 오류(lint) 탐지
+  - 출력
+    - 이해도 판정 (미흡 / 보완 필요 / 완료)
+    - 문장 단위 인라인 피드백
+    - 다음 학습을 위한 구체적 개선 코멘트
+
+---
 
 ### LangGraph & Redis 연동
 
@@ -267,13 +358,30 @@ JOBTORY의 라이브 코딩 면접은
 
 ---
 
+## GraphDB + HybridRAG
+ - Neo4j 그래프 기반 추천 + Elastic 하이브리드 서치 리랭킹
+ - GraphDB를 통해 구조적 관계기반 1차 추출, HybridRAG를 통해 의미/키워드 유사도로 정확성 높이는 2차 추출
+
+### GraphDB
+ - input: `livecoding_reports` / output: `graph_output.recommended_problems`
+
+ - Problem / AlgoSkill / Difficulty + 사용자 Evidence/Gap/Similarity
+  - Evidence(3-hop), Gap(2-hop), User-Sim(4-hop), Algo-Sim(4-hop) 경로 가중치를 가산해서 추천할  후보 problem의 점수 생성
+
+### HybridRAG(Elastic Re-Rank)
+ - input: Neo4j에서 후보 `problem_id`와 `graph_output.recommendation_query` / output: `graph_output.recommended_problems`
+
+ - 키워드 매칭(problem), 코사인 유사도, 단어 필터링(problem_id, difficulty) 조합해서 Re-Rank
+
+---
+
 ## 📊 평가 시스템
 
 ### 3단계 종합 평가 프로세스
 
 JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동으로 평가합니다:
 
-#### 1️⃣ 코드 품질 평가 (40점)
+#### 1️⃣ 코드 품질 평가 (35점)
 - **Ruff 정적 분석 기반**
   - 코드 스타일 준수도 (PEP8, Naming Convention 등)
   - 잠재적 버그 및 안티패턴 탐지
@@ -288,11 +396,10 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 - **Ruff 협업 관련 규칙**: N, D, Q, I, ERA (문서화, 주석, import 정리 등)
 - 평가 근거: STT 대화 로그, 질문/답변 히스토리, 코드 변화 패턴
 
-#### 3️⃣ 문제 해결 능력 (30점)
+#### 3️⃣ 문제 해결 능력 (35점)
 - **코드 실행 결과 분석**
   - 테스트 케이스 통과율
   - 알고리즘 효율성 (시간/공간 복잡도)
-  - 엣지 케이스 처리
 - **문제 접근 방식**
   - Intro 단계에서의 전략 수립
   - 코딩 과정에서의 점진적 개선 (코드 변화량 분석)
@@ -313,12 +420,13 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 |------|------|------|
 | **Frontend** | Vue 3, Vite, CodeMirror | 라이브코딩 UI, 타이머, STT/TTS 제어 |
 | **Backend** | Django, Django REST Framework | 인증, 세션 관리, API 서버 |
-| **LLM / Orchestration** | LangGraph, OpenAI `gpt-5-nano` | 질문/피드백 생성, 단계별 그래프 오케스트레이션 |
+| **LLM** | LangGraph, OpenAI `gpt-5-nano` | 질문/피드백 생성 |
 | **정적 분석** | Ruff | Python 코드 품질·협업 관련 규칙 분리 평가 |
 | **STT** | Whisper 계열 (faster-whisper 등) | 한국어 STT, 전략·답변 인식 |
-| **TTS** | OpenAI `tts-1` (`nova` 등) | 문제 설명, 질문, 피드백 음성 출력 |
+| **TTS** | OpenAI `openai 4o mini` (`nova` 등) | 문제 설명, 질문, 피드백 음성 출력 |
 | **Storage** | PostgreSQL, Redis | 영구 데이터(PostgreSQL), 세션/그래프/코드/버퍼(Redis) |
-| **Infra** | Docker, Docker Compose | 로컬/배포 환경 컨테이너 구성 |
+| **Infra** | Docker, AWS | 로컬/배포 환경 컨테이너 구성 |
+| **GraphDB** | Neo4j | 사용자 리포트 기반 약점 알고리즘–문제 관계 그래프 구성 및 맞춤 문제 추천 |
 
 ---
 
@@ -331,7 +439,7 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 | `livecoding:{session_id}:code` | 코드 스냅샷 | `latest`, `history[]`, `question_history[]`, `question_cnt` |
 | `conv:{session_id}` | STT/TTS 대화 로그 | 질문/답변 텍스트, 타임스탬프, 발화 타입 등 |
 | LangGraph checkpoint | 그래프 상태 | LangGraph에서 내부적으로 사용하는 키 |
-| **LLM / Orchestration** | LangGraph, OpenAI GPT-4o-mini | 질문/피드백 생성, 단계별 그래프 오케스트레이션, 종합 평가 |
+| LLM | LangGraph, OpenAI GPT-4o-mini | 질문/피드백 생성, 종합 평가 |
 
 ---
 
@@ -340,10 +448,13 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 ```text
 SKN18-FINAL-4TEAM/
 ├── backend/                  # Django + LangGraph 백엔드
+│   ├── anti_cheat/           # LangGraph 그래프/노드 정의
 │   ├── api/                  # REST API (livecoding, STT/TTS, 인증 등)
+│   ├── graph_sync/           # 그래프 db
 │   ├── interview_engine/     # LangGraph 그래프/노드 정의
+│   ├── planner/              # 학습플래너
 │   ├── stt/                  # STT 파이프라인
-│   ├── tts_client.py         # TTS 유틸리티
+│   ├── tts_client.py         # TTS 유틸리티 
 │   └── ...                   # 설정, 모델 등
 ├── frontend/
 │   └── vue-app/              # Vue 3 + Vite 프론트엔드
@@ -360,15 +471,18 @@ SKN18-FINAL-4TEAM/
 
 ## 🚀 설치 & 실행 (요약)
 
-### 1) Backend
+### 1) Backend 
 
 ```bash
+
+
 python -m venv .venv --python 3.12
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 cd backend
 python manage.py migrate
+python manage.py makemigration api
 python manage.py runserver
 ```
 

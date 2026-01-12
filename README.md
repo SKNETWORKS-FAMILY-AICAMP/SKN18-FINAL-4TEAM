@@ -84,6 +84,8 @@ JobTory는 이 문제를 해결하기 위해, **라이브 코딩 + AI 면접관 
 
 > 상세 다이어그램은 [시스템 아키텍처 문서](https://docs.google.com/document/d/10WTTrO3g1uwa_P4MdwcbhA52s4dwlMNI/edit?usp=sharing&ouid=116457762953203703245&rtpof=true&sd=true) 에서 확인할 수 있습니다.
 
+---
+
 ## 🔄 Live Coding Interview End-to-End Pipeline
 
 JOBTORY의 라이브 코딩 면접은  

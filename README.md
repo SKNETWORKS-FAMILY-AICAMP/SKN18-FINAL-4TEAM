@@ -299,7 +299,6 @@ JOBTORY의 라이브 코딩 면접은
     - 난이도 급상승 문제 제한
   - 출력
     - 최종 추천 문제 리스트(기본 3문제)
-    - 각 문제별 추천 이유 및 예상 학습 포인트
 
 ---
 
@@ -422,7 +421,7 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 | **Backend** | Django, Django REST Framework | 인증, 세션 관리, API 서버 |
 | **LLM** | LangGraph, OpenAI `gpt-5-nano` | 질문/피드백 생성 |
 | **정적 분석** | Ruff | Python 코드 품질·협업 관련 규칙 분리 평가 |
-| **STT** | Whisper 계열 (faster-whisper 등) | 한국어 STT, 전략·답변 인식 |
+| **STT** | Whisper | 한국어 STT, 전략·답변 인식 |
 | **TTS** | OpenAI `gpt-4o-mini` (`nova` 등) | 문제 설명, 질문, 피드백 음성 출력 |
 | **Storage** | PostgreSQL, Redis | 영구 데이터(PostgreSQL), 세션/그래프/코드/버퍼(Redis) |
 | **Infra** | Docker, AWS | 로컬/배포 환경 컨테이너 구성 |
@@ -478,11 +477,12 @@ SKN18-FINAL-4TEAM/
 docker-compose -f docker/docker-compose.yml --env-file .env up -d
 python -m venv .venv --python 3.12
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
-pip install -r requirements.txt
+uv pip install -r requirements.txt
 
 cd backend
 python manage.py migrate
-python manage.py makemigration api
+python manage.py makemigrations api
+python manage.py makemigrations planner
 python manage.py runserver
 ```
 

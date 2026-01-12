@@ -423,7 +423,7 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 | **LLM** | LangGraph, OpenAI `gpt-5-nano` | 질문/피드백 생성 |
 | **정적 분석** | Ruff | Python 코드 품질·협업 관련 규칙 분리 평가 |
 | **STT** | Whisper 계열 (faster-whisper 등) | 한국어 STT, 전략·답변 인식 |
-| **TTS** | OpenAI `openai 4o mini` (`nova` 등) | 문제 설명, 질문, 피드백 음성 출력 |
+| **TTS** | OpenAI `gpt-4o-mini` (`nova` 등) | 문제 설명, 질문, 피드백 음성 출력 |
 | **Storage** | PostgreSQL, Redis | 영구 데이터(PostgreSQL), 세션/그래프/코드/버퍼(Redis) |
 | **Infra** | Docker, AWS | 로컬/배포 환경 컨테이너 구성 |
 | **GraphDB** | Neo4j | 사용자 리포트 기반 약점 알고리즘–문제 관계 그래프 구성 및 맞춤 문제 추천 |

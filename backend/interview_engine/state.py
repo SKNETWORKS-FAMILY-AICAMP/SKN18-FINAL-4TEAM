@@ -41,8 +41,8 @@ class CodingState(TypedDict, total=False):
     prev_code: str                  # 직전 코드 스냅샷
     snapshot_index: int             # 현재 스냅샷 인덱스
     last_snapshot_index: int        # 마지막 스냅샷 인덱스(프론트 동기화용)
-    code_quality_feedback: str      # 코드 품질 피드백 메시지
-    collaboration_feedback: str     # 협업/커뮤니케이션 관련 피드백
+    code_quality_feedback: List[str]      # 코드 품질 피드백 메시지
+    collaboration_feedback: List[str]     # 협업/커뮤니케이션 관련 피드백
     question_cnt: int               # 질문/피드백 횟수 카운트
     tts_text: str                   # TTS로 읽을 텍스트
     stt_text: str                   # STT로 받은 텍스트
@@ -51,7 +51,7 @@ class CodingState(TypedDict, total=False):
     # 1. 핵심 컨텍스트 (Redis Shared Data)
     current_user_code: str          # 현재 에디터 코드
     problem_description: str        # 문제 지문
-    real_algorithm_category: str    # 실제 문제 알고리즘 (예: DP)
+    real_algorithm_category: str    # 실제 문제 알고리즘 태그(복수 가능, 예: DP)
 
     # 2. 힌트 에이전트 상태 관리 필드
     hint_trigger: str               # "manual" (버튼)
@@ -80,10 +80,11 @@ class FinalEvalState(TypedDict, total=False):
     final_score: Optional[float]
     final_grade: Optional[str]
     code_collab_score: Optional[float]
+    code_collab_score_30: Optional[float]
+    code_quality_score_35: Optional[float]
     code_collab_feedback: Optional[str]
     problem_eval_score: Optional[float]
     problem_eval_feedback: Optional[str]
-    final_flags: Optional[list]
     problem_evidence: Optional[Dict[str, Any]]
     code_collab_evidence: Optional[Dict[str, Any]]
     graph_output: Optional[Dict[str, Any]]

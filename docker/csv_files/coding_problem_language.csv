@@ -1,0 +1,2942 @@
+﻿"problem_id","function_name","starter_code","language"
+"1","solution","def solution(n, roads):
+    answer = 0
+    return answer","python"
+"2","solution","def solution(n, roads):
+    answer = []
+    return answer","python"
+"3","solution","def solution(heights):
+    answer = 0
+    return answer","python"
+"4","solution","def solution(n, queries):
+    answer = []
+    return answer","python"
+"6","solution","def solution(targets):
+    answer = 0
+    return answer","python"
+"7","solution","def solution(r1, r2):
+    answer = 0
+    return answer","python"
+"8","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"9","solution","def solution(sequence, k):
+    answer = []
+    return answer","python"
+"10","solution","def solution(plans):
+    answer = []
+    return answer","python"
+"11","solution","def solution(picks, minerals):
+    answer = 0
+    return answer","python"
+"12","solution","def solution(board):
+    answer = 0
+    return answer","python"
+"13","solution","def solution(temperature, t1, t2, a, b, onboard):
+    answer = 0
+    return answer","python"
+"14","solution","def solution(m, n, startX, startY, balls):
+    answer = []
+    return answer","python"
+"15","solution","def solution(sequence):
+    answer = 0
+    return answer","python"
+"16","solution","def solution(maps):
+    answer = 0
+    return answer","python"
+"17","solution","def solution(book_time):
+    answer = 0
+    return answer","python"
+"18","solution","def solution(maps):
+    answer = []
+    return answer","python"
+"19","solution","def solution(numbers):
+    answer = []
+    return answer","python"
+"20","solution","def solution(k, n, reqs):
+    answer = 0
+    return answer","python"
+"21","solution","def solution(x, y, n):
+    answer = 0
+    return answer","python"
+"22","solution","def solution(weights):
+    answer = 0
+    return answer","python"
+"23","solution","def solution(scores):
+    answer = 0
+    return answer","python"
+"24","solution","def solution(cap, n, deliveries, pickups):
+    answer = -1
+    return answer","python"
+"25","solution","def solution(users, emoticons):
+    answer = []
+    return answer","python"
+"26","solution","def solution(numbers):
+    answer = []
+    return answer","python"
+"28","solution","def solution(n, m, x, y, r, c, k):
+    answer = ''
+    return answer","python"
+"29","solution","def solution(edges, target):
+    answer = []
+    return answer","python"
+"30","solution","def solution(storey):
+    answer = 0
+    return answer","python"
+"31","solution","def solution(n, l, r):
+    answer = 0
+    return answer","python"
+"32","solution","def solution(data, col, row_begin, row_end):
+    answer = 0
+    return answer","python"
+"33","solution","def solution(n, k, enemy):
+    answer = 0
+    return answer","python"
+"34","solution","def solution(k, d):
+    answer = 0
+    return answer","python"
+"35","solution","def solution(n, count):
+    answer = 0
+    return answer","python"
+"36","solution","def solution(k, tangerine):
+    answer = 0
+    return answer","python"
+"37","solution","def solution(e, starts):
+    answer = []
+    return answer","python"
+"38","solution","def solution(numbers):
+    answer = 0
+    return answer","python"
+"39","solution","def solution(arrayA, arrayB):
+    answer = 0
+    return answer","python"
+"40","solution","def solution(k, ranges):
+    answer = []
+    return answer","python"
+"42","solution","def solution(n, roads, sources, destination):
+    answer = []
+    return answer","python"
+"43","solution","def solution(topping):
+    answer = -1
+    return answer","python"
+"44","solution","def solution(order):
+    answer = 0
+    return answer","python"
+"45","solution","def solution(beginning, target):
+    answer = 0
+    return answer","python"
+"46","solution","def solution(clockHands):
+    answer = 0
+    return answer","python"
+"47","solution","def solution(elements):
+    answer = 0
+    return answer","python"
+"48","solution","def solution(cards):
+    answer = 0
+    return answer","python"
+"49","solution","def solution(edges):
+    answer = []
+    return answer","python"
+"50","solution","def solution(target):
+    answer = []
+    return answer","python"
+"51","solution","def solution(want, number, discount):
+    answer = 0
+    return answer","python"
+"52","solution","def solution(dice):
+    answer = []
+    return answer","python"
+"53","solution","def solution(rc, operations):
+    answer = [[]]
+    return answer","python"
+"54","solution","def solution(n, paths, gates, summits):
+    answer = []
+    return answer","python"
+"55","solution","def solution(alp, cop, problems):
+    answer = 0
+    return answer","python"
+"56","solution","def solution(queue1, queue2):
+    answer = -2
+    return answer","python"
+"57","solution","def solution(board, aloc, bloc):
+    answer = -1
+    return answer","python"
+"58","solution","def solution(board, skill):
+    answer = 0
+    return answer","python"
+"59","solution","def solution(info, edges):
+    answer = 0
+    return answer","python"
+"60","solution","def solution(n, info):
+    answer = []
+    return answer","python"
+"61","solution","def solution(fees, records):
+    answer = []
+    return answer","python"
+"62","solution","def solution(n, k):
+    answer = -1
+    return answer","python"
+"63","solution","def solution(k, dungeons):
+    answer = -1
+    return answer","python"
+"65","solution","def solution(q, a):
+    answer = -1
+    return answer","python"
+"66","solution","def solution(n, m, x, y, queries):
+    answer = -1
+    return answer","python"
+"67","solution","def solution(n, left, right):
+    answer = []
+    return answer","python"
+"69","solution","def solution(n, wires):
+    answer = -1
+    return answer","python"
+"70","solution","def solution(a, s):
+    answer = []
+    return answer","python"
+"71","solution","def solution(a, b, g, s, w, t):
+    answer = -1
+    return answer","python"
+"72","solution","def solution(grid):
+    answer = []
+    return answer","python"
+"73","solution","def solution(word):
+    answer = 0
+    return answer","python"
+"74","solution","def solution(k, num, links):
+    answer = 0
+    return answer","python"
+"75","solution","def solution(n, start, end, roads, traps):
+    answer = 0
+    return answer","python"
+"77","solution","def solution(places):
+    answer = []
+    return answer","python"
+"78","solution","def solution(values, edges, queries):
+    answer = []
+    return answer","python"
+"79","solution","def solution(s):
+    answer = []
+    return answer","python"
+"80","solution","def solution(numbers):
+    answer = []
+    return answer","python"
+"83","solution","def solution(n, z, roads, queries):
+    answer = []
+    return answer","python"
+"84","solution","def solution(a, edges):
+    answer = -2
+    return answer","python"
+"85","solution","def solution(s):
+    answer = -1
+    return answer","python"
+"86","solution","def solution(sales, links):
+    answer = 0
+    return answer","python"
+"87","solution","def solution(board, r, c):
+    answer = 0
+    return answer","python"
+"88","solution","def solution(play_time, adv_time, logs):
+    answer = ''
+    return answer","python"
+"89","solution","def solution(n, s, a, b, fares):
+    answer = 0
+    return answer","python"
+"90","solution","def solution(info, query):
+    answer = []
+    return answer","python"
+"91","solution","def solution(orders, course):
+    answer = []
+    return answer","python"
+"92","solution","def solution(t):
+    answer = 0
+    return answer","python"
+"93","solution","def solution(a):
+    answer = -1
+    return answer","python"
+"94","solution","def solution(s):
+    answer = []
+    return answer","python"
+"95","solution","def solution(s):
+    answer = -1
+    return answer","python"
+"96","solution","def solution(n, edges):
+    answer = 0
+    return answer","python"
+"97","solution","def solution(arr):
+    answer = []
+    return answer","python"
+"98","solution","def solution(a):
+    answer = -1
+    return answer","python"
+"99","solution","def solution(a):
+    answer = 0
+    return answer","python"
+"101","solution","def solution(n, path, order):
+    answer = True
+    return answer","python"
+"102","solution","def solution(board):
+    answer = 0
+    return answer","python"
+"103","solution","def solution(gems):
+    answer = []
+    return answer","python"
+"104","solution","def solution(expression):
+    answer = 0
+    return answer","python"
+"105","solution","def solution(s):
+    answer = []
+    return answer","python"
+"106","solution","def solution(user_id, banned_id):
+    answer = 0
+    return answer","python"
+"107","solution","def solution(k, room_number):
+    answer = []
+    return answer","python"
+"108","solution","def solution(stones, k):
+    answer = 0
+    return answer","python"
+"109","solution","def solution(land, height):
+    answer = 0
+    return answer","python"
+"110","solution","def solution(w,h):
+    answer = 1
+    return answer","python"
+"111","solution","def solution(n, weak, dist):
+    answer = 0
+    return answer","python"
+"112","solution","def solution(n, build_frame):
+    answer = [[]]
+    return answer","python"
+"113","solution","def solution(words, queries):
+    answer = []
+    return answer","python"
+"114","solution","def solution(key, lock):
+    answer = True
+    return answer","python"
+"115","solution","def solution(p):
+    answer = ''
+    return answer","python"
+"116","solution","def solution(s):
+    answer = 0
+    return answer","python"
+"117","solution","def solution(cookie):
+    answer = -1
+    return answer","python"
+"118","solution","def solution(dirs):
+    answer = 0
+    return answer","python"
+"119","solution","def solution(skill, skill_trees):
+    answer = -1
+    return answer","python"
+"120","solution","def solution(n, results):
+    answer = 0
+    return answer","python"
+"121","solution","def solution(arrows):
+    answer = 0
+    return answer","python"
+"122","solution","def solution(n, edge):
+    answer = 0
+    return answer","python"
+"123","solution","def solution(n, times):
+    answer = 0
+    return answer","python"
+"124","solution","def solution(distance, rocks, n):
+    answer = 0
+    return answer","python"
+"125","solution","def solution(numbers, target):
+    answer = 0
+    return answer","python"
+"126","solution","def solution(tickets):
+    answer = []
+    return answer","python"
+"127","solution","def solution(begin, target, words):
+    answer = 0
+    return answer","python"
+"128","solution","def solution(n, computers):
+    answer = 0
+    return answer","python"
+"129","solution","def solution(triangle):
+    answer = 0
+    return answer","python"
+"130","solution","def solution(m, n, puddles):
+    answer = 0
+    return answer","python"
+"132","solution","def solution(N, number):
+    answer = 0
+    return answer","python"
+"134","solution","def solution(word, pages):
+    answer = 0
+    return answer","python"
+"135","solution","def solution(coin, cards):
+    answer = 0
+    return answer","python"
+"136","solution","def solution(nodeinfo):
+    answer = [[]]
+    return answer","python"
+"137","solution","def solution(food_times, k):
+    answer = 0
+    return answer","python"
+"138","solution","def solution(relation):
+    answer = 0
+    return answer","python"
+"139","solution","def solution(record):
+    answer = []
+    
+    return answer","python"
+"140","solution","def solution(people, limit):
+    answer = 0
+    return answer","python"
+"141","solution","def solution(routes):
+    answer = 0
+    return answer","python"
+"142","solution","def solution(number, k):
+    answer = ''
+    return answer","python"
+"143","solution","def solution(n, costs):
+    answer = 0
+    return answer","python"
+"144","solution","def solution(name):
+    answer = 0
+    return answer","python"
+"146","solution","def solution(numbers):
+    answer = 0
+    return answer","python"
+"147","solution","def solution(citations):
+    answer = 0
+    return answer","python"
+"148","solution","def solution(numbers):
+    answer = ''
+    return answer","python"
+"149","solution","def solution(operations):
+    answer = []
+    return answer","python"
+"150","solution","def solution(jobs):
+    answer = 0
+    return answer","python"
+"151","solution","def solution(scoville, K):
+    answer = 0
+    return answer","python"
+"152","solution","def solution(priorities, location):
+    answer = 0
+    return answer","python"
+"153","solution","def solution(progresses, speeds):
+    answer = []
+    return answer","python"
+"154","solution","def solution(prices):
+    answer = []
+    return answer","python"
+"155","solution","def solution(bridge_length, weight, truck_weights):
+    answer = 0
+    return answer","python"
+"156","solution","def solution(genres, plays):
+    answer = []
+    return answer","python"
+"157","solution","def solution(clothes):
+    answer = 0
+    return answer","python"
+"158","solution","def solution(phone_book):
+    answer = True
+    return answer","python"
+"159","solution","def solution(n, t, m, p):
+    answer = ''
+    return answer","python"
+"160","solution","def solution(files):
+    answer = []
+    return answer","python"
+"161","solution","def solution(words):
+    answer = 0
+    return answer","python"
+"162","solution","def solution(msg):
+    answer = []
+    return answer","python"
+"163","solution","def solution(m, musicinfos):
+    answer = ''
+    return answer","python"
+"164","solution","def solution(cacheSize, cities):
+    answer = 0
+    return answer","python"
+"165","solution","def solution(m, n, board):
+    answer = 0
+    return answer","python"
+"166","solution","def solution(n, t, m, timetable):
+    answer = ''
+    return answer","python"
+"167","solution","def solution(str1, str2):
+    answer = 0
+    return answer","python"
+"168","solution","def solution(lines):
+    answer = 0
+    return answer","python"
+"169","solution","def solution(A, B):
+    answer = -1
+    return answer","python"
+"170","solution","def solution(n,a,b):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"172","solution","def solution(strs, t):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"173","solution","def solution(n, words):
+    answer = []
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"174","solution","def solution(n):
+    ans = 0
+    
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return ans","python"
+"175","solution","def solution(n, stations, w):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"176","solution","def solution(N, road, K):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"177","solution","def solution(s):
+    answer = -1
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"178","solution","def solution(sticker):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"179","solution","def solution(arr):
+    answer = 0
+    return answer","python"
+"180","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"181","solution","def solution(s):
+    answer = ''
+    return answer","python"
+"182","solution","def solution(arr1, arr2):
+    answer = [[]]
+    return answer","python"
+"183","solution","def solution(n):
+    answer = [[]]
+    return answer","python"
+"184","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"185","solution","def solution(matrix_sizes):
+    answer = 0
+    return answer","python"
+"186","solution","def solution(A,B):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"187","solution","def solution(s):
+    answer = ''
+    return answer","python"
+"188","solution","def solution(n, s):
+    answer = []
+    return answer","python"
+"189","solution","def solution(n, k):
+    answer = []
+    return answer","python"
+"190","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"191","solution","def solution(n, works):
+    answer = 0
+    return answer","python"
+"192","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"193","solution","def solution(begin, end):
+    answer = []
+    return answer","python"
+"194","solution","def solution(n, cores):
+    answer = 0
+    return answer","python"
+"195","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"196","solution","def solution(land):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"197","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"198","solution","def solution(s):
+    answer = True
+    
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return True","python"
+"199","solution","def solution(n, money):
+    answer = 0
+    return answer","python"
+"200","solution","def solution(n, tops):
+    answer = 0
+    return answer","python"
+"201","solution","def solution(board):
+    answer = 1234
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"202","solution","def solution(s):
+    answer = 0
+
+    # [실행] 버튼을 누르면 출력 값을 볼 수 있습니다.
+    print('Hello Python')
+
+    return answer","python"
+"203","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"204","solution","def solution(n):
+    answer = 0
+    return answer","python"
+"205","solution","def solution(n):
+    answer = ''
+    return answer","python"
+"206","solution","def solution(maps):
+    answer = 0
+    return answer","python"
+"207","solution","def solution(arr):
+    answer = -1
+    return answer","python"
+"208","solution","def solution(land):
+    answer = 0
+    return answer","python"
+"209","solution","def solution(h1, m1, s1, h2, m2, s2):
+    answer = -1
+    return answer","python"
+"210","solution","def solution(n, m, tests):
+    answer = 0
+    return answer","python"
+"511","solution","def solution(x):
+    # x: List[float]
+    # return: List[float] rounded to 6 decimals
+    answer = []
+    return answer","python"
+"512","solution","def solution(x):
+    answer = []
+    return answer","python"
+"513","solution","def solution(y_true, y_pred):
+    # return 2D list confusion matrix
+    answer = []
+    return answer","python"
+"514","solution","def solution(y_true, topk_pred):
+    # y_true: List[int], topk_pred: List[List[int]]
+    answer = 0.0
+    return round(answer, 6)","python"
+"515","solution","def solution(q, docs):
+    # return index of best doc by cosine similarity
+    answer = 0
+    return answer","python"
+"516","solution","def solution(logits):
+    answer = 0.0
+    return round(answer, 6)","python"
+"517","solution","def solution(logits):
+    probs = []
+    return probs","python"
+"518","solution","def solution(probs, y):
+    loss = 0.0
+    return round(loss, 6)","python"
+"519","solution","def solution(y_true, y_pred):
+    precision = recall = f1 = 0.0
+    return [round(precision, 6), round(recall, 6), round(f1, 6)]","python"
+"520","solution","def solution(y_true, y_score):
+    auc = 0.0
+    return round(auc, 6)","python"
+"521","solution","def solution(y, test_ratio):
+    train_idx, test_idx = [], []
+    return [train_idx, test_idx]","python"
+"522","solution","def solution(sentences):
+    vocab = []
+    vectors = []
+    return [vocab, vectors]","python"
+"523","solution","def solution(sentences):
+    vocab = []
+    tfidf_vectors = []
+    return [vocab, tfidf_vectors]","python"
+"524","solution","def solution(points, centroids):
+    # points: List[List[float]], centroids: List[List[float]]
+    counts = [0] * len(centroids)
+    return counts","python"
+"525","solution","def solution(points, assignments, k):
+    centroids = [[0.0, 0.0] for _ in range(k)]
+    return centroids","python"
+"526","solution","def solution(X, y, w, lr):
+    new_w = []
+    return new_w","python"
+"527","solution","def solution(seqs, pad):
+    ans = []
+    return ans","python"
+"528","solution","def solution(s, n):
+    answer = []
+    return answer","python"
+"529","solution","def solution(y_true, y_prob, B):
+    ece = 0.0
+    return round(ece, 6)","python"
+"530","solution","def solution(val_losses, patience):
+    stop_epoch = -1
+    return stop_epoch","python"
+"700","min_cost","def min_cost(cost, m, n):
+    pass","python"
+"701","similar_elements","def similar_elements(test_tup1, test_tup2):
+    pass","python"
+"702","is_not_prime","def is_not_prime(n):
+    pass","python"
+"703","heap_queue_largest","def heap_queue_largest(nums,n):
+    pass","python"
+"704","count_ways","def count_ways(n):
+    pass","python"
+"705","is_Power_Of_Two","def is_Power_Of_Two(x):
+    pass","python"
+"706","find_char_long","def find_char_long(text):
+    pass","python"
+"707","square_nums","def square_nums(nums):
+    pass","python"
+"708","find_Rotations","def find_Rotations(str):
+    pass","python"
+"709","small_nnum","def small_nnum(list1,n):
+    pass","python"
+"710","remove_Occ","def remove_Occ(s,ch):
+    pass","python"
+"711","sort_matrix","def sort_matrix(M):
+    pass","python"
+"712","count_common","def count_common(words):
+    pass","python"
+"713","find_Volume","def find_Volume(l,b,h):
+    pass","python"
+"714","split_lowerstring","def split_lowerstring(text):
+    pass","python"
+"715","text_lowercase_underscore","def text_lowercase_underscore(text):
+    pass","python"
+"716","square_perimeter","def square_perimeter(a):
+    pass","python"
+"717","str_to_list","def str_to_list(string):
+    pass","python"
+"718","test_duplicate","def test_duplicate(arraynums):
+    pass","python"
+"719","is_woodall","def is_woodall(x):
+    pass","python"
+"720","multiples_of_num","def multiples_of_num(m,n):
+    pass","python"
+"721","find_first_duplicate","def find_first_duplicate(nums):
+    pass","python"
+"722","maximum_Sum","def maximum_Sum(list1):
+    pass","python"
+"723","binary_to_decimal","def binary_to_decimal(binary):
+    pass","python"
+"724","find_Product","def find_Product(arr,n):
+    pass","python"
+"725","check_k_elements","def check_k_elements(test_list, K):
+    pass","python"
+"726","remove","def remove(list):
+    pass","python"
+"727","binomial_Coeff","def binomial_Coeff(n,k):
+    pass","python"
+"728","get_Odd_Occurrence","def get_Odd_Occurrence(arr,arr_size):
+    pass","python"
+"729","check_Equality","def check_Equality(s):
+    pass","python"
+"730","func","def func(nums, k):
+    pass","python"
+"731","max_Prime_Factors","def max_Prime_Factors(n):
+    pass","python"
+"732","decimal_To_Binary","def decimal_To_Binary(N):
+    pass","python"
+"733","find_missing","def find_missing(ar,N):
+    pass","python"
+"734","find_rect_num","def find_rect_num(n):
+    pass","python"
+"735","find_Nth_Digit","def find_Nth_Digit(p,q,N):
+    pass","python"
+"736","sort_mixed_list","def sort_mixed_list(mixed_list):
+    pass","python"
+"737","div_even_odd","def div_even_odd(list1):
+    pass","python"
+"738","rearange_string","def rearange_string(S):
+    pass","python"
+"739","freq_element","def freq_element(nums):
+    pass","python"
+"740","filter_evennumbers","def filter_evennumbers(nums):
+    pass","python"
+"741","find_Sum","def find_Sum(arr,n):
+    pass","python"
+"742","text_match","def text_match(text):
+    pass","python"
+"743","text_match_string","def text_match_string(text):
+    pass","python"
+"744","find_gcd","def find_gcd(x, y):
+    pass","python"
+"745","test_distinct","def test_distinct(data):
+    pass","python"
+"746","compute_Last_Digit","def compute_Last_Digit(A,B):
+    pass","python"
+"747","odd_bit_set_number","def odd_bit_set_number(n):
+    pass","python"
+"748","specified_element","def specified_element(nums, N):
+    pass","python"
+"749","min_length_list","def min_length_list(input_list):
+    pass","python"
+"750","check_equilateral","def check_equilateral(x,y,z):
+    pass","python"
+"751","parallelogram_area","def parallelogram_area(b,h):
+    pass","python"
+"752","check_Equality","def check_Equality(str):
+    pass","python"
+"753","counting_sort","def counting_sort(my_list):
+    pass","python"
+"754","tn_gp","def tn_gp(a,n,r):
+    pass","python"
+"755","rev","def rev(num):
+    pass","python"
+"756","find_Max_Num","def find_Max_Num(arr,n):
+    pass","python"
+"757","opposite_Signs","def opposite_Signs(x,y):
+    pass","python"
+"758","is_octagonal","def is_octagonal(n):
+    pass","python"
+"759","max_len_sub","def max_len_sub(arr, n):
+    pass","python"
+"760","count_Substrings","def count_Substrings(s,n):
+    pass","python"
+"761","smallest_num","def smallest_num(xs):
+    pass","python"
+"762","max_difference","def max_difference(test_list):
+    pass","python"
+"763","subject_marks","def subject_marks(subjectmarks):
+    pass","python"
+"764","recursive_list_sum","def recursive_list_sum(data_list):
+    pass","python"
+"765","pos_count","def pos_count(list):
+    pass","python"
+"766","bell_number","def bell_number(n):
+    pass","python"
+"767","is_Monotonic","def is_Monotonic(A):
+    pass","python"
+"768","is_sublist","def is_sublist(l, s):
+    pass","python"
+"769","find_equal_tuple","def find_equal_tuple(Input, k):
+    pass","python"
+"770","comb_sort","def comb_sort(nums):
+    pass","python"
+"771","dif_Square","def dif_Square(n):
+    pass","python"
+"772","multiple_split","def multiple_split(text):
+    pass","python"
+"773","is_samepatterns","def is_samepatterns(colors, patterns):
+    pass","python"
+"774","find_tuples","def find_tuples(test_list, K):
+    pass","python"
+"775","count_Squares","def count_Squares(m,n):
+    pass","python"
+"776","is_Diff","def is_Diff(n):
+    pass","python"
+"777","count_With_Odd_SetBits","def count_With_Odd_SetBits(n):
+    pass","python"
+"778","word_len","def word_len(s):
+    pass","python"
+"779","tetrahedral_number","def tetrahedral_number(n):
+    pass","python"
+"780","zip_tuples","def zip_tuples(test_tup1, test_tup2):
+    pass","python"
+"781","volume_sphere","def volume_sphere(r):
+    pass","python"
+"782","get_Char","def get_Char(strr):
+    pass","python"
+"783","sequence","def sequence(n):
+    pass","python"
+"784","surfacearea_sphere","def surfacearea_sphere(r):
+    pass","python"
+"785","centered_hexagonal_number","def centered_hexagonal_number(n):
+    pass","python"
+"786","merge_dictionaries_three","def merge_dictionaries_three(dict1,dict2, dict3):
+    pass","python"
+"787","freq_count","def freq_count(list1):
+    pass","python"
+"788","closest_num","def closest_num(N):
+    pass","python"
+"789","len_log","def len_log(list1):
+    pass","python"
+"790","find_substring","def find_substring(str1, sub_str):
+    pass","python"
+"791","is_undulating","def is_undulating(n):
+    pass","python"
+"792","power","def power(a,b):
+    pass","python"
+"793","index_minimum","def index_minimum(test_list):
+    pass","python"
+"794","Find_Min_Length","def Find_Min_Length(lst):
+    pass","python"
+"795","divisor","def divisor(n):
+    pass","python"
+"796","frequency_lists","def frequency_lists(list1):
+    pass","python"
+"797","multiply_num","def multiply_num(numbers):
+    pass","python"
+"798","decimal_to_binary","def decimal_to_binary(n):
+    pass","python"
+"799","next_smallest_palindrome","def next_smallest_palindrome(num):
+    pass","python"
+"800","kth_element","def kth_element(arr, n, k):
+    pass","python"
+"801","snake_to_camel","def snake_to_camel(word):
+    pass","python"
+"802","eulerian_num","def eulerian_num(n, m):
+    pass","python"
+"803","sort_sublists","def sort_sublists(input_list):
+    pass","python"
+"804","count","def count(lst):
+    pass","python"
+"805","add_lists","def add_lists(test_list, test_tup):
+    pass","python"
+"806","count_Hexadecimal","def count_Hexadecimal(L,R):
+    pass","python"
+"807","merge_sorted_list","def merge_sorted_list(num1,num2,num3):
+    pass","python"
+"808","odd_Equivalent","def odd_Equivalent(s,n):
+    pass","python"
+"809","extract_missing","def extract_missing(test_list, strt_val, stop_val):
+    pass","python"
+"810","common_in_nested_lists","def common_in_nested_lists(nestedlist):
+    pass","python"
+"811","perimeter","def perimeter(diameter,height):
+    pass","python"
+"812","check_integer","def check_integer(text):
+    pass","python"
+"813","assign_freq","def assign_freq(test_list):
+    pass","python"
+"814","empty_dit","def empty_dit(list1):
+    pass","python"
+"815","tuple_to_int","def tuple_to_int(nums):
+    pass","python"
+"816","list_to_float","def list_to_float(test_list):
+    pass","python"
+"817","string_to_list","def string_to_list(string):
+    pass","python"
+"818","search","def search(arr,n):
+    pass","python"
+"819","max_product_tuple","def max_product_tuple(list1):
+    pass","python"
+"820","check_triplet","def check_triplet(A, n, sum, count):
+    pass","python"
+"821","smartNumber","def smartNumber(n):
+    pass","python"
+"822","amicable_numbers_sum","def amicable_numbers_sum(limit):
+    pass","python"
+"823","angle_complex","def angle_complex(a,b):
+    pass","python"
+"824","find_length","def find_length(string, n):
+    pass","python"
+"825","sum","def sum(a,b):
+    pass","python"
+"826","multiply_int","def multiply_int(x, y):
+    pass","python"
+"827","long_words","def long_words(n, str):
+    pass","python"
+"828","magic_square_test","def magic_square_test(my_matrix):
+    pass","python"
+"829","max_occurrences","def max_occurrences(nums):
+    pass","python"
+"830","reverse_vowels","def reverse_vowels(str1):
+    pass","python"
+"831","tup_string","def tup_string(tup1):
+    pass","python"
+"832","sum_negativenum","def sum_negativenum(nums):
+    pass","python"
+"833","check_last","def check_last(arr,n,p):
+    pass","python"
+"834","hexagonal_num","def hexagonal_num(n):
+    pass","python"
+"835","cal_electbill","def cal_electbill(units):
+    pass","python"
+"836","zero_count","def zero_count(nums):
+    pass","python"
+"837","is_Sum_Of_Powers_Of_Two","def is_Sum_Of_Powers_Of_Two(n):
+    pass","python"
+"838","circle_circumference","def circle_circumference(r):
+    pass","python"
+"839","extract_singly","def extract_singly(test_list):
+    pass","python"
+"840","pancake_sort","def pancake_sort(nums):
+    pass","python"
+"841","count_samepair","def count_samepair(list1,list2,list3):
+    pass","python"
+"842","find_lists","def find_lists(Input):
+    pass","python"
+"843","sum_Pairs","def sum_Pairs(arr,n):
+    pass","python"
+"844","max_Abs_Diff","def max_Abs_Diff(arr,n):
+    pass","python"
+"845","ascii_value_string","def ascii_value_string(str1):
+    pass","python"
+"846","max_path_sum","def max_path_sum(tri, m, n):
+    pass","python"
+"847","sum_digits_single","def sum_digits_single(x):
+    pass","python"
+"848","longest_subseq_with_diff_one","def longest_subseq_with_diff_one(arr, n):
+    pass","python"
+"849","does_Contain_B","def does_Contain_B(a,b,c):
+    pass","python"
+"850","gcd","def gcd(p,q):
+    pass","python"
+"851","merge","def merge(a,b):
+    pass","python"
+"852","parabola_vertex","def parabola_vertex(a, b, c):
+    pass","python"
+"853","specified_element","def specified_element(nums, N):
+    pass","python"
+"854","even_bit_toggle_number","def even_bit_toggle_number(n):
+    pass","python"
+"855","tuple_int_str","def tuple_int_str(tuple_str):
+    pass","python"
+"856","encode_list","def encode_list(list1):
+    pass","python"
+"857","min_Ops","def min_Ops(arr,n,k):
+    pass","python"
+"858","month_season","def month_season(month,days):
+    pass","python"
+"859","solution","def solution(a, b, n):
+    pass","python"
+"860","remove_elements","def remove_elements(list1, list2):
+    pass","python"
+"861","sum_series","def sum_series(n):
+    pass","python"
+"862","area_polygon","def area_polygon(s,l):
+    pass","python"
+"863","divSum","def divSum(n):
+    pass","python"
+"864","count_char_position","def count_char_position(str1):
+    pass","python"
+"865","find_even_Pair","def find_even_Pair(A,N):
+    pass","python"
+"866","next_Power_Of_2","def next_Power_Of_2(n):
+    pass","python"
+"867","frequency","def frequency(a,x):
+    pass","python"
+"868","get_pell","def get_pell(n):
+    pass","python"
+"869","sum_range_list","def sum_range_list(list1, m, n):
+    pass","python"
+"870","perimeter_pentagon","def perimeter_pentagon(a):
+    pass","python"
+"871","count_occurance","def count_occurance(s):
+    pass","python"
+"872","remove_splchar","def remove_splchar(text):
+    pass","python"
+"873","group_keyvalue","def group_keyvalue(l):
+    pass","python"
+"874","is_valid_parenthese","def is_valid_parenthese(str1):
+    pass","python"
+"875","perimeter_triangle","def perimeter_triangle(a,b,c):
+    pass","python"
+"876","answer","def answer(L,R):
+    pass","python"
+"877","string_literals","def string_literals(patterns,text):
+    pass","python"
+"878","is_num_keith","def is_num_keith(x):
+    pass","python"
+"879","distance_lat_long","def distance_lat_long(slat,slon,elat,elon):
+    pass","python"
+"880","common_prefix_util","def common_prefix_util(str1, str2):
+    pass","python"
+"881","find_character","def find_character(string):
+    pass","python"
+"882","count_pairs","def count_pairs(arr, n, k):
+    pass","python"
+"883","greater_specificnum","def greater_specificnum(list,num):
+    pass","python"
+"884","parabola_focus","def parabola_focus(a, b, c):
+    pass","python"
+"885","check_literals","def check_literals(text, patterns):
+    pass","python"
+"886","longest_common_subsequence","def longest_common_subsequence(X, Y, m, n):
+    pass","python"
+"887","prod_Square","def prod_Square(n):
+    pass","python"
+"888","first_Missing_Positive","def first_Missing_Positive(arr,n):
+    pass","python"
+"889","count_Intgral_Points","def count_Intgral_Points(x1,y1,x2,y2):
+    pass","python"
+"890","check_monthnumber","def check_monthnumber(monthname3):
+    pass","python"
+"891","check_String","def check_String(str):
+    pass","python"
+"892","remove_tuple","def remove_tuple(test_tup):
+    pass","python"
+"893","octal_To_Decimal","def octal_To_Decimal(n):
+    pass","python"
+"894","first","def first(arr,x,n):
+    pass","python"
+"895","remove_tuples","def remove_tuples(test_list, K):
+    pass","python"
+"896","find_exponentio","def find_exponentio(test_tup1, test_tup2):
+    pass","python"
+"897","largest_triangle","def largest_triangle(a,b):
+    pass","python"
+"898","highest_Power_of_2","def highest_Power_of_2(n):
+    pass","python"
+"899","position_max","def position_max(list1):
+    pass","python"
+"900","chkList","def chkList(lst):
+    pass","python"
+"901","remove_even","def remove_even(str1):
+    pass","python"
+"902","hamming_Distance","def hamming_Distance(n1,n2):
+    pass","python"
+"903","count","def count(s,c):
+    pass","python"
+"904","inversion_elements","def inversion_elements(test_tup):
+    pass","python"
+"905","concatenate_elements","def concatenate_elements(test_tup):
+    pass","python"
+"906","find_longest_repeating_subseq","def find_longest_repeating_subseq(str):
+    pass","python"
+"907","is_decimal","def is_decimal(num):
+    pass","python"
+"908","heap_replace","def heap_replace(heap,a):
+    pass","python"
+"909","is_allowed_specific_char","def is_allowed_specific_char(string):
+    pass","python"
+"910","count_Num","def count_Num(n):
+    pass","python"
+"911","fourth_Power_Sum","def fourth_Power_Sum(n):
+    pass","python"
+"912","concatenate_strings","def concatenate_strings(test_tup1, test_tup2):
+    pass","python"
+"913","degree_radian","def degree_radian(radian):
+    pass","python"
+"914","decode_list","def decode_list(alist):
+    pass","python"
+"915","check_subset_list","def check_subset_list(list1, list2):
+    pass","python"
+"916","first_Repeated_Char","def first_Repeated_Char(str):
+    pass","python"
+"917","min_Operations","def min_Operations(A,B):
+    pass","python"
+"918","extract_min_max","def extract_min_max(test_tup, K):
+    pass","python"
+"919","replace_max_specialchar","def replace_max_specialchar(text,n):
+    pass","python"
+"920","first_even","def first_even(nums):
+    pass","python"
+"921","check_type","def check_type(test_tuple):
+    pass","python"
+"922","is_majority","def is_majority(arr, n, x):
+    pass","python"
+"923","count_Set_Bits","def count_Set_Bits(n):
+    pass","python"
+"924","find_Min","def find_Min(arr,low,high):
+    pass","python"
+"925","odd_values_string","def odd_values_string(str):
+    pass","python"
+"926","min_of_three","def min_of_three(a,b,c):
+    pass","python"
+"927","all_Bits_Set_In_The_Given_Range","def all_Bits_Set_In_The_Given_Range(n,l,r):
+    pass","python"
+"928","re_arrange_array","def re_arrange_array(arr, n):
+    pass","python"
+"929","replace_blank","def replace_blank(str1,char):
+    pass","python"
+"930","max_sum","def max_sum(tri, n):
+    pass","python"
+"931","larg_nnum","def larg_nnum(list1,n):
+    pass","python"
+"932","lateralsuface_cylinder","def lateralsuface_cylinder(r,h):
+    pass","python"
+"933","volume_cube","def volume_cube(l):
+    pass","python"
+"934","even_bit_set_number","def even_bit_set_number(n):
+    pass","python"
+"935","No_of_Triangle","def No_of_Triangle(N,K):
+    pass","python"
+"936","check_occurences","def check_occurences(test_list):
+    pass","python"
+"937","number_of_substrings","def number_of_substrings(str):
+    pass","python"
+"938","get_total_number_of_sequences","def get_total_number_of_sequences(m,n):
+    pass","python"
+"939","replace_list","def replace_list(list1,list2):
+    pass","python"
+"940","array_3d","def array_3d(m,n,o):
+    pass","python"
+"941","count_charac","def count_charac(str1):
+    pass","python"
+"942","sort_on_occurence","def sort_on_occurence(lst):
+    pass","python"
+"943","next_Perfect_Square","def next_Perfect_Square(N):
+    pass","python"
+"944","max_sum","def max_sum(arr, n):
+    pass","python"
+"945","babylonian_squareroot","def babylonian_squareroot(number):
+    pass","python"
+"946","lps","def lps(str):
+    pass","python"
+"947","harmonic_sum","def harmonic_sum(n):
+    pass","python"
+"948","intersection_array","def intersection_array(array_nums1,array_nums2):
+    pass","python"
+"949","count_X","def count_X(tup, x):
+    pass","python"
+"950","insert_element","def insert_element(list,element):
+    pass","python"
+"951","convert","def convert(numbers):
+    pass","python"
+"952","count_integer","def count_integer(list1):
+    pass","python"
+"953","words_ae","def words_ae(text):
+    pass","python"
+"954","combinations_colors","def combinations_colors(l, n):
+    pass","python"
+"955","count_Primes_nums","def count_Primes_nums(n):
+    pass","python"
+"956","swap_numbers","def swap_numbers(a,b):
+    pass","python"
+"957","count_odd","def count_odd(array_nums):
+    pass","python"
+"958","maximize_elements","def maximize_elements(test_tup1, test_tup2):
+    pass","python"
+"959","newman_prime","def newman_prime(n):
+    pass","python"
+"960","division_elements","def division_elements(test_tup1, test_tup2):
+    pass","python"
+"961","split_two_parts","def split_two_parts(list1, L):
+    pass","python"
+"962","merge_dict","def merge_dict(d1,d2):
+    pass","python"
+"963","dog_age","def dog_age(h_age):
+    pass","python"
+"964","list_split","def list_split(S, step):
+    pass","python"
+"965","lateralsurface_cube","def lateralsurface_cube(l):
+    pass","python"
+"966","square_Sum","def square_Sum(n):
+    pass","python"
+"967","find_star_num","def find_star_num(n):
+    pass","python"
+"968","ascii_value","def ascii_value(k):
+    pass","python"
+"969","sum_even_and_even_index","def sum_even_and_even_index(arr,n):
+    pass","python"
+"970","even_Power_Sum","def even_Power_Sum(n):
+    pass","python"
+"971","rear_extract","def rear_extract(test_list):
+    pass","python"
+"972","substract_elements","def substract_elements(test_tup1, test_tup2):
+    pass","python"
+"973","even_binomial_Coeff_Sum","def even_binomial_Coeff_Sum(n):
+    pass","python"
+"974","get_Position","def get_Position(a,n,m):
+    pass","python"
+"975","volume_cylinder","def volume_cylinder(r,h):
+    pass","python"
+"976","dict_filter","def dict_filter(dict,n):
+    pass","python"
+"977","count_first_elements","def count_first_elements(test_tup):
+    pass","python"
+"978","is_num_decagonal","def is_num_decagonal(n):
+    pass","python"
+"979","sequential_search","def sequential_search(dlist, item):
+    pass","python"
+"980","all_unique","def all_unique(test_list):
+    pass","python"
+"981","sub_list","def sub_list(nums1,nums2):
+    pass","python"
+"982","validate","def validate(n):
+    pass","python"
+"983","check_element","def check_element(list,element):
+    pass","python"
+"984","text_match_two_three","def text_match_two_three(text):
+    pass","python"
+"985","max_sub_array_sum_repeated","def max_sub_array_sum_repeated(a, n, k):
+    pass","python"
+"986","square_Sum","def square_Sum(n):
+    pass","python"
+"987","modular_inverse","def modular_inverse(arr, N, P):
+    pass","python"
+"988","odd_Days","def odd_Days(N):
+    pass","python"
+"989","max_length","def max_length(list1):
+    pass","python"
+"990","count_no_of_ways","def count_no_of_ways(n, k):
+    pass","python"
+"991","find","def find(n,m):
+    pass","python"
+"992","otherside_rightangle","def otherside_rightangle(w,h):
+    pass","python"
+"993","max_val","def max_val(listval):
+    pass","python"
+"994","sum_div","def sum_div(number):
+    pass","python"
+"995","get_Inv_Count","def get_Inv_Count(arr,n):
+    pass","python"
+"996","flatten_list","def flatten_list(list1):
+    pass","python"
+"997","intersection_nested_lists","def intersection_nested_lists(l1, l2):
+    pass","python"
+"998","max_aggregate","def max_aggregate(stdata):
+    pass","python"
+"999","count_binary_seq","def count_binary_seq(n):
+    pass","python"
+"1000","dict_depth","def dict_depth(d):
+    pass","python"
+"1001","set_Bit_Number","def set_Bit_Number(n):
+    pass","python"
+"1002","solve","def solve(a,n):
+    pass","python"
+"1003","find_Element","def find_Element(arr,ranges,rotations,index):
+    pass","python"
+"1004","start_withp","def start_withp(words):
+    pass","python"
+"1005","max_sum_increasing_subseq","def max_sum_increasing_subseq(a, n, index, k):
+    pass","python"
+"1006","colon_tuplex","def colon_tuplex(tuplex,m,n):
+    pass","python"
+"1007","large_product","def large_product(nums1, nums2, N):
+    pass","python"
+"1008","maximum","def maximum(a,b):
+    pass","python"
+"1009","string_to_tuple","def string_to_tuple(str1):
+    pass","python"
+"1010","set_left_most_unset_bit","def set_left_most_unset_bit(n):
+    pass","python"
+"1011","volume_cone","def volume_cone(r,h):
+    pass","python"
+"1012","pos_nos","def pos_nos(list1):
+    pass","python"
+"1013","max_sum_rectangular_grid","def max_sum_rectangular_grid(grid, n):
+    pass","python"
+"1014","find_Max_Len_Even","def find_Max_Len_Even(str):
+    pass","python"
+"1015","find_last_occurrence","def find_last_occurrence(A, x):
+    pass","python"
+"1016","modified_encode","def modified_encode(alist):
+    pass","python"
+"1017","max_volume","def max_volume(s):
+    pass","python"
+"1018","find_long_word","def find_long_word(text):
+    pass","python"
+"1019","sum_difference","def sum_difference(n):
+    pass","python"
+"1020","find_demlo","def find_demlo(s):
+    pass","python"
+"1021","position_min","def position_min(list1):
+    pass","python"
+"1022","right_rotate","def right_rotate(arr, n, out_of_place, cur):
+    pass","python"
+"1023","sum_of_alternates","def sum_of_alternates(test_tuple):
+    pass","python"
+"1024","get_Min_Squares","def get_Min_Squares(n):
+    pass","python"
+"1025","most_occurrences","def most_occurrences(test_list):
+    pass","python"
+"1026","check_isosceles","def check_isosceles(x,y,z):
+    pass","python"
+"1027","rotate_left","def rotate_left(list1,m,n):
+    pass","python"
+"1028","neg_count","def neg_count(list):
+    pass","python"
+"1029","find_char","def find_char(text):
+    pass","python"
+"1030","count_unset_bits","def count_unset_bits(n):
+    pass","python"
+"1031","char_frequency","def char_frequency(str1):
+    pass","python"
+"1032","Sort","def Sort(sub_li):
+    pass","python"
+"1033","check_Validity","def check_Validity(a,b,c):
+    pass","python"
+"1034","ap_sum","def ap_sum(a,n,d):
+    pass","python"
+"1035","check_monthnum","def check_monthnum(monthname1):
+    pass","python"
+"1036","text_match_word","def text_match_word(text):
+    pass","python"
+"1037","check_Equality","def check_Equality(s):
+    pass","python"
+"1038","find_Divisor","def find_Divisor(x,y):
+    pass","python"
+"1039","sum_three_smallest_nums","def sum_three_smallest_nums(lst):
+    pass","python"
+"1040","set_to_tuple","def set_to_tuple(s):
+    pass","python"
+"1041","__init__","def __init__(self, value, list_num, index):
+    pass","python"
+"1042","dig_let","def dig_let(s):
+    pass","python"
+"1043","count_Odd_Squares","def count_Odd_Squares(n,m):
+    pass","python"
+"1044","diff_consecutivenums","def diff_consecutivenums(nums):
+    pass","python"
+"1045","zigzag","def zigzag(n, k):
+    pass","python"
+"1046","count_Squares","def count_Squares(m,n):
+    pass","python"
+"1047","bin_coff","def bin_coff(n, r):
+    pass","python"
+"1048","check","def check(string):
+    pass","python"
+"1049","minimum_Length","def minimum_Length(s):
+    pass","python"
+"1050","first_Element","def first_Element(arr,n,k):
+    pass","python"
+"1051","unique_Characters","def unique_Characters(str):
+    pass","python"
+"1052","remove_column","def remove_column(list1, n):
+    pass","python"
+"1053","tn_ap","def tn_ap(a,n,d):
+    pass","python"
+"1054","count_Rectangles","def count_Rectangles(radius):
+    pass","python"
+"1055","find_angle","def find_angle(a,b):
+    pass","python"
+"1056","find_max","def find_max(test_list):
+    pass","python"
+"1057","moddiv_list","def moddiv_list(nums1,nums2):
+    pass","python"
+"1058","Check_Solution","def Check_Solution(a,b,c):
+    pass","python"
+"1059","get_carol","def get_carol(n):
+    pass","python"
+"1060","remove_empty","def remove_empty(list1):
+    pass","python"
+"1061","max_occurrences","def max_occurrences(nums):
+    pass","python"
+"1062","add_K_element","def add_K_element(test_list, K):
+    pass","python"
+"1063","make_flip","def make_flip(ch):
+    pass","python"
+"1064","count_Digit","def count_Digit(n):
+    pass","python"
+"1065","adjacent_num_product","def adjacent_num_product(list_nums):
+    pass","python"
+"1066","__init__","def __init__(self, data):
+    pass","python"
+"1067","repeat_tuples","def repeat_tuples(test_tup, N):
+    pass","python"
+"1068","lateralsurface_cuboid","def lateralsurface_cuboid(l,w,h):
+    pass","python"
+"1069","float_sort","def float_sort(price):
+    pass","python"
+"1070","smallest_missing","def smallest_missing(A, left_element, right_element):
+    pass","python"
+"1071","heap_assending","def heap_assending(nums):
+    pass","python"
+"1072","volume_cuboid","def volume_cuboid(l,w,h):
+    pass","python"
+"1073","permute_string","def permute_string(str):
+    pass","python"
+"1074","round_num","def round_num(n,m):
+    pass","python"
+"1075","remove_replica","def remove_replica(test_tup):
+    pass","python"
+"1076","remove_Char","def remove_Char(s,c):
+    pass","python"
+"1077","move_first","def move_first(test_list):
+    pass","python"
+"1078","surfacearea_cuboid","def surfacearea_cuboid(l,w,h):
+    pass","python"
+"1079","multi_list","def multi_list(rownum,colnum):
+    pass","python"
+"1080","index_on_inner_list","def index_on_inner_list(list_data, index_no):
+    pass","python"
+"1081","find_rotation_count","def find_rotation_count(A):
+    pass","python"
+"1082","even_bit_toggle_number","def even_bit_toggle_number(n):
+    pass","python"
+"1083","frequency_Of_Smallest","def frequency_Of_Smallest(n,arr):
+    pass","python"
+"1084","get_perrin","def get_perrin(n):
+    pass","python"
+"1085","swap_count","def swap_count(s):
+    pass","python"
+"1086","even_or_odd","def even_or_odd(N):
+    pass","python"
+"1087","highest_Power_of_2","def highest_Power_of_2(n):
+    pass","python"
+"1088","find_lucas","def find_lucas(n):
+    pass","python"
+"1089","add_string","def add_string(list,string):
+    pass","python"
+"1090","convert_list_dictionary","def convert_list_dictionary(l1, l2, l3):
+    pass","python"
+"1091","get_max_sum","def get_max_sum(n):
+    pass","python"
+"1092","max_length_list","def max_length_list(input_list):
+    pass","python"
+"1093","check_distinct","def check_distinct(test_tup):
+    pass","python"
+"1094","first_non_repeating_character","def first_non_repeating_character(str1):
+    pass","python"
+"1095","check_char","def check_char(string):
+    pass","python"
+"1096","median_numbers","def median_numbers(a,b,c):
+    pass","python"
+"1097","sum_of_digits","def sum_of_digits(nums):
+    pass","python"
+"1098","bitwise_xor","def bitwise_xor(test_tup1, test_tup2):
+    pass","python"
+"1099","extract_freq","def extract_freq(test_list):
+    pass","python"
+"1100","add_nested_tuples","def add_nested_tuples(test_tup1, test_tup2):
+    pass","python"
+"1101","ncr_modp","def ncr_modp(n, r, p):
+    pass","python"
+"1102","is_valid_URL","def is_valid_URL(str):
+    pass","python"
+"1103","minimum","def minimum(a,b):
+    pass","python"
+"1104","check_tuplex","def check_tuplex(tuplex,tuple1):
+    pass","python"
+"1105","find_Parity","def find_Parity(x):
+    pass","python"
+"1106","rearrange_bigger","def rearrange_bigger(n):
+    pass","python"
+"1107","k_smallest_pairs","def k_smallest_pairs(nums1, nums2, k):
+    pass","python"
+"1108","min_product_tuple","def min_product_tuple(list1):
+    pass","python"
+"1109","min_val","def min_val(listval):
+    pass","python"
+"1110","snake_to_camel","def snake_to_camel(word):
+    pass","python"
+"1111","remove_odd","def remove_odd(l):
+    pass","python"
+"1112","extract_nth_element","def extract_nth_element(list1, n):
+    pass","python"
+"1113","overlapping","def overlapping(list1,list2):
+    pass","python"
+"1114","max_Product","def max_Product(arr):
+    pass","python"
+"1115","breakSum","def breakSum(n):
+    pass","python"
+"1116","group_tuples","def group_tuples(Input):
+    pass","python"
+"1117","Find_Max","def Find_Max(lst):
+    pass","python"
+"1118","round_and_sum","def round_and_sum(list1):
+    pass","python"
+"1119","cube_Sum","def cube_Sum(n):
+    pass","python"
+"1120","concatenate_tuple","def concatenate_tuple(test_tup):
+    pass","python"
+"1121","find_Average_Of_Cube","def find_Average_Of_Cube(n):
+    pass","python"
+"1122","get_maxgold","def get_maxgold(gold, m, n):
+    pass","python"
+"1123","extract_rear","def extract_rear(test_tuple):
+    pass","python"
+"1124","count_element_in_list","def count_element_in_list(list1, x):
+    pass","python"
+"1125","filter_oddnumbers","def filter_oddnumbers(nums):
+    pass","python"
+"1126","change_date_format","def change_date_format(dt):
+    pass","python"
+"1127","shell_sort","def shell_sort(my_list):
+    pass","python"
+"1128","and_tuples","def and_tuples(test_tup1, test_tup2):
+    pass","python"
+"1129","parabola_directrix","def parabola_directrix(a, b, c):
+    pass","python"
+"1130","common_element","def common_element(list1, list2):
+    pass","python"
+"1131","median_trapezium","def median_trapezium(base1,base2,height):
+    pass","python"
+"1132","check_greater","def check_greater(arr, number):
+    pass","python"
+"1133","text_match_one","def text_match_one(text):
+    pass","python"
+"1134","last_Digit","def last_Digit(n):
+    pass","python"
+"1135","neg_nos","def neg_nos(list1):
+    pass","python"
+"1136","remove_odd","def remove_odd(str1):
+    pass","python"
+"1137","count_bidirectional","def count_bidirectional(test_list):
+    pass","python"
+"1138","multiple_to_single","def multiple_to_single(L):
+    pass","python"
+"1139","find_adverb_position","def find_adverb_position(text):
+    pass","python"
+"1140","surfacearea_cube","def surfacearea_cube(l):
+    pass","python"
+"1141","positive_count","def positive_count(nums):
+    pass","python"
+"1142","largest_neg","def largest_neg(list1):
+    pass","python"
+"1143","trim_tuple","def trim_tuple(test_list, K):
+    pass","python"
+"1144","index_multiplication","def index_multiplication(test_tup1, test_tup2):
+    pass","python"
+"1145","count_Occurrence","def count_Occurrence(tup, lst):
+    pass","python"
+"1146","cube_nums","def cube_nums(nums):
+    pass","python"
+"1147","cal_sum","def cal_sum(n):
+    pass","python"
+"1148","check_Triangle","def check_Triangle(x1,y1,x2,y2,x3,y3):
+    pass","python"
+"1149","extract_string","def extract_string(str, l):
+    pass","python"
+"1150","remove_whitespaces","def remove_whitespaces(text1):
+    pass","python"
+"1151","loss_amount","def loss_amount(actual_cost,sale_amount):
+    pass","python"
+"1152","sumofFactors","def sumofFactors(n):
+    pass","python"
+"1153","text_match_wordz","def text_match_wordz(text):
+    pass","python"
+"1154","check_monthnumb_number","def check_monthnumb_number(monthnum2):
+    pass","python"
+"1155","reverse_string_list","def reverse_string_list(stringlist):
+    pass","python"
+"1156","Find_Min","def Find_Min(lst):
+    pass","python"
+"1157","rectangle_area","def rectangle_area(l,b):
+    pass","python"
+"1158","remove_uppercase","def remove_uppercase(str1):
+    pass","python"
+"1159","Extract","def Extract(lst):
+    pass","python"
+"1160","upper_ctr","def upper_ctr(str):
+    pass","python"
+"1161","combinations_list","def combinations_list(list1):
+    pass","python"
+"1162","max_subarray_product","def max_subarray_product(arr):
+    pass","python"
+"1163","check_value","def check_value(dict, n):
+    pass","python"
+"1164","drop_empty","def drop_empty(dict1):
+    pass","python"
+"1165","find_peak_util","def find_peak_util(arr, low, high, n):
+    pass","python"
+"1166","decimal_to_Octal","def decimal_to_Octal(deciNum):
+    pass","python"
+"1167","max_product","def max_product(arr, n):
+    pass","python"
+"1168","max_profit","def max_profit(price, k):
+    pass","python"
+"1169","add_pairwise","def add_pairwise(test_tup):
+    pass","python"
+"1170","find_remainder","def find_remainder(arr, lens, n):
+    pass","python"
+"1171","check_Consecutive","def check_Consecutive(l):
+    pass","python"
+"1172","tuple_intersection","def tuple_intersection(test_list1, test_list2):
+    pass","python"
+"1173","replace_char","def replace_char(str1,ch,newch):
+    pass","python"
+"1174","sort_counter","def sort_counter(dict1):
+    pass","python"
+"1175","big_sum","def big_sum(nums):
+    pass","python"
+"1176","is_lower","def is_lower(string):
+    pass","python"
+"1177","remove_lowercase","def remove_lowercase(str1):
+    pass","python"
+"1178","first_Digit","def first_Digit(n):
+    pass","python"
+"1179","get_max_occuring_char","def get_max_occuring_char(str1):
+    pass","python"
+"1180","is_subset_sum","def is_subset_sum(set, n, sum):
+    pass","python"
+"1181","match","def match(text):
+    pass","python"
+"1182","first_Factorial_Divisible_Number","def first_Factorial_Divisible_Number(x):
+    pass","python"
+"1183","remove_matching_tuple","def remove_matching_tuple(test_list1, test_list2):
+    pass","python"
+"1184","is_palindrome","def is_palindrome(n):
+    pass","python"
+"1185","nCr","def nCr(n, r):
+    pass","python"
+"1186","sort_tuple","def sort_tuple(tup):
+    pass","python"
+"1187","area_pentagon","def area_pentagon(a):
+    pass","python"
+"1188","frequency_Of_Largest","def frequency_Of_Largest(n,arr):
+    pass","python"
+"1189","extract_symmetric","def extract_symmetric(test_list):
+    pass","python"
+"1190","sum_gp","def sum_gp(a,n,r):
+    pass","python"
+"1191","binary_search","def binary_search(item_list,item):
+    pass","python"
+"1192","calculate_polygons","def calculate_polygons(startx, starty, endx, endy, radius):
+    pass","python"
+"1193","binary_to_integer","def binary_to_integer(test_tup):
+    pass","python"
+"1194","remove_lowercase","def remove_lowercase(str1):
+    pass","python"
+"1195","heap_queue_smallest","def heap_queue_smallest(nums,n):
+    pass","python"
+"1196","surfacearea_cone","def surfacearea_cone(r,h):
+    pass","python"
+"1197","gcd","def gcd(x, y):
+    pass","python"
+"1198","diameter_circle","def diameter_circle(r):
+    pass","python"
+"1199","concatenate_elements","def concatenate_elements(list):
+    pass","python"
+"1200","ngcd","def ngcd(x,y):
+    pass","python"
+"1201","find","def find(n,m):
+    pass","python"
+"1202","add_consecutive_nums","def add_consecutive_nums(nums):
+    pass","python"
+"1203","sum_Of_Series","def sum_Of_Series(n):
+    pass","python"
+"1204","re_order","def re_order(A):
+    pass","python"
+"1205","permutation_coefficient","def permutation_coefficient(n, k):
+    pass","python"
+"1206","remove_words","def remove_words(list1, removewords):
+    pass","python"
+"1207","same_order","def same_order(l1, l2):
+    pass","python"
+"1208","average_Odd","def average_Odd(n):
+    pass","python"
+"1209","no_of_subsequences","def no_of_subsequences(arr, k):
+    pass","python"
+"1210","find_Min_Sum","def find_Min_Sum(num):
+    pass","python"
+"1211","flatten","def flatten(test_tuple):
+    pass","python"
+"1212","add_str","def add_str(test_tup, K):
+    pass","python"
+"1213","sum_elements","def sum_elements(test_tup):
+    pass","python"
+"1214","modular_sum","def modular_sum(arr, n, m):
+    pass","python"
+"1215","radix_sort","def radix_sort(nums):
+    pass","python"
+"1216","largest_pos","def largest_pos(list1):
+    pass","python"
+"1217","sqrt_root","def sqrt_root(num):
+    pass","python"
+"1218","volume_tetrahedron","def volume_tetrahedron(num):
+    pass","python"
+"1219","find_lcm","def find_lcm(num1, num2):
+    pass","python"
+"1220","check_isosceles","def check_isosceles(x,y,z):
+    pass","python"
+"1221","lbs","def lbs(arr):
+    pass","python"
+"1222","check_string","def check_string(str1):
+    pass","python"
+"1223","max_sum_increasing_subsequence","def max_sum_increasing_subsequence(arr, n):
+    pass","python"
+"1224","parallel_lines","def parallel_lines(line1, line2):
+    pass","python"
+"1225","capitalize_first_last_letters","def capitalize_first_last_letters(str1):
+    pass","python"
+"1226","get_pairs_count","def get_pairs_count(arr, n, sum):
+    pass","python"
+"1227","min_length","def min_length(list1):
+    pass","python"
+"1228","jacobsthal_lucas","def jacobsthal_lucas(n):
+    pass","python"
+"1229","negative_count","def negative_count(nums):
+    pass","python"
+"1230","min_coins","def min_coins(coins, m, V):
+    pass","python"
+"1231","check_permutation","def check_permutation(str1, str2):
+    pass","python"
+"1232","remove_datatype","def remove_datatype(test_tuple, data_type):
+    pass","python"
+"1233","search_literal","def search_literal(pattern,text):
+    pass","python"
+"1234","topbottom_surfacearea","def topbottom_surfacearea(r):
+    pass","python"
+"1235","nth_items","def nth_items(list,n):
+    pass","python"
+"1236","first_repeated_word","def first_repeated_word(str1):
+    pass","python"
+"1237","string_list_to_tuple","def string_list_to_tuple(str1):
+    pass","python"
+"1238","basesnum_coresspondingnum","def basesnum_coresspondingnum(bases_num,index):
+    pass","python"
+"1239","find_Diff","def find_Diff(arr,n):
+    pass","python"
+"1240","get_sum","def get_sum(n):
+    pass","python"
+"1241","fill_spaces","def fill_spaces(text):
+    pass","python"
+"1242","count_digits","def count_digits(num1,num2):
+    pass","python"
+"1243","flatten_tuple","def flatten_tuple(test_list):
+    pass","python"
+"1244","take_L_and_F_set_bits","def take_L_and_F_set_bits(n):
+    pass","python"
+"1245","last_occurence_char","def last_occurence_char(string,char):
+    pass","python"
+"1246","Total_Hamming_Distance","def Total_Hamming_Distance(n):
+    pass","python"
+"1247","longest_increasing_subsequence","def longest_increasing_subsequence(arr):
+    pass","python"
+"1248","odd_Num_Sum","def odd_Num_Sum(n):
+    pass","python"
+"1249","find_Max","def find_Max(arr,low,high):
+    pass","python"
+"1250","extract_column","def extract_column(list1, n):
+    pass","python"
+"1251","Seq_Linear","def Seq_Linear(seq_nums):
+    pass","python"
+"1252","tuple_to_float","def tuple_to_float(test_tup):
+    pass","python"
+"1253","Split","def Split(list):
+    pass","python"
+"1254","difference","def difference(n):
+    pass","python"
+"1255","find_Odd_Pair","def find_Odd_Pair(A,N):
+    pass","python"
+"1256","toggle_string","def toggle_string(string):
+    pass","python"
+"1257","digit_distance_nums","def digit_distance_nums(n1, n2):
+    pass","python"
+"1258","max_sub_array_sum","def max_sub_array_sum(a, size):
+    pass","python"
+"1259","union_elements","def union_elements(test_tup1, test_tup2):
+    pass","python"
+"1260","assign_elements","def assign_elements(test_list):
+    pass","python"
+"1261","Find_Max_Length","def Find_Max_Length(lst):
+    pass","python"
+"1262","extract_values","def extract_values(text):
+    pass","python"
+"1263","count_Pairs","def count_Pairs(arr,n):
+    pass","python"
+"1264","split","def split(word):
+    pass","python"
+"1265","sum_digits","def sum_digits(n):
+    pass","python"
+"1266","issort_list","def issort_list(list1):
+    pass","python"
+"1267","empty_list","def empty_list(length):
+    pass","python"
+"1268","sort_sublists","def sort_sublists(list1):
+    pass","python"
+"1269","remove_words","def remove_words(list1, charlist):
+    pass","python"
+"1270","max_sum_pair_diff_lessthan_K","def max_sum_pair_diff_lessthan_K(arr, N, K):
+    pass","python"
+"1271","two_unique_nums","def two_unique_nums(nums):
+    pass","python"
+"1272","unique_product","def unique_product(list_data):
+    pass","python"
+"1273","surfacearea_cylinder","def surfacearea_cylinder(r,h):
+    pass","python"
+"1274","count_no","def count_no(A,N,L,R):
+    pass","python"
+"1275","is_Sub_Array","def is_Sub_Array(A,B,n,m):
+    pass","python"
+"1276","last_Digit_Factorial","def last_Digit_Factorial(n):
+    pass","python"
+"1277","interleave_lists","def interleave_lists(list1,list2,list3):
+    pass","python"
+"1278","find_dissimilar","def find_dissimilar(test_tup1, test_tup2):
+    pass","python"
+"1279","even_ele","def even_ele(test_tuple, even_fnc):
+    pass","python"
+"1280","surface_Area","def surface_Area(b,s):
+    pass","python"
+"1281","my_dict","def my_dict(dict1):
+    pass","python"
+"1282","catalan_number","def catalan_number(num):
+    pass","python"
+"1283","find_adverbs","def find_adverbs(text):
+    pass","python"
+"1284","expensive_items","def expensive_items(items,n):
+    pass","python"
+"1285","split_Arr","def split_Arr(a,n,k):
+    pass","python"
+"1286","list_tuple","def list_tuple(listx):
+    pass","python"
+"1287","big_diff","def big_diff(nums):
+    pass","python"
+"1288","perfect_squares","def perfect_squares(a, b):
+    pass","python"
+"1289","polar_rect","def polar_rect(x,y):
+    pass","python"
+"1290","swap_List","def swap_List(newList):
+    pass","python"
+"1291","binomial_Coeff","def binomial_Coeff(n,k):
+    pass","python"
+"1292","removezero_ip","def removezero_ip(ip):
+    pass","python"
+"1293","diff_even_odd","def diff_even_odd(list1):
+    pass","python"
+"1294","min_Swaps","def min_Swaps(str1,str2):
+    pass","python"
+"1295","tuple_size","def tuple_size(tuple_list):
+    pass","python"
+"1296","find_kth","def find_kth(arr1, arr2, m, n, k):
+    pass","python"
+"1297","armstrong_number","def armstrong_number(number):
+    pass","python"
+"1298","sum_average","def sum_average(number):
+    pass","python"
+"1299","is_Even","def is_Even(n):
+    pass","python"
+"1300","__init__","def __init__(self, a, b):
+    pass","python"
+"1301","first_repeated_char","def first_repeated_char(str1):
+    pass","python"
+"1302","get_ludic","def get_ludic(n):
+    pass","python"
+"1303","reverse_words","def reverse_words(s):
+    pass","python"
+"1304","prime_num","def prime_num(num):
+    pass","python"
+"1305","radian_degree","def radian_degree(degree):
+    pass","python"
+"1306","find_literals","def find_literals(text, pattern):
+    pass","python"
+"1307","bell_Number","def bell_Number(n):
+    pass","python"
+"1308","floor_Min","def floor_Min(A,B,N):
+    pass","python"
+"1309","remove_kth_element","def remove_kth_element(list1, L):
+    pass","python"
+"1310","max_of_nth","def max_of_nth(test_list, N):
+    pass","python"
+"1311","merge","def merge(lst):
+    pass","python"
+"1312","maximum_value","def maximum_value(test_list):
+    pass","python"
+"1313","cummulative_sum","def cummulative_sum(test_list):
+    pass","python"
+"1314","average_tuple","def average_tuple(nums):
+    pass","python"
+"1315","tuple_modulo","def tuple_modulo(test_tup1, test_tup2):
+    pass","python"
+"1316","min_Jumps","def min_Jumps(a, b, d):
+    pass","python"
+"1317","div_list","def div_list(nums1,nums2):
+    pass","python"
+"1318","move_num","def move_num(test_str):
+    pass","python"
+"1319","largest_subset","def largest_subset(a, n):
+    pass","python"
+"1320","increment_numerics","def increment_numerics(test_list, K):
+    pass","python"
+"1321","get_median","def get_median(arr1, arr2, n):
+    pass","python"
+"1322","nth_nums","def nth_nums(nums,n):
+    pass","python"
+"1323","is_upper","def is_upper(string):
+    pass","python"
+"1324","swap_List","def swap_List(newList):
+    pass","python"
+"1325","triangle_area","def triangle_area(r):
+    pass","python"
+"1326","find_First_Missing","def find_First_Missing(array,start,end):
+    pass","python"
+"1327","replace_spaces","def replace_spaces(string):
+    pass","python"
+"1328","Split","def Split(list):
+    pass","python"
+"1329","adjac","def adjac(ele, sub = []):
+    pass","python"
+"1330","replace_spaces","def replace_spaces(text):
+    pass","python"
+"1331","move_zero","def move_zero(num_list):
+    pass","python"
+"1332","pair_OR_Sum","def pair_OR_Sum(arr,n):
+    pass","python"
+"1333","even_Power_Sum","def even_Power_Sum(n):
+    pass","python"
+"1334","heap_sort","def heap_sort(iterable):
+    pass","python"
+"1335","Check_Solution","def Check_Solution(a,b,c):
+    pass","python"
+"1336","noprofit_noloss","def noprofit_noloss(actual_cost,sale_amount):
+    pass","python"
+"1337","wind_chill","def wind_chill(v,t):
+    pass","python"
+"1338","sample_nam","def sample_nam(sample_names):
+    pass","python"
+"1339","remove_parenthesis","def remove_parenthesis(items):
+    pass","python"
+"1340","is_nonagonal","def is_nonagonal(n):
+    pass","python"
+"1341","remove_similar_row","def remove_similar_row(test_list):
+    pass","python"
+"1342","text_match_wordz_middle","def text_match_wordz_middle(text):
+    pass","python"
+"1343","reverse_Array_Upto_K","def reverse_Array_Upto_K(input, k):
+    pass","python"
+"1344","get_product","def get_product(val):
+    pass","python"
+"1345","No_of_cubes","def No_of_cubes(N,K):
+    pass","python"
+"1346","split_upperstring","def split_upperstring(text):
+    pass","python"
+"1347","exchange_elements","def exchange_elements(lst):
+    pass","python"
+"1348","sum_Range_list","def sum_Range_list(nums, m, n):
+    pass","python"
+"1349","are_Equal","def are_Equal(arr1,arr2,n,m):
+    pass","python"
+"1350","check_subset","def check_subset(test_tup1, test_tup2):
+    pass","python"
+"1351","matrix_to_list","def matrix_to_list(test_list):
+    pass","python"
+"1352","grouping_dictionary","def grouping_dictionary(l):
+    pass","python"
+"1353","rectangle_perimeter","def rectangle_perimeter(l,b):
+    pass","python"
+"1354","fifth_Power_Sum","def fifth_Power_Sum(n):
+    pass","python"
+"1355","find_Min_Sum","def find_Min_Sum(a,b,n):
+    pass","python"
+"1356","first_Digit","def first_Digit(n):
+    pass","python"
+"1357","max_occurrences","def max_occurrences(list1):
+    pass","python"
+"1358","Repeat","def Repeat(x):
+    pass","python"
+"1359","find_Points","def find_Points(l1,r1,l2,r2):
+    pass","python"
+"1360","max_sum_of_three_consecutive","def max_sum_of_three_consecutive(arr, n):
+    pass","python"
+"1361","sorted_dict","def sorted_dict(dict1):
+    pass","python"
+"1362","find_max_val","def find_max_val(n, x, y):
+    pass","python"
+"1363","average_Even","def average_Even(n):
+    pass","python"
+"1364","move_last","def move_last(num_list):
+    pass","python"
+"1365","count_char","def count_char(string,char):
+    pass","python"
+"1366","Check_Vow","def Check_Vow(string, vowels):
+    pass","python"
+"1367","replace","def replace(string, char):
+    pass","python"
+"1368","check_IP","def check_IP(Ip):
+    pass","python"
+"1369","decreasing_trend","def decreasing_trend(nums):
+    pass","python"
+"1370","get_Pos_Of_Right_most_Set_Bit","def get_Pos_Of_Right_most_Set_Bit(n):
+    pass","python"
+"1371","max_of_three","def max_of_three(num1,num2,num3):
+    pass","python"
+"1372","convert","def convert(list):
+    pass","python"
+"1373","remove_duplicate","def remove_duplicate(string):
+    pass","python"
+"1374","sum_nums","def sum_nums(x, y,m,n):
+    pass","python"
+"1375","remove_extra_char","def remove_extra_char(text1):
+    pass","python"
+"1376","validity_triangle","def validity_triangle(a,b,c):
+    pass","python"
+"1377","remove_spaces","def remove_spaces(str1):
+    pass","python"
+"1378","access_key","def access_key(ditionary,key):
+    pass","python"
+"1379","increasing_trend","def increasing_trend(nums):
+    pass","python"
+"1380","smallest_Divisor","def smallest_Divisor(n):
+    pass","python"
+"1381","mul_list","def mul_list(nums1,nums2):
+    pass","python"
+"1382","sum_Square","def sum_Square(n):
+    pass","python"
+"1383","count_Char","def count_Char(str,x):
+    pass","python"
+"1384","sum_Of_Primes","def sum_Of_Primes(n):
+    pass","python"
+"1385","freq_element","def freq_element(test_tup):
+    pass","python"
+"1386","recur_gcd","def recur_gcd(a, b):
+    pass","python"
+"1387","len_complex","def len_complex(a,b):
+    pass","python"
+"1388","min_jumps","def min_jumps(arr, n):
+    pass","python"
+"1389","mul_consecutive_nums","def mul_consecutive_nums(nums):
+    pass","python"
+"1390","group_element","def group_element(test_list):
+    pass","python"
+"1391","last_Two_Digits","def last_Two_Digits(N):
+    pass","python"
+"1392","remove_multiple_spaces","def remove_multiple_spaces(text1):
+    pass","python"
+"1393","extract_unique","def extract_unique(test_dict):
+    pass","python"
+"1394","check_greater","def check_greater(test_tup1, test_tup2):
+    pass","python"
+"1395","zip_list","def zip_list(list1,list2):
+    pass","python"
+"1396","count_even","def count_even(array_nums):
+    pass","python"
+"1397","sort_dict_item","def sort_dict_item(test_dict):
+    pass","python"
+"1398","min_Swaps","def min_Swaps(str1,str2):
+    pass","python"
+"1399","count_range_in_list","def count_range_in_list(li, min, max):
+    pass","python"
+"1400","equilibrium_index","def equilibrium_index(arr):
+    pass","python"
+"1401","find_ind","def find_ind(key, i, n, 
+			k, arr):
+    pass","python"
+"1402","is_key_present","def is_key_present(d,x):
+    pass","python"
+"1403","harmonic_sum","def harmonic_sum(n):
+    pass","python"
+"1404","sort_sublists","def sort_sublists(list1):
+    pass","python"
+"1405","is_subset","def is_subset(arr1, m, arr2, n):
+    pass","python"
+"1406","count_Set_Bits","def count_Set_Bits(n):
+    pass","python"
+"1407","Convert","def Convert(string):
+    pass","python"
+"1408","get_unique","def get_unique(test_list):
+    pass","python"
+"1409","front_and_rear","def front_and_rear(test_tup):
+    pass","python"
+"1410","product_Equal","def product_Equal(n):
+    pass","python"
+"1411","remove_duplicate","def remove_duplicate(list1):
+    pass","python"
+"1412","check_valid","def check_valid(test_tup):
+    pass","python"
+"1413","count_Fac","def count_Fac(n):
+    pass","python"
+"1414","str_to_tuple","def str_to_tuple(test_str):
+    pass","python"
+"1415","rombus_perimeter","def rombus_perimeter(a):
+    pass","python"
+"1416","sd_calc","def sd_calc(data):
+    pass","python"
+"1417","alternate_elements","def alternate_elements(list1):
+    pass","python"
+"1418","text_match","def text_match(text):
+    pass","python"
+"1419","add_dict_to_tuple","def add_dict_to_tuple(test_tup, test_dict):
+    pass","python"
+"1420","maxAverageOfPath","def maxAverageOfPath(cost, N):
+    pass","python"
+"1421","filter_data","def filter_data(students,h,w):
+    pass","python"
+"1422","count_same_pair","def count_same_pair(nums1, nums2):
+    pass","python"
+"1423","power_base_sum","def power_base_sum(base, power):
+    pass","python"
+"1424","extract_quotation","def extract_quotation(text1):
+    pass","python"
+"1425","multiply_elements","def multiply_elements(test_tup):
+    pass","python"
+"1426","remove_char","def remove_char(S):
+    pass","python"
+"1427","sum_list","def sum_list(lst1,lst2):
+    pass","python"
+"1428","add_list","def add_list(nums1,nums2):
+    pass","python"
+"1429","consecutive_duplicates","def consecutive_duplicates(nums):
+    pass","python"
+"1430","lateralsurface_cone","def lateralsurface_cone(r,h):
+    pass","python"
+"1431","replace_specialchar","def replace_specialchar(text):
+    pass","python"
+"1432","find_first_occurrence","def find_first_occurrence(A, x):
+    pass","python"
+"1433","sum_Of_Subarray_Prod","def sum_Of_Subarray_Prod(arr,n):
+    pass","python"
+"1434","set_middle_bits","def set_middle_bits(n):
+    pass","python"
+"1435","left_insertion","def left_insertion(a, x):
+    pass","python"
+"1436","check_str","def check_str(string):
+    pass","python"
+"1437","geometric_sum","def geometric_sum(n):
+    pass","python"
+"1438","find_Index","def find_Index(n):
+    pass","python"
+"1439","tuple_to_dict","def tuple_to_dict(test_tup):
+    pass","python"
+"1440","all_Characters_Same","def all_Characters_Same(s):
+    pass","python"
+"1441","area_tetrahedron","def area_tetrahedron(side):
+    pass","python"
+"1442","rotate_right","def rotate_right(list1,m,n):
+    pass","python"
+"1443","check_none","def check_none(test_tup):
+    pass","python"
+"1444","divisible_by_digits","def divisible_by_digits(startnum, endnum):
+    pass","python"
+"1445","sector_area","def sector_area(r,a):
+    pass","python"
+"1446","lcs_of_three","def lcs_of_three(X, Y, Z, m, n, o):
+    pass","python"
+"1447","capital_words_spaces","def capital_words_spaces(str1):
+    pass","python"
+"1448","sort_numeric_strings","def sort_numeric_strings(nums_str):
+    pass","python"
+"1449","add_tuple","def add_tuple(test_list, test_tup):
+    pass","python"
+"1450","check_min_heap","def check_min_heap(arr, i):
+    pass","python"
+"1451","jacobsthal_num","def jacobsthal_num(n):
+    pass","python"
+"1452","min_k","def min_k(test_list, K):
+    pass","python"
+"1453","extract_index_list","def extract_index_list(l1, l2, l3):
+    pass","python"
+"1454","second_smallest","def second_smallest(numbers):
+    pass","python"
+"1455","text_match_zero_one","def text_match_zero_one(text):
+    pass","python"
+"1456","count_reverse_pairs","def count_reverse_pairs(test_list):
+    pass","python"
+"1457","unique_sublists","def unique_sublists(list1):
+    pass","python"
+"1458","is_decimal","def is_decimal(num):
+    pass","python"
+"1459","unique_Element","def unique_Element(arr,n):
+    pass","python"
+"1460","arc_length","def arc_length(d,a):
+    pass","python"
+"1461","check_monthnumber_number","def check_monthnumber_number(monthnum3):
+    pass","python"
+"1462","find_Min_Diff","def find_Min_Diff(arr,n):
+    pass","python"
+"1463","number_ctr","def number_ctr(str):
+    pass","python"
+"1464","is_polite","def is_polite(n):
+    pass","python"
+"1465","pair_wise","def pair_wise(l1):
+    pass","python"
+"1466","get_Pairs_Count","def get_Pairs_Count(arr,n,sum):
+    pass","python"
+"1467","check_Odd_Parity","def check_Odd_Parity(x):
+    pass","python"
+"1468","Diff","def Diff(li1,li2):
+    pass","python"
+"1469","odd_Num_Sum","def odd_Num_Sum(n):
+    pass","python"
+"1470","check_expression","def check_expression(exp):
+    pass","python"
+"1471","remove_length","def remove_length(test_str, K):
+    pass","python"
+"1472","occurance_substring","def occurance_substring(text,pattern):
+    pass","python"
+"1473","check_email","def check_email(email):
+    pass","python"
+"1474","odd_position","def odd_position(nums):
+    pass","python"
+"1475","count_vowels","def count_vowels(test_str):
+    pass","python"
+"1476","find_Sum","def find_Sum(arr,n):
+    pass","python"
+"1477","pack_consecutive_duplicates","def pack_consecutive_duplicates(list1):
+    pass","python"
+"1478","unique_sublists","def unique_sublists(list1):
+    pass","python"
+"1479","find_combinations","def find_combinations(test_list):
+    pass","python"
+"1480","count_Divisors","def count_Divisors(n):
+    pass","python"
+"1481","Odd_Length_Sum","def Odd_Length_Sum(arr):
+    pass","python"
+"1482","rgb_to_hsv","def rgb_to_hsv(r, g, b):
+    pass","python"
+"1483","mul_even_odd","def mul_even_odd(list1):
+    pass","python"
+"1484","tuple_str_int","def tuple_str_int(test_str):
+    pass","python"
+"1485","right_insertion","def right_insertion(a, x):
+    pass","python"
+"1486","text_match_three","def text_match_three(text):
+    pass","python"
+"1487","new_tuple","def new_tuple(test_list, test_str):
+    pass","python"
+"1488","perimeter_polygon","def perimeter_polygon(s,l):
+    pass","python"
+"1489","even_position","def even_position(nums):
+    pass","python"
+"1490","remove_nested","def remove_nested(test_tup):
+    pass","python"
+"1491","count_list","def count_list(input_list):
+    pass","python"
+"1492","last","def last(arr,x,n):
+    pass","python"
+"1493","text_starta_endb","def text_starta_endb(text):
+    pass","python"
+"1494","cheap_items","def cheap_items(items,n):
+    pass","python"
+"1495","return_sum","def return_sum(dict):
+    pass","python"
+"1496","sum_Odd","def sum_Odd(n):
+    pass","python"
+"1497","_sum","def _sum(arr):
+    pass","python"
+"1498","left_Rotate","def left_Rotate(n,d):
+    pass","python"
+"1499","remove_all_spaces","def remove_all_spaces(text):
+    pass","python"
+"1500","test_three_equal","def test_three_equal(x,y,z):
+    pass","python"
+"1501","count_Rotation","def count_Rotation(arr,n):
+    pass","python"
+"1502","is_Perfect_Square","def is_Perfect_Square(n):
+    pass","python"
+"1503","is_Product_Even","def is_Product_Even(arr,n):
+    pass","python"
+"1504","max_sum_list","def max_sum_list(lists):
+    pass","python"
+"1505","max_run_uppercase","def max_run_uppercase(test_str):
+    pass","python"
+"1506","first_odd","def first_odd(nums):
+    pass","python"
+"1507","check_K","def check_K(test_tup, K):
+    pass","python"
+"1508","check_smaller","def check_smaller(test_tup1, test_tup2):
+    pass","python"
+"1509","count_variable","def count_variable(a,b,c,d):
+    pass","python"
+"1510","check_identical","def check_identical(test_list1, test_list2):
+    pass","python"
+"1511","road_rd","def road_rd(street):
+    pass","python"
+"1512","string_length","def string_length(str1):
+    pass","python"
+"1513","rombus_area","def rombus_area(p,q):
+    pass","python"
+"1514","sort_by_dnf","def sort_by_dnf(arr, n):
+    pass","python"
+"1515","clear_tuple","def clear_tuple(test_tup):
+    pass","python"
+"1516","div_of_nums","def div_of_nums(nums,m,n):
+    pass","python"
+"1517","lower_ctr","def lower_ctr(str):
+    pass","python"
+"1518","count_duplic","def count_duplic(lists):
+    pass","python"
+"1519","check_monthnum_number","def check_monthnum_number(monthnum1):
+    pass","python"
+"1520","merge_dictionaries","def merge_dictionaries(dict1,dict2):
+    pass","python"
+"1521","pass_validity","def pass_validity(p):
+    pass","python"
+"1522","check_substring","def check_substring(string, sample):
+    pass","python"
+"1523","remove_even","def remove_even(l):
+    pass","python"
+"1524","access_elements","def access_elements(nums, list_index):
+    pass","python"
+"1525","check_Type_Of_Triangle","def check_Type_Of_Triangle(a,b,c):
+    pass","python"
+"1526","sum_column","def sum_column(list1, C):
+    pass","python"
+"1527","count_alpha_dig_spl","def count_alpha_dig_spl(string):
+    pass","python"
+"1528","second_frequent","def second_frequent(input):
+    pass","python"
+"1529","round_up","def round_up(a, digits):
+    pass","python"
+"1530","count_Pairs","def count_Pairs(arr,n):
+    pass","python"
+"1531","extract_max","def extract_max(input):
+    pass","python"
+"1532","get_key","def get_key(dict):
+    pass","python"
+"1533","generate_matrix","def generate_matrix(n):
+    pass","python"
+"1534","slope","def slope(x1,y1,x2,y2):
+    pass","python"
+"1535","max_sub_array_sum","def max_sub_array_sum(a,size):
+    pass","python"
+"1536","cube_Sum","def cube_Sum(n):
+    pass","python"
+"1537","min_Swaps","def min_Swaps(s1,s2):
+    pass","python"
+"1538","sort_tuple","def sort_tuple(tup):
+    pass","python"
+"1539","Check_Solution","def Check_Solution(a,b,c):
+    pass","python"
+"1540","get_inv_count","def get_inv_count(arr, n):
+    pass","python"
+"1541","get_odd_occurence","def get_odd_occurence(arr, arr_size):
+    pass","python"
+"1542","nth_super_ugly_number","def nth_super_ugly_number(n, primes):
+    pass","python"
+"1543","get_Number","def get_Number(n, k):
+    pass","python"
+"1544","find_Digits","def find_Digits(n):
+    pass","python"
+"1545","find_platform","def find_platform(arr, dep, n):
+    pass","python"
+"1546","lcopy","def lcopy(xs):
+    pass","python"
+"1547","area_trapezium","def area_trapezium(base1,base2,height):
+    pass","python"
+"1548","Sum","def Sum(N):
+    pass","python"
+"1549","is_triangleexists","def is_triangleexists(a,b,c):
+    pass","python"
+"1550","Sum_of_Inverse_Divisors","def Sum_of_Inverse_Divisors(N,Sum):
+    pass","python"
+"1551","remove_negs","def remove_negs(num_list):
+    pass","python"
+"1552","sum_of_odd_Factors","def sum_of_odd_Factors(n):
+    pass","python"
+"1553","raw_heap","def raw_heap(rawheap):
+    pass","python"
+"1554","check_Even_Parity","def check_Even_Parity(x):
+    pass","python"
+"1555","find_Min_Swaps","def find_Min_Swaps(arr,n):
+    pass","python"
+"1556","listify_list","def listify_list(list1):
+    pass","python"
+"1557","count_list","def count_list(input_list):
+    pass","python"
+"1558","sub_lists","def sub_lists(my_list):
+    pass","python"
+"1559","check_alphanumeric","def check_alphanumeric(string):
+    pass","python"
+"1560","anagram_lambda","def anagram_lambda(texts,str):
+    pass","python"
+"1561","n_common_words","def n_common_words(text,n):
+    pass","python"
+"1562","find_longest_conseq_subseq","def find_longest_conseq_subseq(arr, n):
+    pass","python"
+"1563","palindrome_lambda","def palindrome_lambda(texts):
+    pass","python"
+"1564","ntimes_list","def ntimes_list(nums,n):
+    pass","python"
+"1565","check_monthnumb","def check_monthnumb(monthname2):
+    pass","python"
+"1566","min_Num","def min_Num(arr,n):
+    pass","python"
+"1567","length_Of_Last_Word","def length_Of_Last_Word(a):
+    pass","python"
+"1568","remove_list_range","def remove_list_range(list1, leftrange, rigthrange):
+    pass","python"
+"1569","sum_positivenum","def sum_positivenum(nums):
+    pass","python"
+"1570","are_Rotations","def are_Rotations(string1,string2):
+    pass","python"
+"1571","check_subset","def check_subset(list1,list2):
+    pass","python"
+"1572","fibonacci","def fibonacci(n):
+    pass","python"
+"1573","check_Concat","def check_Concat(str1,str2):
+    pass","python"
+"1574","min_difference","def min_difference(test_list):
+    pass","python"
+"1575","lcm","def lcm(x, y):
+    pass","python"
+"1576","sort_String","def sort_String(str):
+    pass","python"
+"1577","check_tuples","def check_tuples(test_tuple, K):
+    pass","python"
+"1578","text_match","def text_match(text):
+    pass","python"
+"1579","Check_Solution","def Check_Solution(a,b,c):
+    pass","python"
+"1580","sum_even_odd","def sum_even_odd(list1):
+    pass","python"
+"1581","parallelogram_perimeter","def parallelogram_perimeter(b,h):
+    pass","python"
+"1582","div_of_nums","def div_of_nums(nums,m,n):
+    pass","python"
+"1583","all_Bits_Set_In_The_Given_Range","def all_Bits_Set_In_The_Given_Range(n,l,r):
+    pass","python"
+"1584","is_Isomorphic","def is_Isomorphic(str1,str2):
+    pass","python"
+"1585","sum_num","def sum_num(numbers):
+    pass","python"
+"1586","is_odd","def is_odd(n):
+    pass","python"
+"1587","substract_elements","def substract_elements(test_tup1, test_tup2):
+    pass","python"
+"1588","reverse_list_lists","def reverse_list_lists(lists):
+    pass","python"
+"1589","find_Extra","def find_Extra(arr1,arr2,n):
+    pass","python"
+"1590","same_Length","def same_Length(A,B):
+    pass","python"
+"1591","remove_spaces","def remove_spaces(text):
+    pass","python"
+"1592","Extract","def Extract(lst):
+    pass","python"
+"1593","float_to_tuple","def float_to_tuple(test_str):
+    pass","python"
+"1594","max_sum_subseq","def max_sum_subseq(A):
+    pass","python"
+"1595","last","def last(n):
+    pass","python"
+"1596","is_Word_Present","def is_Word_Present(sentence,word):
+    pass","python"
+"1597","extract_elements","def extract_elements(numbers, n):
+    pass","python"
+"1598","check","def check(arr,n):
+    pass","python"
+"1599","match_num","def match_num(string):
+    pass","python"
+"1600","smallest_multiple","def smallest_multiple(n):
+    pass","python"
+"1601","add_dict","def add_dict(d1,d2):
+    pass","python"
+"1602","count_Unset_Bits","def count_Unset_Bits(n):
+    pass","python"
+"1603","even_num","def even_num(x):
+    pass","python"
+"1604","factorial","def factorial(start,end):
+    pass","python"
+"1605","extract_date","def extract_date(url):
+    pass","python"
+"1606","lucky_num","def lucky_num(n):
+    pass","python"
+"1607","find_fixed_point","def find_fixed_point(arr, n):
+    pass","python"
+"1608","previous_palindrome","def previous_palindrome(num):
+    pass","python"
+"1609","check_date","def check_date(m, d, y):
+    pass","python"
+"1610","maximum_product","def maximum_product(nums):
+    pass","python"
+"1611","binomial_coeff","def binomial_coeff(n, k):
+    pass","python"
+"1612","end_num","def end_num(string):
+    pass","python"
+"1613","is_Two_Alter","def is_Two_Alter(s):
+    pass","python"
+"1614","rearrange_numbs","def rearrange_numbs(array_nums):
+    pass","python"
+"1615","find_triplet_array","def find_triplet_array(A, arr_size, sum):
+    pass","python"
+"1616","text_uppercase_lowercase","def text_uppercase_lowercase(text):
+    pass","python"
+"1617","coin_change","def coin_change(S, m, n):
+    pass","python"
+"1618","multiply_list","def multiply_list(items):
+    pass","python"
+"1619","remove_tuple","def remove_tuple(test_list):
+    pass","python"
+"1620","chunk_tuples","def chunk_tuples(test_tup, N):
+    pass","python"
+"1621","max_product","def max_product(arr):
+    pass","python"
+"1622","super_seq","def super_seq(X, Y, m, n):
+    pass","python"
+"1623","max_of_two","def max_of_two(x, y):
+    pass","python"
+"1624","mutiple_tuple","def mutiple_tuple(nums):
+    pass","python"
+"1625","binomial_coeffi","def binomial_coeffi(n, k):
+    pass","python"
+"1626","__init__","def __init__(self, data):
+    pass","python"
+"1627","change_date_format","def change_date_format(dt):
+    pass","python"
+"1628","count_tuplex","def count_tuplex(tuplex,value):
+    pass","python"
+"1629","text_match","def text_match(text):
+    pass","python"
+"1630","sum_series","def sum_series(number):
+    pass","python"
+"1631","remove_duplic_list","def remove_duplic_list(l):
+    pass","python"
+"1632","camel_to_snake","def camel_to_snake(text):
+    pass","python"
+"1633","dealnnoy_num","def dealnnoy_num(n, m):
+    pass","python"
+"1634","series_sum","def series_sum(number):
+    pass","python"
+"1635","re_arrange_tuples","def re_arrange_tuples(test_list, ord_list):
+    pass","python"
+"1636","max_char","def max_char(str1):
+    pass","python"
+"1637","find_closet","def find_closet(A, B, C, p, q, r):
+    pass","python"
+"1638","sorted_models","def sorted_models(models):
+    pass","python"
+"1639","heap_sort","def heap_sort(arr):
+    pass","python"
+"1640","count_elim","def count_elim(num):
+    pass","python"
+"1641","check_element","def check_element(test_tup, check_list):
+    pass","python"
+"1642","combine_lists","def combine_lists(num1,num2):
+    pass","python"
+"1643","num_position","def num_position(text):
+    pass","python"
+"1644","tuple_to_set","def tuple_to_set(t):
+    pass","python"
+"1645","most_common_elem","def most_common_elem(s,a):
+    pass","python"
+"1646","len_log","def len_log(list1):
+    pass","python"
+"1647","get_item","def get_item(tup1,index):
+    pass","python"
+"1648","count_digs","def count_digs(tup):
+    pass","python"
+"1649","chinese_zodiac","def chinese_zodiac(year):
+    pass","python"
+"1650","max_similar_indices","def max_similar_indices(test_list1, test_list2):
+    pass","python"
+"1651","nCr_mod_p","def nCr_mod_p(n, r, p):
+    pass","python"
+"1652","subset","def subset(ar, n):
+    pass","python"
+"1653","profit_amount","def profit_amount(actual_cost,sale_amount):
+    pass","python"
+"1654","is_abundant","def is_abundant(n):
+    pass","python"
+"1655","split_list","def split_list(text):
+    pass","python"
+"1656","get_First_Set_Bit_Pos","def get_First_Set_Bit_Pos(n):
+    pass","python"
+"1657","int_to_roman","def int_to_roman(num):
+    pass","python"
+"1658","Average","def Average(lst):
+    pass","python"
+"1659","get_noOfways","def get_noOfways(n):
+    pass","python"
+"1660","roman_to_int","def roman_to_int(s):
+    pass","python"
+"1661","sum_Natural","def sum_Natural(n):
+    pass","python"
+"1662","discriminant_value","def discriminant_value(x,y,z):
+    pass","python"
+"1663","word_len","def word_len(s):
+    pass","python"
+"1664","camel_to_snake","def camel_to_snake(text):
+    pass","python"
+"1665","remove_empty","def remove_empty(tuple1):
+    pass","python"
+"1666","check","def check(string):
+    pass","python"
+"1667","floor_Max","def floor_Max(A,B,N):
+    pass","python"
+"1668","join_tuples","def join_tuples(test_list):
+    pass","python"
+"1669","min_of_two","def min_of_two(x, y):
+    pass","python"
+"1670","maximum_segments","def maximum_segments(n, a, b, c):
+    pass","python"
+"1671","concatenate_nested","def concatenate_nested(test_tup1, test_tup2):
+    pass","python"
+"1672","left_rotate","def left_rotate(s,d):
+    pass","python"
+"1673","min_sum_path","def min_sum_path(A):
+    pass","python"
+"10001","solution","def solution(nums):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10002","solution","def solution(x, y):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10003","solution","def solution(counts):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10004","solution","def solution(p, q):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10005","solution","def solution(y_true, y_pred):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10006","solution","def solution(y, score):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10007","solution","def solution(nums):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10008","solution","def solution(mat):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10009","solution","def solution(points, centroids):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10010","solution","def solution(arr):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10011","solution","def solution(corpus, target_idx):
+    answer = ''
+    # TODO: implement
+    return answer
+","python"
+"10012","solution","def solution(nums, k):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10013","solution","def solution(nums, q):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10014","solution","def solution(nums):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10015","solution","def solution(nums, z):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10017","solution","def solution(nums, width):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10018","solution","def solution(nums, x):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10021","solution","def solution(nums, r):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10022","solution","def solution(y, y_hat):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10024","solution","def solution(nums, r):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10025","solution","def solution(y, p):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10035","solution","def solution(pairs):
+    answer = {}
+    # TODO: implement
+    return answer
+","python"
+"10037","solution","def solution(s):
+    answer = ''
+    # TODO: implement
+    return answer
+","python"
+"10038","solution","def solution(arr, lo, hi):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10039","solution","def solution(left, right):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10040","solution","def solution(scores):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10041","solution","def solution(data):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10042","solution","def solution(arr, k):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10043","solution","def solution(line):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10044","solution","def solution(arr):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10045","solution","def solution(times, gap):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10047","solution","def solution(nums, b):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10048","solution","def solution(days):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10050","solution","def solution(items):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10052","solution","def solution(rows):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10053","solution","def solution(items):
+    answer = {}
+    # TODO: implement
+    return answer
+","python"
+"10055","solution","def solution(vals, thr):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10058","solution","def solution(cats):
+    answer = {}
+    # TODO: implement
+    return answer
+","python"
+"10068","solution","def solution(a, b):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10069","solution","def solution(x):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10070","solution","def solution(x):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10071","solution","def solution(x, k):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10073","solution","def solution(tokens, L):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10074","solution","def solution(d, pos):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10075","solution","def solution(a, b):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10076","solution","def solution(q, k):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10077","solution","def solution(probs, p):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10078","solution","def solution(x, mask):
+    answer = 0.0
+    # TODO: implement
+    return answer
+","python"
+"10080","solution","def solution(d1, d2):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10082","solution","def solution(logits, T):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10083","solution","def solution(v):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10084","solution","def solution(probs, threshold):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10086","solution","def solution(s, n):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10087","solution","def solution(y_true, probs):
+    answer = []
+    # TODO: implement
+    return answer
+","python"
+"10088","solution","def solution(lens, budget):
+    answer = 0
+    # TODO: implement
+    return answer
+","python"
+"10089","solution","def solution(beams, k):
+    answer = []
+    # TODO: implement
+    return answer
+","python"

@@ -3,9 +3,9 @@ import ast
 import difflib
 from typing import List
 
-from langchain.chat_models import init_chat_model
 from langchain_core.messages import HumanMessage, SystemMessage
 
+from interview_engine.llm import get_llm
 from interview_engine.state import CodingState
 
 
@@ -119,6 +119,12 @@ def question_generation_agent(state: CodingState) -> CodingState:
     norm_prev = _normalize_code_for_compare(prev_code)
     norm_starter = _normalize_code_for_compare(starter_code)
 
+    # 비교 기준(스타터/이전 질문 코드)이 없으면 변화율을 판단할 수 없으므로 질문 생성 스킵
+    # (예: Redis 캐시가 일부 유실되어 starter_code가 비어있는 경우)
+    if not norm_prev and not norm_starter:
+        state["tts_text"] = ""
+        return state
+
     # 1) 아직 starter code에서 크게 벗어나지 않았다면(거의 손대지 않은 상태) 질문 스킵
     is_starter_only = norm_starter == norm_current
 
@@ -158,12 +164,14 @@ def question_generation_agent(state: CodingState) -> CodingState:
     # (feedback, collab_lines는 code_quality_collabo_agent에서 채워진 값을 사용)
     raw_quality = state.get("code_quality_feedback") or []
     raw_collab = state.get("collaboration_feedback") or []
+    total_coquality = list(dict.fromkeys(raw_quality + raw_collab))
+    total_coquality_text = "\n".join(total_coquality)
+
 
     human_prompt = (
         f"코드 언어: {language}\n"
         f"[현재 전체 코드]\n{norm_current}\n\n"
-        f"[코드 품질 피드백]\n{raw_quality}\n\n"
-        f"[협업/스타일 피드백]\n{raw_collab}\n\n"
+        f"[코드 품질, 협업/스타일 전체 피드백]\n{total_coquality_text}\n\n"
         f"[이전 질문]\n{last_question_text}\n\n"
         "위 정보를 바탕으로, 지원자의 코드에 대해 후속 질문 1개를 생성하세요.\n"
         "- ruff 피드백에 대해선 언급하지 않고 참고만 합니다."
@@ -173,7 +181,7 @@ def question_generation_agent(state: CodingState) -> CodingState:
         "- 질문은 반드시 JSON 포맷으로만 반환해야 한다는 규칙을 지켜주세요."
     )
 
-    model = init_chat_model("gpt-5-nano")
+    model = get_llm("question")
     messages = [SystemMessage(content=system_prompt), HumanMessage(content=human_prompt)]
 
     existing_questions = state.get("question") or []
@@ -182,6 +190,8 @@ def question_generation_agent(state: CodingState) -> CodingState:
     state["question"] = existing_questions
 
     try:
+        print("[LLM][question_generation_agent] system_prompt:", system_prompt, flush=True)
+        print("[LLM][question_generation_agent] human_prompt:", human_prompt, flush=True)
         response = model.invoke(messages)
         raw_content = (getattr(response, "content", "") or "").strip()
 

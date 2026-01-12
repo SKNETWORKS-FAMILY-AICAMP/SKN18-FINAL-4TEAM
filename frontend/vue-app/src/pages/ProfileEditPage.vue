@@ -1,201 +1,260 @@
 <template>
   <div class="profile-edit-page">
-    <header class="profile-header">
-      <RouterLink to="/" class="brand">
-        <span class="brand-mark">JOBTORY</span>
-      </RouterLink>
-      <p class="page-label">회원정보 수정</p>
+    <div class="bg-grid"></div>
+
+    <header class="page-header">
+      <div class="nav-left">
+        <RouterLink to="/mypage" class="nav-back-btn">
+          &larr; MYPAGE
+        </RouterLink>
+      </div>
+
+      <RouterLink to="/" class="nav-logo">JOBTORY</RouterLink>
+
+      <div class="nav-right">
+        </div>
     </header>
 
-    <main class="profile-main">
-      <section class="card">
-        <h1 class="title">프로필 수정</h1>
-
-        <div v-if="loading" class="loading-message">
-          회원정보를 불러오는 중...
+    <main class="edit-content">
+      <div class="stylized-card form-card">
+        <div class="card-header">
+          <h1 class="title">EDIT PROFILE</h1>
+          <p class="subtitle">계정 정보와 프로필 상세 내용을 수정합니다.</p>
         </div>
 
-        <div v-else-if="loadError" class="error-message">
+        <div v-if="loading" class="loading-state">
+          <div class="spinner"></div>
+          <p>회원정보를 불러오는 중...</p>
+        </div>
+        
+        <div v-else-if="loadError" class="error-state">
           {{ loadError }}
         </div>
 
-        <div v-else class="form-grid">
-          <!-- 아이디 (읽기 전용) -->
-          <div class="field-block">
-            <label class="field-label">아이디</label>
-            <div class="field-line readonly">
-              <input 
-                v-model="username" 
-                class="field-input" 
-                type="text" 
-                readonly 
-                disabled
-              />
-            </div>
-            <p class="hint-text">아이디는 변경할 수 없습니다.</p>
-          </div>
+        <div v-else class="form-body">
+          <section class="form-section">
+            <h3 class="section-label">ACCOUNT INFO</h3>
+            <div class="form-grid">
+              <div class="field-group">
+                <label>아이디</label>
+                <input v-model="username" type="text" class="input-field readonly" readonly disabled />
+                <span class="field-hint">아이디는 변경 불가</span>
+              </div>
 
-          <!-- 이름 -->
-          <div class="field-block">
-            <label class="field-label">이름</label>
-            <div class="field-line">
-              <input v-model="name" class="field-input" type="text" placeholder="홍길동" />
-            </div>
-          </div>
+              <div class="field-group">
+                <label>이메일</label>
+                <input v-model="email" type="email" class="input-field readonly" readonly disabled />
+                <span class="field-hint">이메일은 변경 불가</span>
+              </div>
 
-          <!-- 이메일 (읽기 전용) -->
-          <div class="field-block">
-            <label class="field-label">이메일</label>
-            <div class="field-line readonly">
-              <input 
-                v-model="email" 
-                class="field-input" 
-                type="email" 
-                readonly 
-                disabled
-              />
-            </div>
-            <p class="hint-text">이메일은 변경할 수 없습니다.</p>
-          </div>
+              <div class="field-group">
+                <label>이름</label>
+                <input v-model="name" type="text" class="input-field" placeholder="이름 입력" />
+              </div>
 
-          <!-- 전화번호 -->
-          <div class="field-block">
-            <label class="field-label">전화번호</label>
-            <div class="field-line phone-line">
-              <input v-model="phone1" class="field-input phone-input" type="tel" maxlength="3" />
-              <span class="hyphen">-</span>
-              <input v-model="phone2" class="field-input phone-input" type="tel" maxlength="4" />
-              <span class="hyphen">-</span>
-              <input v-model="phone3" class="field-input phone-input" type="tel" maxlength="4" />
-            </div>
-          </div>
+              <div class="field-group">
+                <label>전화번호</label>
+                <div class="multi-input-row">
+                  <input v-model="phone1" type="tel" maxlength="3" class="input-field center-text" />
+                  <span class="separator">-</span>
+                  <input v-model="phone2" type="tel" maxlength="4" class="input-field center-text" />
+                  <span class="separator">-</span>
+                  <input v-model="phone3" type="tel" maxlength="4" class="input-field center-text" />
+                </div>
+              </div>
 
-          <!-- 생년월일 -->
-          <div class="field-block full-width">
-            <label class="field-label">생년월일</label>
-            <div class="birth-row">
-              <select v-model="birthYear" class="birth-select">
-                <option value="">년</option>
-                <option v-for="year in years" :key="year" :value="year">
-                  {{ year }}
-                </option>
-              </select>
-              <select v-model="birthMonth" class="birth-select">
-                <option value="">월</option>
-                <option v-for="month in months" :key="month" :value="month">
-                  {{ month }}
-                </option>
-              </select>
-              <select v-model="birthDay" class="birth-select">
-                <option value="">일</option>
-                <option v-for="day in days" :key="day" :value="day">
-                  {{ day }}
-                </option>
-              </select>
-            </div>
-          </div>
-
-          <!-- 비밀번호 변경 섹션 -->
-          <div class="field-block full-width password-section">
-            <div class="section-header">
-              <label class="field-label">비밀번호 변경</label>
-              <button 
-                type="button" 
-                class="toggle-button" 
-                @click="showPasswordChange = !showPasswordChange"
-              >
-                {{ showPasswordChange ? '숨기기' : '변경하기' }}
-              </button>
-            </div>
-            <p class="hint-text">비밀번호를 변경하지 않으려면 이 섹션을 비워두세요.</p>
-          </div>
-
-          <template v-if="showPasswordChange">
-            <!-- 현재 비밀번호 -->
-            <div class="field-block">
-              <label class="field-label">현재 비밀번호</label>
-              <div class="field-line">
-                <input 
-                  v-model="currentPassword" 
-                  class="field-input" 
-                  type="password" 
-                  placeholder="현재 비밀번호 입력"
-                />
+              <div class="field-group full-width">
+                <label>생년월일</label>
+                <div class="multi-input-row">
+                  <select v-model="birthYear" class="input-field">
+                    <option value="">년도</option>
+                    <option v-for="y in years" :key="y" :value="y">{{ y }}</option>
+                  </select>
+                  <select v-model="birthMonth" class="input-field">
+                    <option value="">월</option>
+                    <option v-for="m in months" :key="m" :value="m">{{ m }}</option>
+                  </select>
+                  <select v-model="birthDay" class="input-field">
+                    <option value="">일</option>
+                    <option v-for="d in days" :key="d" :value="d">{{ d }}</option>
+                  </select>
+                </div>
               </div>
             </div>
+          </section>
 
-            <!-- 새 비밀번호 -->
-            <div class="field-block">
-              <label class="field-label">새 비밀번호</label>
-              <div class="field-line">
-                <input 
-                  v-model="newPassword" 
-                  class="field-input" 
-                  type="password" 
-                  placeholder="새 비밀번호 입력"
-                />
+          <div class="divider"></div>
+
+          <section class="form-section">
+            <h3 class="section-label">CAREER PROFILE</h3>
+            <div class="form-grid">
+              <div class="field-group">
+                <label>최종 학력 *</label>
+                <div class="select-wrapper">
+                  <select v-model="profileForm.graduated_school" class="input-field">
+                    <option value="">선택해주세요</option>
+                    <option v-for="opt in graduatedOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>학교명</label>
+                <input v-model="profileForm.university" type="text" class="input-field" placeholder="학교명 입력" />
+              </div>
+
+              <div class="field-group">
+                <label>전공</label>
+                <div class="select-wrapper">
+                  <select v-model="profileForm.major" class="input-field">
+                    <option value="">선택해주세요</option>
+                    <option v-for="opt in majorOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>학적 상태</label>
+                <div class="select-wrapper">
+                  <select v-model="profileForm.academic_status" class="input-field">
+                    <option value="">선택해주세요</option>
+                    <option v-for="opt in academicOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>졸업(예정) 연도</label>
+                <input v-model="profileForm.graduation_year" type="number" class="input-field" placeholder="YYYY" />
+              </div>
+
+              <div class="field-group">
+                <label>경력 레벨 *</label>
+                <div class="select-wrapper">
+                  <select v-model="profileForm.career_level" class="input-field">
+                    <option value="">선택해주세요</option>
+                    <option v-for="opt in careerOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <label>현재 구직 상태</label>
+                <div class="select-wrapper">
+                  <select v-model="profileForm.current_status" class="input-field">
+                    <option value="">선택해주세요</option>
+                    <option v-for="opt in statusOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+              
+              <div class="field-group">
+                <label>희망 근무지</label>
+                <div class="select-wrapper">
+                  <select v-model="profileForm.region_single" class="input-field">
+                    <option value="">선택해주세요</option>
+                    <option v-for="opt in regionOptions" :key="opt" :value="opt">{{ opt }}</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="field-group full-width">
+                <label>기술 스택</label>
+                <div class="chips-container">
+                  <label v-for="opt in techStackOptions" :key="opt" class="chip-item">
+                    <input type="checkbox" :value="opt" v-model="profileForm.tech_stack" />
+                    <span class="chip-label">{{ opt }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="field-group full-width">
+                <label>희망 직무</label>
+                <div class="chips-container">
+                  <label v-for="opt in desiredRoleOptions" :key="opt" class="chip-item">
+                    <input type="checkbox" :value="opt" v-model="profileForm.desired_role" />
+                    <span class="chip-label">{{ opt }}</span>
+                  </label>
+                </div>
+              </div>
+              
+               <div class="field-group full-width">
+                <label>세부 희망 직무</label>
+                <div class="chips-container">
+                  <label v-for="opt in detailedRoleOptions" :key="opt" class="chip-item">
+                    <input type="checkbox" :value="opt" v-model="profileForm.detailed_role" />
+                    <span class="chip-label">{{ opt }}</span>
+                  </label>
+                </div>
               </div>
             </div>
+          </section>
 
-            <!-- 새 비밀번호 확인 -->
-            <div class="field-block full-width">
-              <label class="field-label">새 비밀번호 확인</label>
-              <div class="field-line" :class="{ 'error-line': showPasswordError, 'success-line': showPasswordMatch }">
+          <div class="divider"></div>
+
+          <section class="form-section">
+            <div class="toggle-header" @click="showPasswordChange = !showPasswordChange">
+              <h3 class="section-label">PASSWORD CHANGE</h3>
+              <span class="toggle-icon">{{ showPasswordChange ? '−' : '+' }}</span>
+            </div>
+            
+            <div v-if="showPasswordChange" class="password-form form-grid">
+               <div class="field-group full-width">
+                <label>현재 비밀번호</label>
+                <input v-model="currentPassword" type="password" class="input-field" placeholder="현재 사용 중인 비밀번호" />
+              </div>
+              <div class="field-group">
+                <label>새 비밀번호</label>
+                <input v-model="newPassword" type="password" class="input-field" placeholder="변경할 비밀번호" />
+              </div>
+              <div class="field-group">
+                <label>새 비밀번호 확인</label>
                 <input 
                   v-model="newPasswordConfirm" 
-                  class="field-input" 
                   type="password" 
-                  placeholder="새 비밀번호 재입력"
+                  class="input-field" 
+                  placeholder="비밀번호 재입력" 
+                  :class="{ 'error': showPasswordError, 'success': showPasswordMatch }"
                 />
+                <p v-if="showPasswordMatch" class="msg success">일치합니다</p>
+                <p v-if="showPasswordError" class="msg error">일치하지 않습니다</p>
               </div>
-              <p v-if="showPasswordMatch" class="password-hint success">비밀번호가 일치합니다.</p>
-              <p v-else-if="showPasswordError" class="password-hint error">비밀번호가 일치하지 않습니다.</p>
             </div>
-          </template>
-        </div>
+          </section>
 
-        <div class="button-group" v-if="!loading && !loadError">
-          <button 
-            type="button" 
-            class="cancel-button" 
-            @click="handleCancel"
-          >
-            취소
-          </button>
-          <button 
-            type="button" 
-            class="submit-button" 
-            :disabled="pending" 
-            @click="handleSubmit"
-          >
-            {{ pending ? "저장 중..." : "저장하기" }}
-          </button>
+          <div class="action-bar sticky-bottom">
+            <p v-if="message" :class="['status-msg', messageType]">{{ message }}</p>
+            <div class="btn-group">
+              <button type="button" class="btn ghost" @click="handleCancel">취소</button>
+              <button type="button" class="btn primary" :disabled="pending" @click="handleSubmit">
+                {{ pending ? "저장 중..." : "변경사항 저장" }}
+              </button>
+            </div>
+          </div>
         </div>
-
-        <p v-if="message" :class="['message', messageType]">
-          {{ message }}
-        </p>
-      </section>
+      </div>
     </main>
   </div>
 </template>
 
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, reactive, ref } from "vue";
 import { useRouter, RouterLink } from "vue-router";
 import { useAuth } from "../hooks/useAuth";
+import { useProfileOptions } from "../hooks/useProfileOptions";
 
-const API_BASE = import.meta.env.VITE_API_BASE || "http://localhost:8000";
+import API_BASE from "../config/apiBase";
 const router = useRouter();
 const auth = useAuth();
+const { options: optionData, fetchProfileOptions } = useProfileOptions();
 
-// 날짜 옵션
+// Date Utils
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 70 }, (_, i) => currentYear - i);
 const months = Array.from({ length: 12 }, (_, i) => i + 1);
 const days = Array.from({ length: 31 }, (_, i) => i + 1);
 
-// 상태 관리
+// State
 const loading = ref(true);
 const loadError = ref("");
 const pending = ref(false);
@@ -203,7 +262,7 @@ const message = ref("");
 const messageType = ref("info");
 const showPasswordChange = ref(false);
 
-// 폼 데이터
+// Form Data
 const username = ref("");
 const name = ref("");
 const email = ref("");
@@ -217,589 +276,481 @@ const currentPassword = ref("");
 const newPassword = ref("");
 const newPasswordConfirm = ref("");
 
-// 비밀번호 검증
-const showPasswordMatch = computed(
-  () => !!newPassword.value && !!newPasswordConfirm.value && newPassword.value === newPasswordConfirm.value
-);
+const profileForm = reactive({
+  graduated_school: "",
+  university: "",
+  major: "",
+  academic_status: "",
+  graduation_year: "",
+  career_level: "",
+  current_status: "",
+  tech_stack: [],
+  desired_role: [],
+  detailed_role: [],
+  region_single: "",
+});
 
-const showPasswordError = computed(
-  () => !!newPassword.value && !!newPasswordConfirm.value && newPassword.value !== newPasswordConfirm.value
-);
+// Options
+const graduatedOptions = computed(() => optionData.value?.graduated_school || []);
+const majorOptions = computed(() => optionData.value?.major || []);
+const academicOptions = computed(() => optionData.value?.academic_status || []);
+const careerOptions = computed(() => optionData.value?.career_level || []);
+const statusOptions = computed(() => optionData.value?.current_status || []);
+const techStackOptions = computed(() => optionData.value?.tech_stack || []);
+const desiredRoleOptions = computed(() => optionData.value?.desired_role || []);
+const detailedRoleOptions = computed(() => optionData.value?.detailed_role || []);
+const regionOptions = computed(() => optionData.value?.region || []);
 
-// 전화번호 조합
-const buildPhone = () => {
-  if (!phone1.value || !phone2.value || !phone3.value) return "";
-  return `${phone1.value}-${phone2.value}-${phone3.value}`;
+const showPasswordMatch = computed(() => !!newPassword.value && newPassword.value === newPasswordConfirm.value);
+const showPasswordError = computed(() => !!newPasswordConfirm.value && newPassword.value !== newPasswordConfirm.value);
+
+// Helpers
+const buildPhone = () => (!phone1.value || !phone2.value || !phone3.value) ? "" : `${phone1.value}-${phone2.value}-${phone3.value}`;
+const parsePhone = (str) => { if(!str) return; const p = str.split("-"); if(p.length===3) { phone1.value=p[0]; phone2.value=p[1]; phone3.value=p[2]; }};
+const buildBirthdate = () => (!birthYear.value || !birthMonth.value || !birthDay.value) ? null : `${birthYear.value}-${String(birthMonth.value).padStart(2,"0")}-${String(birthDay.value).padStart(2,"0")}`;
+const parseBirthdate = (str) => { if(!str) return; const p = str.split("-"); if(p.length===3) { birthYear.value=p[0]; birthMonth.value=parseInt(p[1],10); birthDay.value=parseInt(p[2],10); }};
+
+const mapProfileDetail = (data) => {
+  profileForm.graduated_school = data.graduated_school || "";
+  profileForm.university = data.university || "";
+  profileForm.major = data.major || "";
+  profileForm.academic_status = data.academic_status || "";
+  profileForm.graduation_year = data.graduation_year || "";
+  profileForm.career_level = data.career_level || "";
+  profileForm.current_status = data.current_status || "";
+  profileForm.tech_stack = data.tech_stack || [];
+  profileForm.desired_role = data.desired_role || [];
+  profileForm.detailed_role = data.detailed_role || [];
+  profileForm.region_single = (data.region && data.region[0]) || "";
 };
 
-// 생년월일 조합
-const buildBirthdate = () => {
-  if (!birthYear.value || !birthMonth.value || !birthDay.value) return null;
-  const month = String(birthMonth.value).padStart(2, "0");
-  const day = String(birthDay.value).padStart(2, "0");
-  return `${birthYear.value}-${month}-${day}`;
-};
-
-// 전화번호 파싱
-const parsePhone = (phoneStr) => {
-  if (!phoneStr) return;
-  const parts = phoneStr.split("-");
-  if (parts.length === 3) {
-    phone1.value = parts[0];
-    phone2.value = parts[1];
-    phone3.value = parts[2];
-  }
-};
-
-// 생년월일 파싱
-const parseBirthdate = (dateStr) => {
-  if (!dateStr) return;
-  const parts = dateStr.split("-");
-  if (parts.length === 3) {
-    birthYear.value = parts[0];
-    birthMonth.value = parseInt(parts[1], 10);
-    birthDay.value = parseInt(parts[2], 10);
-  }
-};
-
-// 회원정보 불러오기
 const loadProfile = async () => {
   loading.value = true;
   loadError.value = "";
-
   try {
-    // ✅ 먼저 세션을 한 번 검증 (만료되었으면 여기서 정리)
     const valid = await auth.ensureValidSession();
-    if (!valid) {
-      loadError.value = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
-      setTimeout(() => {
-        router.push({ name: "login", query: { redirect: "/profile/edit" } });
-      }, 1500);
-      return;
-    }
-
-    // 🔑 더 이상 localStorage 직접 보지 말고, useAuth의 token을 사용
+    if (!valid) throw new Error("로그인이 필요합니다.");
     const token = auth.token?.value;
-    if (!token) {
-      loadError.value = "로그인 정보가 없습니다. 다시 로그인해주세요.";
-      setTimeout(() => {
-        router.push({ name: "login", query: { redirect: "/profile/edit" } });
-      }, 1500);
-      return;
-    }
-
+    
+    // 1. User Info
     const res = await fetch(`${API_BASE}/api/user/profile/`, {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${token}` }
     });
-
-    if (!res.ok) {
-      if (res.status === 401) {
-        // ✅ 여기서도 진짜 401이면 세션 만료로 보고 로그인 페이지로 이동
-        loadError.value = "로그인 세션이 만료되었습니다. 다시 로그인해주세요.";
-        setTimeout(() => {
-          router.push({ name: "login", query: { redirect: "/profile/edit" } });
-        }, 1500);
-        return;
-      }
-      throw new Error("회원정보를 불러오는데 실패했습니다.");
-    }
-
+    if(!res.ok) throw new Error("회원정보 로드 실패");
     const data = await res.json();
-
     username.value = data.user_id || "";
     name.value = data.name || "";
     email.value = data.email || "";
+    parsePhone(data.phone_number);
+    parseBirthdate(data.birthdate);
 
-    if (data.phone_number) {
-      parsePhone(data.phone_number);
-    }
-    if (data.birthdate) {
-      parseBirthdate(data.birthdate);
-    }
+    // 2. Profile Detail
+    const detailRes = await fetch(`${API_BASE}/api/user/profile/detail/`, {
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    if(detailRes.ok) mapProfileDetail(await detailRes.json());
+    
   } catch (err) {
-    loadError.value =
-      err?.message || "회원정보를 불러오는 중 오류가 발생했습니다.";
+    loadError.value = err.message;
   } finally {
     loading.value = false;
   }
 };
 
-
-// 취소 버튼
 const handleCancel = () => {
-  if (confirm("수정을 취소하시겠습니까? 변경사항이 저장되지 않습니다.")) {
-    router.push("/mypage");
-  }
+  if (confirm("수정을 취소하시겠습니까?")) router.push("/mypage");
 };
 
-// 저장 버튼
 const handleSubmit = async () => {
   message.value = "";
-  messageType.value = "info";
-
-  // 필수 필드 검증
-  if (!name.value) {
-    window.alert("이름을 입력해 주세요.");
-    return;
-  }
-
-  // 비밀번호 변경 시 검증
+  if (!name.value) return alert("이름을 입력해주세요.");
+  
   if (showPasswordChange.value) {
-    if (!currentPassword.value) {
-      window.alert("현재 비밀번호를 입력해 주세요.");
-      return;
-    }
-    if (!newPassword.value) {
-      window.alert("새 비밀번호를 입력해 주세요.");
-      return;
-    }
-    if (!newPasswordConfirm.value) {
-      window.alert("새 비밀번호 확인을 입력해 주세요.");
-      return;
-    }
-    if (newPassword.value !== newPasswordConfirm.value) {
-      window.alert("새 비밀번호와 비밀번호 확인이 일치하지 않습니다.");
-      return;
-    }
+    if (!currentPassword.value || !newPassword.value) return alert("비밀번호 항목을 입력해주세요.");
+    if (newPassword.value !== newPasswordConfirm.value) return alert("새 비밀번호가 일치하지 않습니다.");
   }
 
-  const phone_number = buildPhone();
-  const birthdate = buildBirthdate();
-
-  // 수정할 데이터 준비
   const updateData = {
     name: name.value,
-    phone_number: phone_number || null,
-    birthdate: birthdate || null,
+    phone_number: buildPhone() || null,
+    birthdate: buildBirthdate() || null,
   };
-
-  // 비밀번호 변경이 있으면 추가
-  if (showPasswordChange.value && currentPassword.value && newPassword.value) {
+  
+  if (showPasswordChange.value) {
     updateData.current_password = currentPassword.value;
     updateData.new_password = newPassword.value;
   }
 
-  // ✅ 저장 전에 한 번 더 세션 갱신/검증
-  const valid = await auth.ensureValidSession();
-  if (!valid) {
-    window.alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
-    router.push({ name: "login", query: { redirect: "/profile/edit" } });
-    return;
-  }
-
-  const token = auth.token?.value;
-  if (!token) {
-    window.alert("로그인 정보가 없습니다. 다시 로그인해 주세요.");
-    router.push({ name: "login", query: { redirect: "/profile/edit" } });
-    return;
-  }
-
   pending.value = true;
   try {
+    const token = auth.token?.value;
+    // 1. Update User
     const res = await fetch(`${API_BASE}/api/user/profile/`, {
       method: "PATCH",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify(updateData),
     });
-
-    const data = await res.json().catch(() => ({}));
-
     if (!res.ok) {
-      if (res.status === 401) {
-        window.alert("로그인 세션이 만료되었습니다. 다시 로그인해 주세요.");
-        router.push({ name: "login", query: { redirect: "/profile/edit" } });
-        return;
-      }
-      const detail = data.detail || "회원정보 수정에 실패했습니다.";
-      throw new Error(detail);
+       const d = await res.json();
+       throw new Error(d.detail || "회원정보 수정 실패");
     }
 
-    message.value = "회원정보가 성공적으로 수정되었습니다.";
+    // 2. Update Profile Detail
+    const detailPayload = {
+      ...profileForm,
+      region: profileForm.region_single ? [profileForm.region_single] : []
+    };
+    const detailRes = await fetch(`${API_BASE}/api/user/profile/detail/`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(detailPayload),
+    });
+    if (!detailRes.ok) throw new Error("프로필 상세 저장 실패");
+
+    message.value = "저장되었습니다.";
     messageType.value = "success";
-
-    // 비밀번호 필드 초기화
-    currentPassword.value = "";
-    newPassword.value = "";
-    newPasswordConfirm.value = "";
     showPasswordChange.value = false;
-
-    // 2초 후 마이페이지로 이동
-    setTimeout(() => {
-      router.push("/mypage");
-    }, 2000);
+    currentPassword.value = ""; newPassword.value = ""; newPasswordConfirm.value = "";
+    
+    setTimeout(() => router.push("/mypage"), 1000);
   } catch (err) {
-    message.value = err?.message || "회원정보 수정 중 오류가 발생했습니다.";
+    message.value = err.message;
     messageType.value = "error";
   } finally {
     pending.value = false;
   }
 };
 
-// 컴포넌트 마운트 시 회원정보 로드
 onMounted(() => {
+  fetchProfileOptions();
   loadProfile();
 });
 </script>
 
 <style scoped>
-@import url("https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;900&display=swap");
 
 .profile-edit-page {
   min-height: 100vh;
-  background: #f6f5ef;
-  font-family: "Nunito", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: #f8f4eb;
+  font-family: "Inter", sans-serif;
   color: #111827;
-  display: flex;
-  flex-direction: column;
+  position: relative;
 }
 
-.profile-header {
+/* 배경 그리드 */
+.bg-grid {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  z-index: 0;
+  background-size: 40px 40px;
+  background-image:
+    linear-gradient(to right, rgba(0, 0, 0, 0.05) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 0, 0, 0.05) 1px, transparent 1px);
+  mask-image: linear-gradient(to bottom, black 40%, transparent 100%);
+  pointer-events: none;
+}
+
+/* 헤더 */
+.page-header {
+  position: relative;
+  z-index: 10;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20px 32px;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 30px 40px;
 }
 
-.brand {
+.nav-logo {
+  font-family: "Inter", sans-serif;
+  font-weight: 900;
+  font-size: 28px;
+  color: #000;
   text-decoration: none;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
 }
 
-.brand-mark {
-  display: inline-block;
-  padding: 8px 18px;
-  border-radius: 999px;
-  background: linear-gradient(135deg, #111827, #1f2937);
-  color: #f9fafb;
-  font-size: 18px;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-
-.page-label {
-  margin: 0;
-  font-size: 14px;
-  font-weight: 600;
-  color: #6b7280;
-}
-
-.profile-main {
-  flex: 1;
-  display: flex;
+.nav-back-btn {
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
-  padding: 40px 16px 60px;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #4b5563;
+  text-decoration: none;
+  padding: 8px 16px;
+  border-radius: 8px;
+  transition: all 0.2s;
 }
-
-.card {
-  width: 100%;
-  max-width: 980px;
-  background: #f8f6ee;
-  border-radius: 16px;
-  padding: 56px 52px 64px;
-  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
-}
-
-.title {
-  margin: 0 0 40px;
-  text-align: center;
-  font-size: 48px;
-  font-weight: 800;
+.nav-back-btn:hover {
+  background: rgba(0,0,0,0.05);
   color: #111827;
 }
 
-.loading-message,
-.error-message {
-  text-align: center;
-  padding: 40px 20px;
-  font-size: 16px;
-  color: #6b7280;
+/* 메인 컨텐츠 */
+.edit-content {
+  position: relative;
+  z-index: 1;
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 0 20px 80px;
 }
 
-.error-message {
-  color: #dc2626;
+/* 카드 스타일 */
+.stylized-card {
+  background: #ffffff;
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  box-shadow: 0 20px 48px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.card-header {
+  padding: 40px 40px 24px;
+  border-bottom: 1px solid #f3f4f6;
+  text-align: center;
+}
+
+.title {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: #6b7280;
+  font-size: 15px;
+}
+
+.form-body {
+  padding: 40px;
+}
+
+/* 폼 섹션 */
+.form-section {
+  margin-bottom: 32px;
+}
+
+.section-label {
+  font-size: 12px;
+  font-weight: 800;
+  color: #9ca3af;
+  letter-spacing: 0.05em;
+  margin: 0 0 20px;
+  text-transform: uppercase;
 }
 
 .form-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  column-gap: 72px;
-  row-gap: 24px;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 24px;
 }
 
-.field-block {
+.field-group {
   display: flex;
   flex-direction: column;
-  gap: 6px;
-}
-
-.field-block.full-width {
-  grid-column: 1 / -1;
-}
-
-.field-label {
-  font-size: 16px;
-  font-weight: 800;
-  color: #111827;
-}
-
-.field-line {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  border-bottom: 2px solid #111827;
-  padding-bottom: 6px;
-  transition: border-color 0.2s ease;
-}
-
-.field-line.readonly {
-  border-bottom-color: #d1d5db;
-  background: #f3f4f6;
-  padding: 8px 12px;
-  border-radius: 8px;
-}
-
-.field-line:focus-within {
-  border-bottom-color: #84b091;
-}
-
-.field-input {
-  flex: 1;
-  border: none;
-  background: transparent;
-  outline: none;
-  font-size: 14px;
-  font-family: inherit;
-  color: #111827;
-}
-
-.field-input:disabled {
-  color: #9ca3af;
-  cursor: not-allowed;
-}
-
-.phone-line {
   gap: 8px;
 }
+.field-group.full-width { grid-column: 1 / -1; }
 
-.phone-input {
-  flex: 0 0 70px;
-  text-align: center;
-}
-
-.hyphen {
-  flex: 0 0 auto;
-  color: #6b7280;
-}
-
-.hint-text {
-  margin: 4px 0 0;
-  font-size: 12px;
-  color: #6b7280;
-}
-
-.hint-text.success {
-  color: #16a34a;
-}
-
-.hint-text.error {
-  color: #dc2626;
-}
-
-.password-hint {
-  margin: 4px 0 0;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.password-hint.success {
-  color: #16a34a;
-}
-
-.password-hint.error {
-  color: #dc2626;
-}
-
-.error-line {
-  border-bottom-color: #dc2626;
-}
-
-.success-line {
-  border-bottom-color: #16a34a;
-}
-
-.birth-row {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-}
-
-.birth-select {
-  flex: 1;
-  min-width: 0;
-  border-radius: 8px;
-  border: 1px solid #d1d5db;
-  padding: 8px 12px;
-  font-size: 14px;
-  background: #ffffff;
-  font-family: inherit;
-  cursor: pointer;
-}
-
-.password-section {
-  margin-top: 16px;
-  padding-top: 24px;
-  border-top: 2px solid #e5e7eb;
-}
-
-.section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-
-.toggle-button {
-  padding: 6px 16px;
-  border-radius: 999px;
-  border: 1px solid #d1d5db;
-  background: #ffffff;
-  color: #111827;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.toggle-button:hover {
-  background: #f3f4f6;
-  border-color: #9ca3af;
-}
-
-.button-group {
-  display: flex;
-  justify-content: center;
-  gap: 16px;
-  margin-top: 40px;
-}
-
-.cancel-button,
-.submit-button {
-  padding: 12px 32px;
-  border-radius: 999px;
-  border: none;
-  font-size: 16px;
+.field-group label {
+  font-size: 13px;
   font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.cancel-button {
-  background: #e5e7eb;
   color: #374151;
 }
 
-.cancel-button:hover {
-  background: #d1d5db;
+/* Input Styles */
+.input-field {
+  width: 100%;
+  padding: 12px 14px;
+  border-radius: 12px;
+  border: 1px solid #e5e7eb;
+  font-family: inherit;
+  font-size: 14px;
+  background: #ffffff;
+  color: #111827;
+  transition: all 0.2s;
+  box-sizing: border-box;
 }
 
-.submit-button {
-  background: linear-gradient(135deg, #111827, #1f2937);
-  color: #f9fafb;
-  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.25);
+.input-field:focus {
+  outline: none;
+  border-color: #111827;
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.08);
 }
 
-.submit-button:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.35);
+.input-field.readonly {
+  background: #f9fafb;
+  color: #6b7280;
+  border-color: #f3f4f6;
+  cursor: not-allowed;
 }
 
-.submit-button:active {
-  transform: translateY(0);
+.field-hint {
+  font-size: 12px;
+  color: #9ca3af;
 }
 
-.submit-button:disabled {
+.select-wrapper {
+  position: relative;
+}
+
+/* Multi Input Row (Phone, Birth) */
+.multi-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.multi-input-row .input-field {
+  flex: 1;
+}
+.center-text { text-align: center; }
+.separator { font-weight: 700; color: #d1d5db; }
+
+/* Chips / Checkboxes */
+.chips-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip-item {
+  position: relative;
+  cursor: pointer;
+}
+
+.chip-item input {
+  position: absolute;
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.chip-label {
+  display: inline-block;
+  padding: 8px 16px;
+  border-radius: 8px;
+  background: #ffffff;
+  border: 1px solid #d1d5db;
+  font-size: 13px;
+  font-weight: 600;
+  color: #4b5563;
+  transition: all 0.2s;
+}
+
+.chip-item:hover .chip-label {
+  border-color: #9ca3af;
+  background: #f9fafb;
+}
+
+.chip-item input:checked + .chip-label {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+  box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* Password Toggle */
+.toggle-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  cursor: pointer;
+  padding-bottom: 10px;
+  border-bottom: 1px dashed #e5e7eb;
+}
+.toggle-header h3 { margin: 0; }
+.toggle-icon { font-size: 24px; font-weight: 300; color: #9ca3af; }
+.password-form { margin-top: 24px; padding: 20px; background: #f9fafb; border-radius: 12px; }
+
+.msg { font-size: 12px; margin-top: 4px; font-weight: 600; }
+.msg.success { color: #059669; }
+.msg.error { color: #dc2626; }
+.input-field.error { border-color: #dc2626; }
+.input-field.success { border-color: #059669; }
+
+/* Sticky Action Bar */
+.action-bar {
+  position: sticky;
+  bottom: 0;
+  background: #ffffff;
+  padding: 20px 0 0;
+  margin-top: 40px;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.sticky-bottom { z-index: 5; }
+
+.status-msg {
+  font-size: 13px;
+  font-weight: 600;
+}
+.status-msg.success { color: #059669; }
+.status-msg.error { color: #dc2626; }
+
+.btn-group {
+  margin-left: auto;
+  display: flex;
+  gap: 12px;
+}
+
+.btn {
+  padding: 12px 24px;
+  border-radius: 999px;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.btn.ghost {
+  background: transparent;
+  color: #6b7280;
+}
+.btn.ghost:hover {
+  background: #f3f4f6;
+  color: #111827;
+}
+
+.btn.primary {
+  background: #111827;
+  color: #ffffff;
+}
+.btn.primary:hover {
+  background: #000000;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+.btn.primary:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   transform: none;
-  box-shadow: none;
 }
 
-.message {
-  margin-top: 24px;
-  padding: 12px 20px;
-  border-radius: 8px;
-  text-align: center;
-  font-size: 14px;
-  font-weight: 600;
+.divider { height: 1px; background: #f3f4f6; margin: 32px 0; }
+
+/* Loading */
+.loading-state { text-align: center; padding: 60px; color: #9ca3af; }
+.spinner {
+  width: 30px; height: 30px; border: 3px solid #e5e7eb; border-top-color: #111827;
+  border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 16px;
 }
+@keyframes spin { to { transform: rotate(360deg); } }
 
-.message.success {
-  background: #d1fae5;
-  color: #065f46;
-  border: 1px solid #10b981;
-}
-
-.message.error {
-  background: #fee2e2;
-  color: #991b1b;
-  border: 1px solid #dc2626;
-}
-
-.message.info {
-  background: #dbeafe;
-  color: #1e40af;
-  border: 1px solid #3b82f6;
-}
-
-@media (max-width: 768px) {
-  .card {
-    padding: 40px 24px 48px;
-  }
-
-  .form-grid {
-    grid-template-columns: 1fr;
-    column-gap: 0;
-  }
-
-  .title {
-    font-size: 36px;
-  }
-
-  .button-group {
-    flex-direction: column;
-  }
-
-  .cancel-button,
-  .submit-button {
-    width: 100%;
-  }
-}
-
-@media (max-width: 480px) {
-  .profile-header {
-    padding: 16px 20px;
-  }
-
-  .brand-mark {
-    font-size: 16px;
-    padding: 6px 14px;
-  }
-
-  .card {
-    padding: 32px 20px 40px;
-    border-radius: 12px;
-  }
-
-  .title {
-    font-size: 28px;
-  }
+/* Mobile */
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+  .card-header, .form-body { padding: 24px; }
+  .page-header { padding: 20px; }
+  .action-bar { flex-direction: column; gap: 16px; align-items: stretch; }
+  .btn-group { margin-left: 0; justify-content: stretch; }
+  .btn { width: 100%; }
 }
 </style>

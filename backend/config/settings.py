@@ -9,10 +9,18 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 env_path = BASE_DIR.parent / ".env"
 load_dotenv(env_path)
 
-SECRET_KEY = os.getenv("DJANGO_SECRET_KEY", "development-secret-key")
-DEBUG = os.getenv("DJANGO_DEBUG", "true").lower() == "true"
-ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if os.getenv("DJANGO_ALLOWED_HOSTS") else []
+def _get_env_any(*names: str) -> str:
+    for name in names:
+        value = os.getenv(name)
+        if value:
+            return value
+    raise RuntimeError(f"Missing required env var(s): {', '.join(names)}")
 
+
+SECRET_KEY = _get_env_any("DJANGO_SECRET_KEY")
+DEBUG = os.getenv("DJANGO_DEBUG", "").lower() == "true"
+ALLOWED_HOSTS = os.getenv("DJANGO_ALLOWED_HOSTS", "").split(",") if os.getenv("DJANGO_ALLOWED_HOSTS") else []
+FRONTEND_BASE_URL = _get_env_any("FRONTEND_BASE_URL")
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -24,6 +32,8 @@ INSTALLED_APPS = [
     "rest_framework",
     "api",
     "anti_cheat",
+    "graph_sync.apps.GraphSyncConfig",
+    "planner",
 ]
 
 MIDDLEWARE = [
@@ -59,11 +69,11 @@ WSGI_APPLICATION = "config.wsgi.application"
 ASGI_APPLICATION = "config.asgi.application"
 
 # DB 설정을 환경변수에서 유연하게 가져오도록 POSTGRES_*와 DB_*를 모두 지원
-DB_NAME = os.getenv("POSTGRES_DB") or os.getenv("DB_NAME", "jobtory")
-DB_USER = os.getenv("POSTGRES_USER") or os.getenv("DB_USER", "gyulcross")
-DB_PASSWORD = os.getenv("POSTGRES_PASSWORD") or os.getenv("DB_PASSWORD", "gyulcross0113")
-DB_HOST = os.getenv("POSTGRES_HOST") or os.getenv("DB_HOST", "localhost")
-DB_PORT = os.getenv("POSTGRES_PORT") or os.getenv("DB_PORT", "5432")
+DB_NAME = _get_env_any("POSTGRES_DB", "DB_NAME")
+DB_USER = _get_env_any("POSTGRES_USER", "DB_USER")
+DB_PASSWORD = _get_env_any("POSTGRES_PASSWORD", "DB_PASSWORD")
+DB_HOST = _get_env_any("POSTGRES_HOST", "DB_HOST")
+DB_PORT = _get_env_any("POSTGRES_PORT", "DB_PORT")
 
 DATABASES = {
     "default": {
@@ -93,7 +103,9 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOW_ALL_ORIGINS = True
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOW_CREDENTIALS = True
+CORS_ALLOWED_ORIGINS = [FRONTEND_BASE_URL]
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": [
@@ -118,7 +130,7 @@ REST_FRAMEWORK = {
     },
 }
 
-ELASTICSEARCH_HOST = os.getenv("ELASTICSEARCH_HOST", "http://localhost:9200")
+ELASTICSEARCH_HOST = _get_env_any("ELASTICSEARCH_HOST")
 
 # Email 설정 (기본은 콘솔 출력)
 EMAIL_BACKEND = os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
@@ -132,12 +144,11 @@ DEFAULT_FROM_EMAIL = os.getenv("DEFAULT_FROM_EMAIL", EMAIL_HOST_USER or "no-repl
 # Google OAuth 설정
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-# 개발 기본 포트를 실제 프론트 주소(5174)에 맞춰 둡니다.
-FRONTEND_BASE_URL = os.getenv("FRONTEND_BASE_URL", "http://localhost:5174")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", f"{FRONTEND_BASE_URL}/login")
+# Google OAuth redirect
+GOOGLE_REDIRECT_URI = _get_env_any("GOOGLE_REDIRECT_URI")
 
 # Cache 설정 (Redis 사용)
-REDIS_URL = os.getenv("REDIS_URL", "redis://127.0.0.1:6379/0")
+REDIS_URL = _get_env_any("REDIS_URL")
 
 CACHES = {
     "default": {

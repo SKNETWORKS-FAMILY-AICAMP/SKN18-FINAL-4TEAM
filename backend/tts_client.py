@@ -27,8 +27,10 @@ TTS_VOICE = os.getenv("TTS_VOICE", "nova")
 # 약간 빠른 재생 속도 (실제 생성 시간에도 소폭 영향)
 TTS_SPEED = float(os.getenv("TTS_SPEED", "1.1"))
 
-# 한 번에 생성할 최대 문장 수 (너무 긴 인트로로 인한 지연 방지)
-TTS_MAX_SENTENCES = int(os.getenv("TTS_MAX_SENTENCES", "4"))
+# 한 번에 생성할 최대 문장 수
+# 0 이하이면 기본적으로 제한을 두지 않고,
+# 호출 측에서 config.max_sentences 로 명시적으로 제한할 때만 잘라냅니다.
+TTS_MAX_SENTENCES = int(os.getenv("TTS_MAX_SENTENCES", "0"))
 
 
 def split_into_sentences(text: str) -> list[str]:

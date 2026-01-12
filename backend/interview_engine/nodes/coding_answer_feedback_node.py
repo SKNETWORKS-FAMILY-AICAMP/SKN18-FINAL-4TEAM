@@ -5,7 +5,7 @@ from interview_engine.state import CodingState
 
 ANSWER_FEEDBACK_MESSAGES = [
     "아, 그렇게 생각하셨군요. 답변 잘 들었습니다. 이제 다시 문제 풀이에 집중해 주세요.",
-    "좋은 설명 감사합니다. 말씀해 주신 내용을 바탕으로 계속 코드를 개선해 보겠습니다. 다시 문제 풀이를 이어가 주세요.",
+    "좋은 설명 감사합니다. 말씀해 주신 내용을 바탕으로 계속 코드를 개선해 주세요. 다시 문제 풀이를 이어가 주세요.",
     "네, 이해했습니다. 지금 말씀해 주신 방향대로 코드를 정리해 보면서 문제를 계속 풀어 보시면 좋겠습니다.",
 ]
 
@@ -29,4 +29,9 @@ def coding_answer_feedback_agent(state: CodingState) -> CodingState:
 
     state["user_answers"] = user_answers
     state["tts_text"] = message
+    # Redis checkpointer(thread) 기준으로 state가 누적되기 때문에,
+    # event_type을 question_answer로 남겨두면 다음 tick(질문 생성) 호출에서
+    # 엔트리가 잘못 분기되어 다시 이 노드가 실행될 수 있다.
+    # 답변 리액션 이후에는 코딩 진행(tick) 상태로 되돌린다.
+    state["event_type"] = "coding_tick"
     return state

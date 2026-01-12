@@ -448,11 +448,11 @@ JobTory는 단순한 정답 확인을 넘어 **3가지 핵심 역량**을 자동
 ```text
 SKN18-FINAL-4TEAM/
 ├── backend/                  # Django + LangGraph 백엔드
-│   ├── anti_cheat/           # LangGraph 그래프/노드 정의
+│   ├── anti_cheat/           # Vision 기반 부정행위 감지 파이프라인
 │   ├── api/                  # REST API (livecoding, STT/TTS, 인증 등)
-│   ├── graph_sync/           # 그래프 db
+│   ├── graph_sync/           # 문제 추천을 위한 GraphDB/검색 동기화 파이프라인
 │   ├── interview_engine/     # LangGraph 그래프/노드 정의
-│   ├── planner/              # 학습플래너
+│   ├── planner/              # 성장 리포트 및 학습 코치 파이프라인
 │   ├── stt/                  # STT 파이프라인
 │   ├── tts_client.py         # TTS 유틸리티 
 │   └── ...                   # 설정, 모델 등
